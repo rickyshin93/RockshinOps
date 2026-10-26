@@ -361,5 +361,6 @@
   "GPU memory unavailable": "GPU 内存计数不可用",
   "Invalid GPU counters": "GPU 计数无效",
   "CPU counters unavailable": "CPU 计数不可用",
-  "%s counters unavailable": "%s 计数不可用"
+  "%s counters unavailable": "%s 计数不可用",
+  "运行摘要": "LocalOps {{version}} · 指标每 {{metrics}} 秒 · 进程每 {{processes}} 秒 · 历史仅保留本次运行最近 {{hours}} 小时"
 }

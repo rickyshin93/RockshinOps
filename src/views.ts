@@ -69,7 +69,7 @@ export function navigation(): string {
 }
 
 export function actionControls(state: ViewState): string {
-  if (state.page === "settings") return '<span class="settings-shortcut">⌘,</span>';
+  if (state.page === "settings") return `<span class="settings-shortcut">${isMac(state) ? "⌘," : "Ctrl+,"}</span>`;
   const ranges = [[60, t("1 分钟")], [300, t("5 分钟")], [900, t("15 分钟")], [3600, t("1 小时")]] as const;
   const history = metricPages.includes(state.page) ? `<div class="segmented" role="group" aria-label="${t("历史时间范围")}">${ranges.map(([seconds, label]) => `<button data-range="${seconds}" class="${state.range === seconds ? "selected" : ""}" aria-pressed="${state.range === seconds}">${label}</button>`).join("")}</div><button class="icon-button pause-button ${state.paused ? "selected" : ""}" data-action="pause" aria-label="${state.paused ? t("恢复实时视图") : t("暂停实时视图")}" title="${state.paused ? t("恢复实时视图") : t("暂停视图，菜单栏继续采集")}">${icon(state.paused ? "play" : "pause")}</button>` : "";
   return `${history}<button class="icon-button" data-action="refresh" ${state.busy ? 'aria-disabled="true" aria-busy="true"' : ""} aria-label="${state.page === "cleanup" ? t("重新扫描") : t("立即刷新")}" title="${state.page === "cleanup" ? t("重新扫描") : t("立即刷新")}">${icon("refresh")}</button>`;

@@ -60,7 +60,7 @@ function render(filters = false) {
   if (focusKey) for (const button of focusArea!.querySelectorAll<HTMLElement>("button")) {
     if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.process, button.dataset.metric].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
   }
-  el("page-footer").textContent = state.info ? `LocalOps ${state.info.version} ${t("· 指标每")} ${state.info.refreshSeconds} ${t("秒 · 进程每")} ${state.info.processRefreshSeconds} ${t("秒 · 历史仅保留本次运行最近")} ${state.info.historySeconds / 3600} ${t("小时")}` : t("LocalOps · 数据仅在本机读取");
+  el("page-footer").textContent = state.info ? t("运行摘要", { version: state.info.version, metrics: state.info.refreshSeconds, processes: state.info.processRefreshSeconds, hours: state.info.historySeconds / 3600 }) : t("LocalOps · 数据仅在本机读取");
   for (const button of el("navigation").querySelectorAll<HTMLButtonElement>("button")) {
     if (button.dataset.page === state.page) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
