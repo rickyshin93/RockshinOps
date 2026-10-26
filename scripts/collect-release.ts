@@ -15,5 +15,8 @@ for (const suffix of suffixes[target]!) {
   if (!files.some(file => file.endsWith(suffix))) throw new Error(`Missing ${suffix} package in ${directory}`);
 }
 mkdirSync("release-files", { recursive: true });
-for (const file of files) copyFileSync(join(directory, file), join("release-files", file));
-console.log(`Collected ${target}: ${files.join(", ")}`);
+const assetNames = files.map(file => file.replaceAll(" ", "."));
+for (const [index, file] of files.entries()) {
+  copyFileSync(join(directory, file), join("release-files", assetNames[index]!));
+}
+console.log(`Collected ${target}: ${assetNames.join(", ")}`);
