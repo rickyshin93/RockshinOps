@@ -2,6 +2,7 @@
 
 ## Doing
 
+- 2026-10-27: Building and publishing the bilingual promotional website on GitHub Pages; English default, responsive technology-inspired design and links to released installers. Acceptance: goals/2026-10-27-public-website.md.
 - 2026-10-27: Final native tray appearance regression remains unverified: the menu-bar preview tool returns an old cached image. Sampling, preferences, language persistence, window close/reopen, Lucide rendering and native App icons are verified.
 
 ## Next

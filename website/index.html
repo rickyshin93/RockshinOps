@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b12">
+  <meta name="description" content="A clear view of your computer. LocalOps is an open-source desktop monitor for macOS, Windows and Linux.">
+  <meta property="og:title" content="LocalOps — Your machine. In the clear.">
+  <meta property="og:description" content="Real system activity. One quiet place. An open-source desktop monitor for macOS, Windows and Linux.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://rickyshin93.github.io/local-ops/">
+  <meta property="og:image" content="https://rickyshin93.github.io/local-ops/assets/localops-brand/overview-en.jpg">
+  <link rel="canonical" href="https://rickyshin93.github.io/local-ops/">
+  <link rel="icon" href="assets/localops-brand/icon.png">
+  <link rel="preload" href="assets/space-grotesk.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <title>LocalOps — Your machine. In the clear.</title>
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+  <header class="header wrap">
+    <a class="brand" href="./" aria-label="LocalOps home"><img src="assets/localops-brand/icon.png" width="38" height="38" alt=""><span>LocalOps</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#features" data-i18n="navFeatures">Features</a>
+      <a href="#download" data-i18n="navDownload">Download</a>
+      <a class="source-link" href="https://github.com/rickyshin93/local-ops">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+    <button class="language" id="language" type="button" aria-label="切换为中文"><span aria-hidden="true">文 / A</span><span id="language-label">中文</span></button>
+  </header>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="orbital" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
+      <a class="release" href="https://github.com/rickyshin93/local-ops/releases/tag/v0.2.0"><span class="status-dot"></span><span data-i18n="release">V0.2.0 IS HERE</span><span class="release-divider"></span><span data-i18n="releaseNote">Meet your machine</span><span aria-hidden="true">↗</span></a>
+      <h1 id="hero-title"><span data-i18n="hero1">Your machine.</span><br><span class="quiet" data-i18n="hero2">In the clear.</span></h1>
+      <p class="hero-copy" data-i18n="heroCopy">From a busy CPU to a filling disk. See what your computer is doing, in one quiet place.</p>
+      <div class="hero-actions"><a class="button primary" href="#download"><span data-i18n="getApp">Get LocalOps</span><span aria-hidden="true">↓</span></a><a class="button secondary" href="https://github.com/rickyshin93/local-ops"><span data-i18n="exploreSource">Explore the source</span><span aria-hidden="true">↗</span></a></div>
+      <p class="availability"><span data-i18n="free">Free & open source</span><span aria-hidden="true">/</span><span>macOS · Windows · Linux</span></p>
+      <figure class="product">
+        <div class="product-top"><span><i class="status-dot"></i><span data-i18n="consoleLabel">A LITTLE CLARITY, AT A GLANCE</span></span><span>LOCALOPS / 0.2</span></div>
+        <div class="product-image"><img id="product-image" src="assets/localops-brand/overview-en.jpg" width="1200" height="590" fetchpriority="high" alt="LocalOps overview showing CPU, memory, GPU, disk, network and battery panels with demonstration data."></div>
+        <figcaption><span data-i18n="caption">Actual macOS interface · Demonstration data</span><button id="motion" type="button" aria-pressed="false" data-i18n="pauseMotion">Pause animation</button></figcaption>
+      </figure>
+    </section>
+
+    <section class="principles wrap" aria-label="Product principles">
+      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle1">Native system counters</span></div>
+      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle2">No account required</span></div>
+      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle3">Read-only by design</span></div>
+      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle4">English & Chinese</span></div>
+    </section>
+
+    <section class="features wrap section" id="features" aria-labelledby="features-title">
+      <div class="section-heading"><div><p class="eyebrow" data-i18n="featuresEyebrow">01 / UNDER THE SURFACE</p><h2 id="features-title"><span data-i18n="featuresTitle1">Less guessing.</span><br><span class="quiet" data-i18n="featuresTitle2">More knowing.</span></h2></div><p class="section-intro" data-i18n="featuresIntro">The details you need, without the noise. Go from an at-a-glance reading to the activity behind it.</p></div>
+      <div class="feature-grid">
+        <article class="feature feature-signal">
+          <div class="feature-index">01 <span data-i18n="monitorLabel">OBSERVE</span></div>
+          <h3 data-i18n="monitorTitle">See the whole picture.</h3><p data-i18n="monitorCopy">CPU, memory, disk and network, together. Explore per-core activity and up to an hour of in-session history.</p>
+          <div class="signal-art" aria-hidden="true"><div class="signal-lines"></div><div class="signal-scan"></div><div class="signal-center"><img src="assets/localops-brand/icon.png" width="72" height="72" alt=""></div><span class="signal-node n1">CPU</span><span class="signal-node n2">MEM</span><span class="signal-node n3">I/O</span><span class="signal-node n4">NET</span></div>
+          <div class="feature-foot"><span data-i18n="monitorFoot">ONE VIEW. SIX HARDWARE PANELS.</span><span aria-hidden="true">↗</span></div>
+        </article>
+        <div class="feature-stack">
+          <article class="feature compact"><div class="feature-index">02 <span data-i18n="inspectLabel">UNDERSTAND</span></div><h3 data-i18n="inspectTitle">Find what is busy.</h3><p data-i18n="inspectCopy">Inspect processes, group activity by app, and see open connections. Follow the resource usage back to its source.</p><div class="tag-row"><span data-i18n="processTag">Processes</span><span data-i18n="appsTag">Apps</span><span>TCP / UDP</span></div></article>
+          <article class="feature compact"><div class="feature-index">03 <span data-i18n="spaceLabel">MAKE SENSE OF SPACE</span></div><h3 data-i18n="spaceTitle">Know where it goes.</h3><p data-i18n="spaceCopy">Explore the size of caches, logs and downloads. Understand your disk usage with read-only analysis that leaves your files alone.</p><div class="space-bar" aria-hidden="true"><i></i><i></i><i></i><i></i></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="quiet-section wrap" aria-labelledby="quiet-title"><div class="quiet-mark" aria-hidden="true">[ L / O ]</div><div><p class="eyebrow" data-i18n="quietEyebrow">BUILT TO STAY OUT OF YOUR WAY</p><h2 id="quiet-title" data-i18n="quietTitle">Close the window. Keep the signal.</h2><p data-i18n="quietCopy">Keep your chosen metrics in the menu bar. Native sampling continues when the window is hidden, ready when you come back.</p></div><a class="text-link" href="https://github.com/rickyshin93/local-ops#features"><span data-i18n="allFeatures">All features</span> <span aria-hidden="true">↗</span></a></section>
+
+    <section class="download section wrap" id="download" aria-labelledby="download-title">
+      <div class="section-heading"><div><p class="eyebrow" data-i18n="downloadEyebrow">02 / YOUR NEXT CLEAR VIEW</p><h2 id="download-title" data-i18n="downloadTitle">Make yourself at home.</h2></div><p class="section-intro" data-i18n="downloadIntro">Choose your platform. No account, subscription or cloud dashboard to set up.</p></div>
+      <div class="download-grid">
+        <article class="download-card"><span class="os-symbol" aria-hidden="true">⌘</span><div class="os-title"><h3>macOS</h3><span>.DMG</span></div><p data-i18n="macDesc">Apple Silicon & Intel</p><a class="download-link" href="https://github.com/rickyshin93/local-ops/releases/download/v0.2.0/LocalOps.0.2.0.arm64.dmg"><span>Apple Silicon</span><span aria-hidden="true">↓</span></a><a class="download-link" href="https://github.com/rickyshin93/local-ops/releases/download/v0.2.0/LocalOps.0.2.0.amd64.dmg"><span>Intel</span><span aria-hidden="true">↓</span></a><p class="install-note" data-i18n="macNote">Ad-hoc signed. Not notarized.</p></article>
+        <article class="download-card"><span class="os-symbol windows-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></span><div class="os-title"><h3>Windows</h3><span>.EXE</span></div><p data-i18n="winDesc">For x86_64 PCs</p><a class="download-link" href="https://github.com/rickyshin93/local-ops/releases/download/v0.2.0/LocalOps.Setup.0.2.0.amd64.exe"><span data-i18n="winDownload">Download installer</span><span aria-hidden="true">↓</span></a><p class="install-note" data-i18n="winNote">Unsigned installer. Requires WebView2.</p></article>
+        <article class="download-card"><span class="os-symbol terminal-symbol" aria-hidden="true">&gt;_</span><div class="os-title"><h3>Linux</h3><span>X86_64</span></div><p data-i18n="linuxDesc">For your desktop of choice</p><a class="download-link" href="https://github.com/rickyshin93/local-ops/releases/download/v0.2.0/localops_0.2.0_amd64.deb"><span>Debian / Ubuntu <small>.deb</small></span><span aria-hidden="true">↓</span></a><a class="download-link" href="https://github.com/rickyshin93/local-ops/releases/download/v0.2.0/localops-0.2.0-linux-amd64.tar.gz"><span data-i18n="linuxArchive">Linux archive</span><span><small>.tar.gz</small> ↓</span></a><p class="install-note" data-i18n="linuxNote">GTK 3, WebKitGTK 4.1 and a desktop tray required.</p></article>
+      </div>
+      <div class="release-links"><span data-i18n="version">CURRENT RELEASE — V0.2.0</span><div><a href="https://github.com/rickyshin93/local-ops/releases/tag/v0.2.0" data-i18n="releaseDetails">Release notes & installation</a><a href="https://github.com/rickyshin93/local-ops/releases/download/v0.2.0/SHA256SUMS.txt" data-i18n="checksums">SHA-256 checksums</a></div></div>
+      <p class="platform-note" data-i18n="platformNote">Core collectors are tested on all four build targets. Desktop interaction is verified on macOS Apple Silicon; Windows/Linux desktop and battery/GPU hardware coverage are still in progress. Available GPU and power readings depend on your hardware and drivers.</p>
+    </section>
+
+    <section class="faq wrap" aria-labelledby="faq-title"><div><p class="eyebrow" data-i18n="faqEyebrow">A FEW DETAILS</p><h2 id="faq-title" data-i18n="faqTitle">Good to know.</h2></div><div class="questions">
+      <details><summary data-i18n="faq1">Does LocalOps need a cloud account?</summary><p data-i18n="answer1">No. LocalOps reads system metrics locally. History is held in memory for the current session. There is no account or hosted monitoring service to configure.</p></details>
+      <details><summary data-i18n="faq2">Will space analysis delete my files?</summary><p data-i18n="answer2">No. Analysis is read-only. LocalOps does not delete files, uninstall apps or terminate processes. Reported sizes are logical file sizes, not a promise of reclaimable space.</p></details>
+      <details><summary data-i18n="faq3">Can I use it in Chinese?</summary><p data-i18n="answer3">Yes. The app follows your system language by default. Choose System default, 中文 or English in Settings and save to persist your preference.</p></details>
+      <details><summary data-i18n="faq4">Can I look under the hood?</summary><p><span data-i18n="answer4">Absolutely. LocalOps is MIT-licensed and built with Go, MyGo and TypeScript.</span> <a href="https://github.com/rickyshin93/local-ops" data-i18n="readCode">Read the code on GitHub ↗</a></p></details>
+    </div></section>
+  </main>
+  <footer class="footer wrap"><a class="brand" href="./"><img src="assets/localops-brand/icon.png" width="32" height="32" alt=""><span>LocalOps</span></a><p data-i18n="footerLine">Your computer. A little more understood.</p><div><a href="https://github.com/rickyshin93/local-ops">GitHub ↗</a><a href="https://github.com/rickyshin93/local-ops/blob/main/LICENSE" data-i18n="license">MIT License</a></div><span class="copyright">© 2026 LocalOps</span></footer>
+</body>
+</html>

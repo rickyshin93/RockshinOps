@@ -1,5 +1,9 @@
 # LocalOps 设计规范
 
+## Public website
+
+The standalone promotional site in `website/` uses an instrument-inspired dark presentation: near-black #080b12, cool white #f1f4fc and blue #659dff. Large editorial headings, an 8px spacing rhythm, thin grid rules and restrained signal motion frame the actual light desktop UI. This does not change the app's design system below. Use the existing `resources/icon.png` brand icon (copied under `website/assets/localops-brand/`). Product screenshots render the real app components with synthetic demonstration data, labeled in the page; no local device identity or private process information is published. Motion respects reduced-motion preferences. Typography uses locally served Space Grotesk for English display text, system Chinese fallbacks, and the app's existing system body stack.
+
 方向：**macOS 原生**。参照 Finder / 系统设置（侧栏）、健康 App（指标卡片）、活动监视器（表格）。2026-10-27 起取代「活泼橙色」与「中性克制」两版。
 
 `src/style.css` 的 `:root` 是 token 的唯一实现；本文件是规则。改规则先改本文件，再改 CSS。不在下表里的值不准出现在 CSS 里。

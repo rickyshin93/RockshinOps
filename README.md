@@ -5,7 +5,7 @@
 
 A local desktop system monitor built with **Go, MyGo and TypeScript**. Keep useful metrics in the menu bar, inspect live activity, and see what takes up disk space.
 
-[简体中文](README.zh-CN.md) · [Download](https://github.com/rickyshin93/local-ops/releases) · [Project status](STATUS.md)
+[Website](https://rickyshin93.github.io/local-ops/) · [简体中文](README.zh-CN.md) · [Download](https://github.com/rickyshin93/local-ops/releases) · [Project status](STATUS.md)
 
 ## Platform status
 
@@ -98,6 +98,7 @@ Data is read locally. No analytics, remote upload, privileged helper or HTTP IPC
 
 ## Source layout
 
+- `website/`: bilingual static promotional site, deployed to GitHub Pages by `pages.yml`. English is the default; `?lang=zh` selects Chinese. Preview with `python3 -m http.server 4177 --directory website` and open `http://localhost:4177/`. No build step, CDN or runtime dependencies are required.
 - `internal/metrics/`, `internal/storage/`: native collection, rates, history and read-only inspection.
 - `internal/localization/`: shared English/Chinese catalogs and native translations.
 - `main.go`, `preferences.go`: lifecycle, native menus, preferences and typed IPC.

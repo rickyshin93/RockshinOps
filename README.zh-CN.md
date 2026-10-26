@@ -1,6 +1,6 @@
 # LocalOps
 
-[English](README.md) · [下载](https://github.com/rickyshin93/local-ops/releases) · [构建状态](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml)
+[官网](https://rickyshin93.github.io/local-ops/?lang=zh) · [English](README.md) · [下载](https://github.com/rickyshin93/local-ops/releases) · [构建状态](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml)
 
 使用 Go、MyGo 和 TypeScript 构建的本机监控工具：菜单栏常驻关键指标，窗口中查看系统活动、进程、运行中的 App 和磁盘空间。
 
@@ -58,6 +58,8 @@ bun run build
 在目标系统/架构的主机上构建，产物位于 `build/<os>-<arch>/`。具体四种构建命令见 [英文 README](README.md#test-and-build)。
 
 ## CI 与发布
+
+宣传网站位于 `website/`，默认英文，通过 `?lang=zh` 打开中文。运行 `python3 -m http.server 4177 --directory website` 后访问 `http://localhost:4177/` 即可预览；不需要构建或 CDN。推送网站改动后，`pages.yml` 自动部署到 [GitHub Pages](https://rickyshin93.github.io/local-ops/)。
 
 推送 `main`、提交 PR 或手动触发后，GitHub Actions 会测试并构建 macOS arm64、macOS amd64、Windows amd64 和 Linux amd64。安装包保留为构建产物。
 

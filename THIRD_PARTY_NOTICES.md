@@ -2,6 +2,8 @@
 
 LocalOps includes the following runtime dependencies. Build tools are not distributed with the app.
 
+The public website additionally serves Space Grotesk by The Space Grotesk Project Authors under the SIL Open Font License 1.1. Its complete notice is distributed alongside the font at `website/assets/SPACE-GROTESK-LICENSE.txt`. The font is sourced from the official Google Fonts repository (`ofl/spacegrotesk`) and is not part of the desktop runtime.
+
 ## i18next 26.5.11
 
 The MIT License (MIT)
