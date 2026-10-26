@@ -605,7 +605,8 @@ h2 {
   gap:12px
 }
 .download h2 {
-  max-width:570px
+  max-width:570px;
+  text-wrap:balance
 }
 .download-grid {
   display:grid;
