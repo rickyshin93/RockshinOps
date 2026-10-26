@@ -1,0 +1,62 @@
+{
+  "defaultLanguage": "system",
+  "defaultMenuBarItems": [
+    "disk"
+  ],
+  "sampleIntervalSeconds": 30,
+  "metricsIntervalSeconds": 2,
+  "processIntervalSeconds": 5,
+  "historySeconds": 3600,
+  "connectionTimeoutSeconds": 10,
+  "scanTimeoutSeconds": 20,
+  "scanMaxEntries": 200000,
+  "scanMaxItems": 20,
+  "scanTargets": {
+    "darwin": [
+      {
+        "name": "应用缓存",
+        "path": "~/Library/Caches"
+      },
+      {
+        "name": "应用日志",
+        "path": "~/Library/Logs"
+      },
+      {
+        "name": "下载文件",
+        "path": "~/Downloads"
+      },
+      {
+        "name": "废纸篓",
+        "path": "~/.Trash"
+      }
+    ],
+    "windows": [
+      {
+        "name": "临时文件",
+        "path": "~/AppData/Local/Temp"
+      },
+      {
+        "name": "下载文件",
+        "path": "~/Downloads"
+      }
+    ],
+    "linux": [
+      {
+        "name": "应用缓存",
+        "path": "~/.cache"
+      },
+      {
+        "name": "应用日志",
+        "path": "~/.local/state"
+      },
+      {
+        "name": "下载文件",
+        "path": "~/Downloads"
+      },
+      {
+        "name": "废纸篓",
+        "path": "~/.local/share/Trash/files"
+      }
+    ]
+  }
+}

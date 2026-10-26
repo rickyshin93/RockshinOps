@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>LocalOps</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!--
+    THESIS: A quiet instrument: a neutral shell recedes so live readings lead.
+    OWN-WORLD: See DESIGN.md. Neutral structure, one orange accent for current/actionable, data colors only inside charts. Keep real circular dot histories and truthful data.
+    STORY: Overview -> hardware/process/connection details -> return to the persistent disk-capacity menu bar.
+    FIRST VIEWPORT: Left navigation below native traffic lights; right overview grid with period/pause controls inside the content. No standalone top bar or centered window title.
+    FORM: Operate mode, code-led. Every reading comes from the local system; unavailable values and unrecorded history stay explicit.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="LocalOps">
+        <div class="window-drag" aria-hidden="true"></div>
+        <nav id="navigation" aria-label="LocalOps"></nav>
+        <div class="sidebar-footer">
+          <span id="device-mark" class="device-mark" aria-hidden="true"></span>
+          <div><strong id="machine-name">LocalOps</strong><p id="machine-detail"></p></div>
+        </div>
+      </aside>
+      <main class="main-panel">
+        <div class="main-drag-strip" aria-hidden="true"></div>
+        <div class="content-scroll" id="content-scroll">
+          <div class="page-heading">
+            <div class="page-title"><h1 id="page-title"></h1><p id="page-subtitle"></p></div>
+            <div id="page-actions" class="page-actions"></div>
+          </div>
+          <div id="connection-error" class="notice error" role="alert" hidden></div>
+          <div id="page-filters" class="page-filters" hidden></div>
+          <div id="page-body" aria-busy="true"><div class="empty-state"><span class="loading-dot"></span></div></div>
+          <footer id="page-footer" class="page-footer">LocalOps</footer>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

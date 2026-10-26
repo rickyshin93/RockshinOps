@@ -1,0 +1,108 @@
+# LocalOps
+
+[![Build and release](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml/badge.svg)](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A local desktop system monitor built with **Go, MyGo and TypeScript**. Keep useful metrics in the menu bar, inspect live activity, and see what takes up disk space.
+
+[简体中文](README.zh-CN.md) · [Download](https://github.com/rickyshin93/local-ops/releases) · [Project status](STATUS.md)
+
+## Platform status
+
+| Package | Architecture | Monitoring status |
+| --- | --- | --- |
+| macOS | Apple Silicon / arm64 | Native collectors; interactive desktop acceptance on Apple Silicon |
+| macOS | Intel / x86_64 | Same macOS collectors; CI build and automated tests |
+| Windows | x86_64 / amd64 | Native CPU, memory, disk, network, process and connection collectors; CI sampling checks |
+| Linux | x86_64 / amd64 | Native CPU, memory, disk, network, process and connection collectors; CI sampling checks |
+
+All four targets run real collector smoke tests in CI. Interactive desktop acceptance has been performed on macOS Apple Silicon; Windows/Linux desktop interaction and hardware-specific telemetry need device coverage. [Platform collection contract](docs/platforms.md).
+
+## Features
+
+- CPU usage by core, memory composition/pressure/swap, GPU counters, disk capacity and I/O, physical network traffic, battery and available hardware power telemetry.
+- Actual history for the last minute, 5 minutes, 15 minutes or hour. Pausing freezes the view while native sampling continues. History lives only in memory for the current session.
+- Searchable process and running-app lists with CPU and physical-memory usage; on-demand TCP/UDP connection snapshots.
+- Read-only space analysis of configured caches, logs, downloads and trash. Permission failures and scan limits are visible. No file deletion, app uninstall or process termination.
+- Persistent menu bar metrics: disk space, CPU, memory, GPU, network speed and battery. Close the window to keep sampling; use **Quit** to stop.
+- English and Simplified Chinese. Settings defaults to **System default** and matches the OS language preferences; unsupported languages fall back to English. Save **中文** or **English** to override. The UI, native menus and tray labels change together.
+- A compact macOS-style interface with Lucide icons and native app icons on macOS (generic executable icons elsewhere).
+
+CPU temperature and per-app watt measurements are not implemented. GPU and system power availability depends on hardware and drivers. Windows supports NVIDIA telemetry through an installed `nvidia-smi`; Linux supports AMD sysfs counters and NVIDIA SMI. The GPU panel shows one device. Linux battery details cover the first system battery in sysfs; Windows uses aggregate system battery status.
+
+## Install
+
+Download the package for your architecture from [Releases](https://github.com/rickyshin93/local-ops/releases).
+
+- **macOS:** open the `.dmg` and drag LocalOps to Applications. Packages are ad-hoc signed, not notarized. If macOS blocks the downloaded app, follow Apple's [instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+- **Windows:** run the `LocalOps Setup … amd64.exe` installer. It installs for the current user and requires WebView2. Packages are unsigned, so Windows may display a publisher warning.
+- **Debian/Ubuntu:** install the `.deb` with `sudo apt install ./localops_…_amd64.deb`; the package declares its GTK/WebKitGTK dependencies. A desktop tray implementation is needed to expose the tray menu.
+- **Other Linux desktops:** extract the `.tar.gz` and use its included `install.sh`. Install GTK 3, WebKitGTK 4.1 and an AppIndicator-compatible tray through your distribution. The archive's installer reports missing WebKitGTK dependencies.
+
+Each release includes `SHA256SUMS.txt`. There is no automatic updater.
+
+## Develop
+
+Requirements: **Go 1.27.3**, **Bun 1.4.2**, and macOS Command Line Tools for macOS builds. Windows and Linux builds use pure Go; macOS collectors use C/Objective-C system APIs.
+
+```sh
+bun install --frozen-lockfile
+bun run generate
+bun run dev
+```
+
+Scripts prefer `.tools/go/bin/go` when present, otherwise the Go on `PATH`. The toolchain is not a runtime dependency.
+
+`bun run dev:web` starts a browser preview. Live native data is available only inside the MyGo desktop app; the ordinary browser preview explicitly reports this limitation.
+
+## Test and build
+
+```sh
+bun run test:go
+bun run test:web
+bun run typecheck
+bun run build
+```
+
+Build on the target OS; macOS builds require that architecture's native C toolchain. Packages are written under `build/<os>-<arch>/`.
+
+```sh
+# Examples, each on its matching runner/host
+sh scripts/mygo.sh build -platform darwin/arm64
+sh scripts/mygo.sh build -platform darwin/amd64
+sh scripts/mygo.sh build -platform windows/amd64
+sh scripts/mygo.sh build -platform linux/amd64
+```
+
+[GitHub Actions](.github/workflows/build.yml) runs tests and builds all four targets on pushes to `main`, pull requests and manual dispatches. Download per-platform packages from each run's artifacts.
+
+To publish, update `package.json`'s version, commit it, then push the matching `v<version>` tag. CI checks the tag, builds and tests every target, and publishes installers plus SHA-256 checksums only after all builds pass. No personal token or signing secret is required; the release job uses the repository's `GITHUB_TOKEN`.
+
+## Configuration and data
+
+`localops.json` is the single file for sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems` and `defaultLanguage` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
+
+User settings are stored at `os.UserConfigDir()/LocalOps/preferences.json` (on macOS: `~/Library/Application Support/LocalOps/preferences.json`). Existing settings without a language field follow the system. Invalid settings or failed saves report errors; saved preferences are not silently reset.
+
+Data is read locally. No analytics, remote upload, privileged helper or HTTP IPC server is included. Permission restrictions can result in partial data.
+
+| Metric | Meaning |
+| --- | --- |
+| CPU | Native counter deltas; system usage is weighted across cores. Process usage uses 100% per logical core and may exceed 100%. |
+| Memory | Binary GiB/MiB. macOS uses Mach/sysctl and process `phys_footprint`. Windows/Linux use total minus OS-available memory and process RSS; shared pages can be counted multiple times. Windows swap means page files. |
+| Disk capacity | Space writable by the current user on the home directory's volume, decimal MB/GB/TB. Reclaimable space is excluded; APFS shared volumes are not summed. |
+| Disk I/O | macOS block-driver counters, Windows fixed-volume counters, Linux hardware block devices excluding partitions and virtual layers. Disabled or inaccessible counters are unavailable; LocalOps does not enable them in the registry. |
+| Network | 64-bit interface counter deltas. macOS sums `en*`; Windows uses the hardware-interface flag; Linux uses sysfs hardware device identity. Virtual interfaces remain separate to avoid duplicate traffic. |
+| Connections | macOS `lsof`, Windows connection tables or Linux procfs, limited to current permissions; no remote DNS lookup or outgoing connection to displayed addresses. |
+| Space analysis | Logical file sizes, without following symlinks. Hard links/APFS clones may count more than once; results are not guaranteed reclaimable space. |
+
+## Source layout
+
+- `internal/metrics/`, `internal/storage/`: native collection, rates, history and read-only inspection.
+- `internal/localization/`: shared English/Chinese catalogs and native translations.
+- `main.go`, `preferences.go`: lifecycle, native menus, preferences and typed IPC.
+- `src/`: TypeScript views and React Settings using react-i18next. `src/mygo.ts` is generated.
+- `scripts/`, `.github/`: development, packaging and release automation.
+- [DESIGN.md](DESIGN.md): interface conventions; [STATUS.md](STATUS.md): current progress and verification limits.
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under [MIT](LICENSE); dependency licenses are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

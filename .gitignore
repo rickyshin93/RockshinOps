@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.mygo/
+.tools/
+work/
+.DS_Store
+.impeccable/
+release-files/
