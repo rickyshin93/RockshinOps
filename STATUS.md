@@ -2,7 +2,6 @@
 
 ## Doing
 
-- 2026-10-27: Building and publishing the bilingual promotional website on GitHub Pages; English default, responsive technology-inspired design and links to released installers. Acceptance: goals/2026-10-27-public-website.md.
 - 2026-10-27: Final native tray appearance regression remains unverified: the menu-bar preview tool returns an old cached image. Sampling, preferences, language persistence, window close/reopen, Lucide rendering and native App icons are verified.
 
 ## Next
@@ -15,6 +14,7 @@
 
 ## Done
 
+- 2026-10-27: Published the [bilingual website](https://rickyshin93.github.io/local-ops/) with English default, responsive layouts and released installer links. Public rendering, language switching and asset integrity verified; [Pages deployment passed](https://github.com/rickyshin93/local-ops/actions/runs/40378884753). Acceptance: goals/2026-10-27-public-website.md.
 - 2026-10-27: Released [v0.2.0](https://github.com/rickyshin93/local-ops/releases/tag/v0.2.0) with five installers after all four native build/test jobs passed. Downloaded packages match their SHA-256 hashes; corrected the manifest for GitHub's filename normalization and verified all platform collection paths preserve bytes with stable names.
 - 2026-10-27: Implemented Windows/Linux CPU, memory, disk, network, process and connection collection, platform directories and optional battery/GPU adapters. Native smoke tests and installable packages passed on macOS arm64/amd64, Windows amd64 and Linux amd64 ([CI evidence](https://github.com/rickyshin93/local-ops/actions/runs/40372365187)); interactive Windows/Linux desktop acceptance remains below.
 - 2026-10-27: Added English/Chinese localization and persisted system/en/zh selection. Native system-language default, live UI/menu switching and restart persistence verified; restored the local app to system default.

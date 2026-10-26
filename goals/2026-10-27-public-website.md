@@ -3,7 +3,7 @@
 - Source: User request: modern technology-styled GitHub Pages promotional website, English default, Chinese support, publish with the app.
 - Created: 2026-10-27
 - Execution mode: autonomous
-- Overall status: in_progress
+- Overall status: done
 
 ## 全局边界
 
@@ -51,7 +51,7 @@ Explain LocalOps visually and let visitors choose their platform download.
 ### 4. 验收标准
 
 - [x] Every visitor-facing section is available in English and Chinese; default English.
-- [x] Responsive rendering and interactions verified in a browser with no horizontal overflow or console errors.
+- [x] Responsive rendering and interactions verified in a browser with no horizontal overflow or website-origin console errors.
 - [x] Download links match published assets; screenshot uses actual UI with labeled demo data and no private content.
 
 ### 5. 交付结果
@@ -72,7 +72,7 @@ Explain LocalOps visually and let visitors choose their platform download.
 
 ## Goal 02 — Public GitHub Pages website
 
-- Status: in_progress
+- Status: done
 - Depends on: Goal 01
 
 ### 1. 目标
@@ -93,9 +93,9 @@ Make the approved website reachable on github.io and keep it deployable from the
 
 ### 4. 验收标准
 
-- [ ] Pages deployment succeeds and public HTTPS URL returns the website.
-- [ ] Online English/Chinese pages and key navigation/download links verified in browser.
-- [ ] README and STATUS reflect the actual delivered website.
+- [x] Pages deployment succeeds and public HTTPS URL returns the website.
+- [x] Online English/Chinese pages and key navigation/download links verified in browser.
+- [x] README and STATUS reflect the actual delivered website.
 
 ### 5. 交付结果
 
@@ -104,18 +104,18 @@ Make the approved website reachable on github.io and keep it deployable from the
 
 ### 6. 执行记录
 
-- Completed: not-started
-- Commands run: not-run
-- Results: not-run
-- Artifacts: not-produced
+- Completed: 2026-10-27
+- Commands run: gh api repos/rickyshin93/local-ops/pages; gh run list --workflow pages.yml; HTTPS download and byte comparison of six public assets; native Chrome public-page inspection.
+- Results: Pages run 40378884753 succeeded for 05b6f7d. Public HTML, CSS, JS, both product images and font return HTTP 200 and match local files byte-for-byte. Public English, Chinese toggle, download anchor and five installer destinations verified in Chrome. Balanced Chinese download-heading wrapping visually verified locally before deployment.
+- Artifacts: https://rickyshin93.github.io/local-ops/; https://github.com/rickyshin93/local-ops/actions/runs/40378884753; work/logs/website-public-verification.json; work/logs/website-final-preview.png.
 - Known issues: none
-- Attempts: 0
-- Last failure: none
-- Next strategy: none
+- Attempts: 2
+- Last failure: Browser extension inspection timed out on the public origin; native Chrome accessibility and screenshots completed the public acceptance. An orphaned Chinese heading ending was fixed and redeployed.
+- Next strategy: none; online acceptance complete.
 
 ## 全局验收
 
-- [ ] All goals completed with evidence.
-- [ ] Public website to release download path verified.
-- [ ] Relevant project checks passed.
-- [ ] Docs and project status synchronized.
+- [x] All goals completed with evidence.
+- [x] Public website to release download path verified.
+- [x] Relevant project checks passed.
+- [x] Docs and project status synchronized.
