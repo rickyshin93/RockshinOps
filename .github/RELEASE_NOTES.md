@@ -1,12 +1,12 @@
-LocalOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, and read-only disk space analysis.
+LocalOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.1
+### New in v0.2.2
 
-Signed updates from GitHub Releases, checked after launch and daily. Use Settings, the app menu or the tray menu to check manually. Review release notes, install with progress, skip a version or choose a reminder, then relaunch when ready. Installation requires confirmation unless you opt in to automatic installation.
+Explore disk folders and review selected items before moving them to the system trash. On macOS, review installed apps and possible associated files before moving selected items to the trash. Search results can be incomplete; name matches may be shared with other apps. Permission limitations are shown with an entry to macOS Full Disk Access settings.
 
-**v0.2.0 users: install v0.2.1 manually once to enable future updates.** Updates need a writable installation; upgrade Linux system packages through the package manager. GitHub must be reachable.
+**中文：**新增磁盘浏览和所选项目移入废纸篓；macOS 可核对应用及可能的关联文件后选择移入废纸篓。搜索可能不完整，名称匹配可能属于共享数据；受权限限制时可查看说明并打开完全磁盘访问设置。
 
-**中文：**新增 GitHub 签名更新，启动后和持续运行期间每天检查；设置、应用菜单、托盘菜单均可手动检查。默认确认后安装，支持进度、跳过版本及稍后提醒，重启时机由你决定。v0.2.0 用户需先手动安装一次本版本；Linux 系统软件包通过包管理器升级。
+LocalOps 0.2.1 can update to this release through the signed updater. Users of 0.2.0 should install this version manually once.
 
 ### Downloads
 
@@ -24,6 +24,6 @@ GPU support: macOS IOKit, Linux AMD sysfs or NVIDIA SMI, Windows NVIDIA SMI. Dri
 
 macOS packages are ad-hoc signed and not notarized. Windows packages are unsigned. Operating systems may require explicit approval to open downloaded apps. Update archives are signed independently of OS code signing.
 
-Language defaults to the system preference. Choose **System default / 中文 / English** in Settings and save to persist an override. File analysis is read-only; LocalOps does not delete files or terminate processes.
+Language defaults to the system preference. Choose **System default / 中文 / English** in Settings and save to persist an override. Review is required before moving selected items to the system trash. Emptying the trash requires explicit confirmation; LocalOps does not terminate processes.
 
 See the repository README for installation, dependencies and measurement details.
