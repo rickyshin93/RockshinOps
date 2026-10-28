@@ -130,7 +130,7 @@ The standalone promotional site in `website/` uses an instrument-inspired dark p
 
 - 有界全高双栏、单一内容滚动区、无 sticky、无顶栏、红绿灯在侧栏上方。
 - 数据真实：不可用值显式标注，首样为基线，视觉不暗示「系统健康」。
-- 检查与清理分析只读。
+- 检查和空间分析只读；清理操作须展示目标、后果并要求确认。
 
 ## 5. 自检清单
 

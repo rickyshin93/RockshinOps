@@ -7,7 +7,7 @@ LocalOps is a personal system-monitoring desktop app built with Go, MyGo, and a 
 - Keep platform-specific sampling in Go files with OS suffixes. Add platform implementations when needed; do not fake unsupported metrics.
 - Disk capacity means bytes available to the current user. Display decimal units and label the metric explicitly. Do not sum APFS volumes sharing the same container.
 - Metrics must carry their actual source and unavailable state. CPU and throughput use differences between native counters; the first sample is a baseline, not a zero reading. Per-process CPU uses 100% per logical core.
-- Process/connection/App inspection and cleanup analysis are read-only. Do not add process termination, uninstall, file deletion, privilege escalation, or login-item changes without explicit authorization.
+- Process/connection/App inspection and space analysis are read-only. Selected cleanup and macOS app-uninstall items may be moved to the system trash after review, and the trash may be permanently emptied after explicit confirmation. Do not add process termination, privilege escalation, or login-item changes without explicit authorization.
 - Root `localops.json` defines sampling and other adjustable app parameters. Embed it for packaged builds; no environment-based parameter overrides.
 - UI strings belong in the shared English/Chinese catalogs in `internal/localization/`. Frontend translation uses i18next; React Settings uses react-i18next. Keep metric status codes independent of display language.
 - User language and menu-bar preferences are saved in LocalOps' user configuration directory. Root `localops.json` owns their first-run defaults. In-page selectors must be custom themed controls with keyboard support; do not use native HTML selects.

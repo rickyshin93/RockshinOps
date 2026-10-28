@@ -49,3 +49,63 @@ func TestScanDoesNotFollowSymlinksOrModifyFiles(t *testing.T) {
 		t.Fatal("limited scan falsely reported complete")
 	}
 }
+
+func TestPartialScanKeepsLaterFoldersBrowsable(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"a-large", "z-folder"} {
+		if err := os.Mkdir(filepath.Join(root, name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "a-large", "file"), []byte("123"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	result := ScanSpace(context.Background(), []ScanTarget{{Name: "Test", Path: root}}, 2, 100, time.Second)
+	if result.Complete {
+		t.Fatal("expected a partial scan")
+	}
+	for _, item := range result.Groups[0].Items {
+		if item.Name == "z-folder" && item.Directory {
+			return
+		}
+	}
+	t.Fatalf("later folder missing from partial result: %+v", result.Groups[0].Items)
+}
+
+func TestUnlimitedScanTraversesAllNestedFolders(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"first/deep", "second/deep"} {
+		dir := filepath.Join(root, name)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "file"), []byte("123"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := ScanSpace(context.Background(), []ScanTarget{{Name: "Test", Path: root}}, 0, 0, 0)
+	if !result.Complete || result.Groups[0].Files != 2 || result.Groups[0].Bytes != 6 || len(result.Groups[0].Items) != 2 {
+		t.Fatalf("unexpected unlimited scan: %+v", result)
+	}
+	for _, item := range result.Groups[0].Items {
+		if !item.Directory || !item.Scanned || item.Files != 1 || item.Bytes != 3 {
+			t.Fatalf("unexpected folder: %+v", item)
+		}
+	}
+}
+
+func TestScanProgressCountsThenVisitsEntries(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "folder"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "folder", "file"), []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var counted, total, visited int64
+	result := ScanSpaceWithProgress(context.Background(), ScanTarget{Name: "Test", Path: root},
+		func() { counted++ }, func(n int64) { total = n }, func() { visited++ })
+	if !result.Complete || counted != 3 || total != counted || visited != total || result.Groups[0].Bytes != 4 {
+		t.Fatalf("unexpected progress: counted=%d total=%d visited=%d result=%+v", counted, total, visited, result)
+	}
+}

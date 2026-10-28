@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.2
+
+- Explore disk folders and review selected files before moving them to the system trash.
+- Review installed macOS apps and possible associated files before moving selected items to the trash. Search results may be incomplete and name matches may be shared.
+- Show scan permission limits and provide access to macOS Full Disk Access settings.
+- Continue to receive signed updates from GitHub Releases.
+
+### 中文
+
+- 浏览磁盘文件夹，核对所选项目后可移入系统废纸篓。
+- 查看已安装的 macOS 应用及可能的关联文件，核对后将所选项目移入废纸篓。搜索可能不完整，名称匹配的文件可能由其他应用共享。
+- 显示搜索权限限制，并提供前往 macOS 完全磁盘访问权限设置的入口。
+- 继续通过 GitHub Releases 接收签名更新。
+
 ## 0.2.1
 
 - Check for signed updates automatically after launch and daily while LocalOps is running.

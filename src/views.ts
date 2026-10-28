@@ -1,5 +1,5 @@
 import { t } from "./i18n";
-import type { AppInfo, Snapshot, Trend, ProcessList, Connections, ScanResult, AppUsage, Process } from "./mygo";
+import type { AppInfo, Snapshot, Trend, ProcessList, Connections, ScanResult, AppUsage, Process, InstalledApp, AppReview } from "./mygo";
 import { capacityParts, duration, escapeHTML as e, formatCapacity, formatMemory, formatRate, memoryParts, percent, rateParts, timeLabel } from "./format";
 import { dots, lineChart, type TrendKey } from "./charts";
 import { icon } from "./icons";
@@ -42,6 +42,17 @@ export interface ViewState extends SettingsState {
   connectionError: string;
   scanError: string;
   scanning: boolean;
+  cleanupBusy: boolean;
+  cleanupMessage: string;
+  spaceMode: boolean;
+  spaceHistory: string[];
+  appMode: boolean;
+  installedApps: InstalledApp[] | null;
+  appReview: AppReview | null;
+  appSelection: string[];
+  appBusy: boolean;
+  appSearching: boolean;
+  appMessage: string;
 }
 
 function isMac(state: ViewState): boolean { return state.info?.machine.platform === "darwin"; }
@@ -76,9 +87,9 @@ export function actionControls(state: ViewState): string {
 }
 
 export function filterControls(state: ViewState): string {
-  if (!["processes", "connections", "apps"].includes(state.page)) return "";
-  const sorting = state.page === "connections" ? "" : sortControl(state.sort, state.page === "processes");
-  return `<label class="search-field">${icon("search")}<input id="search" type="search" placeholder="${state.page === "connections" ? t("搜索进程、地址或协议") : t("搜索名称或 PID")}" aria-label="${t("搜索")}${t(pages.find(p => p.id === state.page)!.title)}" value="${e(state.query)}" autocomplete="off" spellcheck="false"/></label>${sorting}${state.page === "processes" ? `<label class="checkbox-label"><input id="only-mine" type="checkbox" ${state.onlyMine ? "checked" : ""}/>${t("仅我的进程")}</label>` : ""}`;
+  if (!["processes", "connections", "apps"].includes(state.page) || (state.page === "apps" && !!state.appReview)) return "";
+  const sorting = state.page === "connections" || (state.page === "apps" && state.appMode) ? "" : sortControl(state.sort, state.page === "processes");
+  return `<label class="search-field">${icon("search")}<input id="search" type="search" placeholder="${state.page === "connections" ? t("搜索进程、地址或协议") : state.page === "apps" && state.appMode ? t("搜索 App 名称或路径") : t("搜索名称或 PID")}" aria-label="${t("搜索")}${t(pages.find(p => p.id === state.page)!.title)}" value="${e(state.query)}" autocomplete="off" spellcheck="false"/></label>${sorting}${state.page === "processes" ? `<label class="checkbox-label"><input id="only-mine" type="checkbox" ${state.onlyMine ? "checked" : ""}/>${t("仅我的进程")}</label>` : ""}`;
 }
 
 function card(state: ViewState, page: Page, color: string, title: string, label: string, main: string, items: [string, string][], keys: TrendKey[], max = 100, status = ""): string {
@@ -202,24 +213,47 @@ function groupApps(processes: Process[]): AppUsage[] {
 }
 
 function appsView(state: ViewState): string {
-  if (state.processError) return empty(t("无法读取 App"), state.processError, `<button data-action="refresh">${t("重试")}</button>`);
-  if (!state.processes) return empty(t("正在读取运行中的 App"), t("将同一个 App 包中的进程归并显示。"));
+  const mode = isMac(state) ? `<div class="app-mode-toolbar"><div class="segmented"><button class="${!state.appMode ? "selected" : ""}" aria-pressed="${!state.appMode}" data-action="running-apps">${t("运行中的 App")}</button><button class="${state.appMode ? "selected" : ""}" aria-pressed="${state.appMode}" data-action="installed-apps">${t("已安装的 App")}</button></div></div>` : "";
+  if (isMac(state) && state.appMode) return mode + installedAppsView(state);
+  if (state.processError) return mode + empty(t("无法读取 App"), state.processError, `<button data-action="refresh">${t("重试")}</button>`);
+  if (!state.processes) return mode + empty(t("正在读取运行中的 App"), t("将同一个 App 包中的进程归并显示。"));
   const apps = groupApps(state.processes.items).filter(app => `${app.name} ${app.path}`.toLowerCase().includes(state.query.toLowerCase()));
   apps.sort((a, b) => state.sort === "name" ? a.name.localeCompare(b.name) : state.sort === "cpu" ? b.cpu - a.cpu : b.memory - a.memory);
-  return `<div class="result-summary"><span>${apps.length} ${t("个正在运行的 App")}</span><span>${(isMac(state) ? t("按 App 包路径归并 · 不含未启动的 App") : t("按可执行文件路径归并 · 仅含运行中的进程"))}</span></div>${apps.length ? `<div class="app-list"><div class="app-row app-head"><span>App</span><span>${t("物理占用")}</span><span>CPU</span><span>${t("进程")}</span></div>${apps.map(app => `<button class="app-row" data-app="${e(app.path)}">${appIcon(app.path, isMac(state))}<span class="app-name"><strong>${e(app.name)}</strong><small>${e(app.path)}</small></span><span>${formatMemory(app.memory)}</span><span>${app.cpuReady ? percent(app.cpu) : t("采样中")}</span><span>${app.processes}</span><span class="card-chevron">${icon("chevron")}</span></button>`).join("")}</div>` : empty(t("没有匹配的 App"), t("试试其他名称，或查看完整进程列表。"))}${note((isMac(state) ? t("只读查看运行状态。物理占用来自各进程 phys_footprint 之和；此页面不执行卸载或删除应用数据。") : t("只读查看运行状态。内存为各进程 RSS 之和，共享页可能重复计入；此页面不执行卸载或删除。")))}`;
+  return mode + `<div class="result-summary"><span>${apps.length} ${t("个正在运行的 App")}</span><span>${(isMac(state) ? t("按 App 包路径归并 · 不含未启动的 App") : t("按可执行文件路径归并 · 仅含运行中的进程"))}</span></div>${apps.length ? `<div class="app-list"><div class="app-row app-head"><span>App</span><span>${t("物理占用")}</span><span>CPU</span><span>${t("进程")}</span></div>${apps.map(app => `<button class="app-row" data-app="${e(app.path)}">${appIcon(app.path, isMac(state))}<span class="app-name"><strong>${e(app.name)}</strong><small>${e(app.path)}</small></span><span>${formatMemory(app.memory)}</span><span>${app.cpuReady ? percent(app.cpu) : t("采样中")}</span><span>${app.processes}</span><span class="card-chevron">${icon("chevron")}</span></button>`).join("")}</div>` : empty(t("没有匹配的 App"), t("试试其他名称，或查看完整进程列表。"))}${note((isMac(state) ? t("只读查看运行状态。物理占用来自各进程 phys_footprint 之和；此页面不执行卸载或删除应用数据。") : t("只读查看运行状态。内存为各进程 RSS 之和，共享页可能重复计入；此页面不执行卸载或删除。")))}`;
+}
+
+function appScanCoverage(review: AppReview): string {
+  if (!review.scanIssues.length) return "";
+  const issueLabel = (kind: string) => kind === "permission" ? t("没有访问权限") : kind === "changed" ? t("扫描期间位置已变化") : t("读取失败");
+  const permission = review.scanIssues.some(issue => issue.kind === "permission") ? `<div class="disk-access-prompt" role="status"><div><strong>${t("部分位置需要访问权限")}</strong><p>${t("开启完全磁盘访问权限可扩大搜索范围。在系统设置中允许 LocalOps；若列表里没有，点“+”添加。开启后退出并重新打开 LocalOps，再重新搜索。部分系统目录仍可能受限。")}</p></div><button class="secondary-button" data-action="open-full-disk-access">${t("打开完全磁盘访问权限")}</button></div>` : "";
+  return permission + `<details class="uninstall-coverage"><summary><strong>${t("扫描覆盖范围受限")}</strong><span>${t("未读取的位置：{{count}} 个", { count: review.scanIssues.length })}</span></summary><p>${t("这是整个搜索范围的访问情况，不是此 App 的残留数量。已找到的项目仍可核对清理；未读取的位置中可能还有关联文件。")}</p><ul>${review.scanIssues.map(issue => `<li><span class="path">${e(issue.path)}</span><small>${e(issueLabel(issue.kind))} · ${e(issue.error)}</small></li>`).join("")}</ul></details>`;
+}
+
+function installedAppsView(state: ViewState): string {
+  const message = state.appMessage ? notice(state.appMessage) : "";
+  if (state.appBusy && !state.appReview) return message + empty(t("正在读取 App"), t("请稍候。"));
+  if (state.appReview) {
+    const review = state.appReview;
+    const selected = state.appSelection.length;
+    const allSelected = review.files.length > 0 && selected === review.files.length;
+    return message + `<button class="cleanup-action uninstall-back" data-action="installed-apps" ${state.appBusy ? "disabled" : ""}>${t("返回应用列表")}</button><section class="uninstall-review"><div class="uninstall-heading">${appIcon(review.app.path, true)}<div><h2>${e(review.app.name)}</h2><p class="path">${e(review.bundleId || review.app.path)}</p></div></div><p class="uninstall-guidance">${t("请逐项核对后选择。名称匹配可能属于共享数据；搜索无法保证找到所有残留。移除前请退出 App。")}</p>${state.appSearching ? `<div class="uninstall-progress" role="status"><span class="loading-dot" aria-hidden="true"></span><span>${t("正在继续搜索关联文件…")}</span><button class="cleanup-action" data-action="stop-app-search">${t("停止搜索")}</button></div>` : ""}${appScanCoverage(review)}<div class="uninstall-list-heading"><label><input type="checkbox" data-app-select-all="true" aria-label="${t("全选关联项目")}" ${allSelected ? "checked" : ""} ${state.appBusy && !state.appSearching ? "disabled" : ""}><span class="uninstall-list-title">${t("关联项目")}</span></label><span>${t("已选择 {{selected}} / {{total}} 项", { selected, total: review.files.length })}</span></div><div class="uninstall-list">${review.files.map(file => `<label><input type="checkbox" data-app-file="${e(file.path)}" ${state.appBusy && !state.appSearching ? "disabled" : ""} ${state.appSelection.includes(file.path) ? "checked" : ""}><span><strong class="path">${e(file.path)}</strong><small>${e(t(file.reason))}</small></span></label>`).join("")}</div><div class="uninstall-actions"><span>${state.appSearching ? t("搜索完成或停止后可移入废纸篓。") : t("所选项目将移入废纸篓。")}</span><button class="primary-button" data-action="remove-app-files" ${selected && !state.appBusy ? "" : "disabled"}>${t("移入废纸篓")}</button></div></section>`;
+  }
+  if (!state.installedApps) return message + empty(t("无法读取已安装的 App"), t("请重试。"));
+  const apps = state.installedApps.filter(app => `${app.name} ${app.path}`.toLowerCase().includes(state.query.toLowerCase()));
+  return message + `<div class="installed-hint"><span>${t("选择 App 后可查看应用包和可能的关联文件。")}</span><button class="cleanup-action" data-action="open-full-disk-access">${t("打开完全磁盘访问权限")}</button></div>` + (apps.length ? `<div class="app-list installed-list">${apps.map(app => `<button data-review-app="${e(app.path)}">${appIcon(app.path, true)}<span><strong>${e(app.name)}</strong><small class="path">${e(app.path)}</small></span>${icon("chevron")}</button>`).join("")}</div>` : empty(t("没有匹配的 App"), t("试试其他名称或路径。")));
 }
 
 function cleanupView(state: ViewState): string {
-  const intro = notice(t("空间分析只读取文件大小，不删除文件。缓存可能仍被 App 使用；下载和废纸篓也不等同于可安全删除空间。"));
-  if (state.scanning) return intro + empty(t("正在扫描本机空间"), t("逐项读取配置的目录。遇到权限限制会标注，达到时间或数量上限会返回已读部分。"));
+  const intro = notice(t("分析只读取文件大小。选中的项目会移入系统废纸篓；清空废纸篓将永久删除所有内容。缓存可能仍被 App 使用。"));
+  if (state.scanning) return intro + `<div class="empty-state" role="status" aria-live="polite"><span class="scan-spinner" aria-hidden="true"></span><strong>${t("正在扫描本机空间")}</strong>${state.spaceMode ? `<strong class="scan-progress" data-scan-progress>${t("正在统计扫描项目…")}</strong>` : ""}<p>${t(state.spaceMode ? "进度按项目数量计算，不代表剩余时间。文件较多时统计和扫描可能需要较长时间；无法读取的项目会在结果中标明。" : "逐项读取配置的目录。遇到权限限制会标注，达到时间或数量上限会返回已读部分。")}</p>${state.spaceMode && state.spaceHistory.length ? `<p class="path">${e(state.spaceHistory.at(-1)!)}</p>` : ""}</div>`;
   if (state.scanError) return intro + empty(t("扫描未完成"), state.scanError, `<button data-action="scan">${t("重新扫描")}</button>`);
-  if (!state.scan) return intro + `<div class="scan-intro"><span class="scan-icon disk">${icon("cleanup")}</span><h2>${t("先了解空间去了哪里")}</h2><p>${t("分析下列配置目录的文件大小。文件内容不会被读取。")}</p><ul>${(state.info?.scanTargets || []).map(target => `<li><strong>${e(t(target.name))}</strong><span class="path">${e(target.path)}</span></li>`).join("")}</ul><button class="primary-button" data-action="scan">${t("开始空间分析")}</button></div>`;
-  return intro + `${!state.scan.complete ? notice(state.scan.warning || t("部分目录无法读取。以下数据仅代表成功读取的文件。")) : ""}<div class="result-summary"><span>${state.scan.complete ? t("扫描完成") : t("扫描结果不完整")}</span><span>${timeLabel(state.scan.finishedAt)} ${t("· 逻辑文件大小，不代表实际可释放空间")}</span></div><div class="scan-groups">${state.scan.groups.map(group => `<section class="scan-group"><div class="scan-group-heading"><div><h2>${e(t(group.name))}</h2><p class="path">${e(group.path)}</p></div><div><strong>${formatCapacity(group.bytes)}</strong><span>${group.files} ${t("个文件")}</span></div></div>${group.error ? notice(group.error) : ""}${group.skipped ? note(`${group.skipped} ${t("项因权限或读取错误跳过。")}`) : ""}<div class="space-list">${group.items.map(item => `<div><span title="${e(item.path)}">${icon("folder")}<strong>${e(item.name)}</strong></span><span>${item.files} ${t("项")}</span><span>${formatCapacity(item.bytes)}</span></div>`).join("") || `<p class="muted">${t("未读取到普通文件")}</p>`}</div></section>`).join("")}</div>${note(t("不跟随符号链接。按第一层目录汇总并显示体积最大的项目；硬链接与 APFS 克隆可能重复计入逻辑大小。扫描范围和资源上限集中配置在 localops.json。"))}`;
+  if (!state.scan) return intro + `<div class="scan-intro"><span class="scan-icon disk">${icon("cleanup")}</span><h2>${t("先了解空间去了哪里")}</h2><p>${t("分析下列配置目录的文件大小。文件内容不会被读取。")}</p><ul>${(state.info?.scanTargets || []).map(target => `<li><strong>${e(t(target.name))}</strong><span class="path">${e(target.path)}</span></li>`).join("")}</ul><button class="primary-button" data-action="space-start">${t("透视磁盘")}</button> <button class="cleanup-action" data-action="cleanup-targets">${t("查看缓存与废纸篓")}</button></div>`;
+  return intro + `<div class="space-toolbar">${state.spaceMode ? `<button class="cleanup-action" data-action="space-back" ${state.spaceHistory.length ? "" : "disabled"}>${t("返回上一级")}</button><button class="cleanup-action" data-action="cleanup-targets">${t("查看缓存与废纸篓")}</button>` : `<button class="cleanup-action" data-action="space-start">${t("透视磁盘")}</button>`}</div>` + `${state.cleanupMessage ? notice(state.cleanupMessage) : ""}${!state.scan.complete ? notice(state.scan.warning || t("部分目录无法读取。以下数据仅代表成功读取的文件。")) : ""}<div class="result-summary"><span>${state.scan.complete ? t("扫描完成") : t("扫描结果不完整")}</span><span>${timeLabel(state.scan.finishedAt)} ${t("· 逻辑文件大小，不代表实际可释放空间")}</span></div><div class="scan-groups">${state.scan.groups.map(group => `<section class="scan-group"><div class="scan-group-heading"><div><h2>${e(t(group.name))}</h2><p class="path">${e(group.path)}</p></div><div><strong>${formatCapacity(group.bytes)}</strong><span>${group.files} ${t("个文件")}</span></div></div>${group.error ? notice(group.error) : ""}${group.skipped ? note(`${group.skipped} ${t("项因权限或读取错误跳过。")}`) : ""}${group.error || group.skipped ? note(t("此目录扫描不完整，清理不可用。")) : ""}<div class="space-list">${group.items.map(item => `<div><span title="${e(item.path)}">${icon("folder")}<strong>${e(item.name)}</strong>${state.spaceMode ? `<i class="space-share" style="--share:${group.bytes ? Math.min(100, item.bytes / group.bytes * 100) : 0}%"></i>` : ""}</span>${state.spaceMode && item.directory ? `<button class="cleanup-action" data-space-path="${e(item.path)}">${t("打开")}</button>` : ""}<span>${item.scanned ? `${item.files} ${t("项")}` : t("未扫描")}</span><span>${item.scanned ? formatCapacity(item.bytes) : "—"}</span>${group.name !== "废纸篓" && !(state.info?.scanTargets || []).some(target => target.name === "废纸篓" && (item.path === target.path || item.path.startsWith(target.path + (target.path.includes("\\") ? "\\" : "/")))) ? `<button class="cleanup-action" data-cleanup-path="${e(item.path)}" ${!!group.error || group.skipped > 0 || state.cleanupBusy ? "disabled" : ""}>${t("移入废纸篓")}</button>` : ""}</div>`).join("") || `<p class="muted">${t("未读取到普通文件")}</p>`}</div>${group.name === "废纸篓" ? `<button class="cleanup-action" data-empty-trash="${e(group.path)}" ${!!group.error || group.skipped > 0 || state.cleanupBusy ? "disabled" : ""}>${t("清空废纸篓")}</button>` : ""}</section>`).join("")}</div>${note(t("不跟随符号链接。目录按逻辑大小汇总；硬链接、APFS 克隆和多次挂载的路径可能重复计入。"))}`;
 }
 
 function aboutView(state: ViewState): string {
   const i = state.info!, m = i.machine;
-  return `<div class="about-hero"><span class="machine-icon">${icon("about")}</span><h2>${e(m.hostname)}</h2><p>${e(m.chip)} · ${formatMemory(m.memory)}</p></div>${m.error ? notice(m.error) : ""}<div class="about-grid">${panel(t("这台电脑"), facts([[t("型号标识"), e(m.model)], [t("操作系统"), e(m.os)], [t("架构"), e(m.architecture)], [t("物理 / 逻辑核心"), `${m.physicalCPUs} / ${m.logicalCPUs}`], [t("已运行"), duration(state.snapshot!.uptimeSeconds)]]))}${panel("LocalOps", facts([[t("版本"), e(i.version)], [t("技术"), "Go + MyGo + Vite"], [t("指标刷新"), `${i.refreshSeconds} ${t("秒")}`], [t("磁盘容量刷新"), `${i.diskRefreshSeconds} ${t("秒")}`], [t("进程刷新"), `${i.processRefreshSeconds} ${t("秒")}`], [t("历史保留"), t("最近 1 小时 · 仅本次运行")]]))}</div>${notice(t("支持 macOS、Windows 和 Linux 系统采集。CPU 温度、App 级功耗、卸载、删除及进程终止不在当前功能范围内。"))}${note(t("数据仅在本机读取。GPU、电池和功率计数的可用性取决于硬件、驱动及当前权限；没有计数时显示不可用。"))}`;
+  return `<div class="about-hero"><span class="machine-icon">${icon("about")}</span><h2>${e(m.hostname)}</h2><p>${e(m.chip)} · ${formatMemory(m.memory)}</p></div>${m.error ? notice(m.error) : ""}<div class="about-grid">${panel(t("这台电脑"), facts([[t("型号标识"), e(m.model)], [t("操作系统"), e(m.os)], [t("架构"), e(m.architecture)], [t("物理 / 逻辑核心"), `${m.physicalCPUs} / ${m.logicalCPUs}`], [t("已运行"), duration(state.snapshot!.uptimeSeconds)]]))}${panel("LocalOps", facts([[t("版本"), e(i.version)], [t("技术"), "Go + MyGo + Vite"], [t("指标刷新"), `${i.refreshSeconds} ${t("秒")}`], [t("磁盘容量刷新"), `${i.diskRefreshSeconds} ${t("秒")}`], [t("进程刷新"), `${i.processRefreshSeconds} ${t("秒")}`], [t("历史保留"), t("最近 1 小时 · 仅本次运行")]]))}</div>${notice(t("支持 macOS、Windows 和 Linux 系统采集。CPU 温度、App 级功耗、卸载及进程终止不在当前功能范围内。"))}${note(t("数据仅在本机读取。GPU、电池和功率计数的可用性取决于硬件、驱动及当前权限；没有计数时显示不可用。"))}`;
 }
 
 export function renderBody(state: ViewState): string {
