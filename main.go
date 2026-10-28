@@ -93,8 +93,8 @@ func (s *System) Connections(ctx context.Context) (metrics.Connections, error) {
 	return metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second)
 }
 
-// SameFile(info, info) captures Windows file IDs now: Lstat resolves them lazily.
 func (s *System) ScanCleanup(ctx context.Context) metrics.ScanResult {
+	// SameFile(info, info) captures Windows file IDs now: Lstat resolves them lazily.
 	s.cleanupMu.Lock()
 	defer s.cleanupMu.Unlock()
 	result := metrics.ScanSpace(ctx, s.info.ScanTargets, s.config.ScanMaxEntries, s.config.ScanMaxItems, time.Duration(s.config.ScanTimeoutSeconds)*time.Second)
