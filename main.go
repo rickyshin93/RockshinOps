@@ -92,6 +92,8 @@ func (s *System) Processes() metrics.ProcessList { return s.monitor.Processes() 
 func (s *System) Connections(ctx context.Context) (metrics.Connections, error) {
 	return metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second)
 }
+
+// SameFile(info, info) captures Windows file IDs now: Lstat resolves them lazily.
 func (s *System) ScanCleanup(ctx context.Context) metrics.ScanResult {
 	s.cleanupMu.Lock()
 	defer s.cleanupMu.Unlock()
@@ -104,13 +106,13 @@ func (s *System) ScanCleanup(ctx context.Context) metrics.ScanResult {
 			continue
 		}
 		if group.Name == "废纸篓" {
-			if info, err := os.Lstat(group.Path); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+			if info, err := os.Lstat(group.Path); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 && os.SameFile(info, info) {
 				s.trashPath, s.trashInfo = group.Path, info
 			}
 			continue
 		}
 		for _, item := range group.Items {
-			if info, err := os.Lstat(item.Path); err == nil && info.Mode()&os.ModeSymlink == 0 {
+			if info, err := os.Lstat(item.Path); err == nil && info.Mode()&os.ModeSymlink == 0 && os.SameFile(info, info) {
 				s.cleanupItems[item.Path] = info
 			}
 		}
@@ -176,7 +178,7 @@ func (s *System) scanDisk(ctx context.Context, root, path string) (metrics.ScanR
 				}
 			}
 			if !inTrash {
-				if info, err := os.Lstat(item.Path); err == nil && info.Mode()&os.ModeSymlink == 0 {
+				if info, err := os.Lstat(item.Path); err == nil && info.Mode()&os.ModeSymlink == 0 && os.SameFile(info, info) {
 					s.cleanupItems[item.Path] = info
 				}
 			}
