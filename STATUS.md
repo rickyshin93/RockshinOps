@@ -2,7 +2,7 @@
 
 ## Doing
 
-- 2026-10-28: Implemented signed GitHub Releases updates for v0.2.1, with Settings/menu checks and user-confirmed installation. Local Go/frontend checks and signed macOS packaging passed. Native macOS checks, rejection of a tampered archive, installation and relaunch passed using an isolated old-version fixture and loopback feed; the installed executable matches the candidate. Four-target CI/public release verification pending.
+- 2026-10-28: Released [v0.2.1](https://github.com/rickyshin93/local-ops/releases/tag/v0.2.1) with signed automatic updates and localized Settings/menu checks. [Four-target CI](https://github.com/rickyshin93/local-ops/actions/runs/40654891951), downloaded checksums/signatures, and a macOS fixture upgrade/relaunch passed. Real GitHub-source native acceptance remains blocked by this machine’s download-host connection timeout; this is separate from the successful loopback test.
 - 2026-10-27: Final native tray appearance regression remains unverified: the menu-bar preview tool returns an old cached image. Sampling, preferences, language persistence, window close/reopen, Lucide rendering and native App icons are verified.
 
 ## Next
@@ -33,4 +33,5 @@
 - CPU temperature and App-level watt measurements are not implemented; GPU/system power availability depends on hardware.
 - Space analysis can be partial when macOS denies directory access. Results are logical file sizes, not guaranteed reclaimable space; no deletion is implemented.
 - Actual sleep/wake and direct tray-menu interaction remain untested; tray capacity and configurable text/icon-only states were observed in earlier builds through Ice; its cached preview cannot establish current release appearance. Error recovery used a browser fixture, not native fault injection. The interface now uses fixed light styling.
+- Direct GitHub download connections timed out on the macOS test machine during v0.2.1 acceptance; authenticated API downloads succeeded and all four update archives passed signature verification. Native public-source upgrade acceptance remains open.
 - Windows/Linux interactive desktop behavior and battery/GPU hardware remain outside local acceptance. macOS packages are ad-hoc signed and not notarized; Windows packages are unsigned.
