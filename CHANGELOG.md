@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3
+
+- On macOS, optionally use the system proxy for update checks and downloads. PAC scripts and authenticated proxies are not supported.
+
+### 中文
+
+- macOS 新增更新使用系统代理的选项，适用于检查和下载更新；不支持 PAC 自动代理脚本及需要认证的代理。
+
 ## 0.2.2
 
 - Explore disk folders and review selected files before moving them to the system trash.

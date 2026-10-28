@@ -18,7 +18,7 @@ const state: ViewState = {
   processes: null, connections: null, scan: null, query: "", sort: "cpu", onlyMine: false,
   busy: false, processError: "", connectionError: "", scanError: "", scanning: false, cleanupBusy: false, cleanupMessage: "", spaceMode: false, spaceHistory: [],
   appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
-  preferences: null, menuBarDraft: [], languageDraft: "system", preferencesBusy: false, preferencesError: "",
+  preferences: null, updateProxyDraft: false, menuBarDraft: [], languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
 let settingsRoot: Root | null = null;
 void i18n.changeLanguage(isMyGo() ? locale() : resolveLanguage(navigator.languages));
@@ -60,7 +60,7 @@ function render(filters = false) {
     renderedScan = "";
     renderedAppReview = "";
     if (!settingsRoot) { el("page-body").replaceChildren(); settingsRoot = createRoot(el("page-body")); }
-    settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, onLanguage: (language: Language) => { state.languageDraft = language; render(); } })));
+    settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, showUpdateProxy: state.info?.machine.platform === "darwin", onLanguage: (language: Language) => { state.languageDraft = language; render(); } })));
   } else {
     settingsRoot?.unmount(); settingsRoot = null;
     const body = renderBody(state);
@@ -247,14 +247,14 @@ async function navigate(page: Page, query = "") {
 async function loadSettings() {
   try {
     state.preferences = await System.preferences();
-    state.menuBarDraft = [...state.preferences.menuBarItems]; state.languageDraft = state.preferences.language as Language; state.preferencesError = "";
+    state.updateProxyDraft = state.preferences.updateUseSystemProxy; state.menuBarDraft = [...state.preferences.menuBarItems]; state.languageDraft = state.preferences.language as Language; state.preferencesError = "";
   } catch (reason) { state.preferencesError = `${t("无法读取设置：")}${String(reason)}`; }
   render();
 }
 async function saveSettings() {
   if (state.preferencesBusy || !preferencesDirty(state)) return;
   state.preferencesBusy = true; state.preferencesError = ""; render();
-  try { state.preferences = await System.savePreferences({ menuBarItems: [...state.menuBarDraft], language: state.languageDraft }); }
+  try { state.preferences = await System.savePreferences({ menuBarItems: [...state.menuBarDraft], language: state.languageDraft, updateUseSystemProxy: state.updateProxyDraft }); }
   catch (reason) { state.preferencesError = `${t("保存失败，当前菜单栏保持原设置：")}${String(reason)}${t("。请重试。")}`; }
   finally { state.preferencesBusy = false; render(); }
 }
@@ -269,6 +269,7 @@ document.addEventListener("click", event => {
   if (button.dataset.emptyTrash) { void cleanup(button.dataset.emptyTrash, true); return; }
   if (button.dataset.spacePath) { state.spaceHistory.push(button.dataset.spacePath); void scan(); return; }
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
+  if (button.dataset.action === "toggle-update-proxy") { state.updateProxyDraft = !state.updateProxyDraft; render(); return; }
   if (button.dataset.metric) {
     if (state.preferencesBusy) return;
     const selected = new Set(state.menuBarDraft);

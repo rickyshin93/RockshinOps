@@ -15,8 +15,9 @@ import (
 )
 
 type Preferences struct {
-	Language     string   `json:"language"`
-	MenuBarItems []string `json:"menuBarItems"`
+	UpdateUseSystemProxy bool     `json:"updateUseSystemProxy"`
+	Language             string   `json:"language"`
+	MenuBarItems         []string `json:"menuBarItems"`
 }
 
 func validatePreferences(p Preferences) error {
@@ -43,15 +44,15 @@ func validatePreferences(p Preferences) error {
 	return nil
 }
 
-func readPreferences(path string, defaults []string, defaultLanguage string) (Preferences, error) {
+func readPreferences(path string, defaults []string, defaultLanguage string, defaultProxy bool) (Preferences, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return Preferences{Language: defaultLanguage, MenuBarItems: append([]string{}, defaults...)}, nil
+		return Preferences{UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage, MenuBarItems: append([]string{}, defaults...)}, nil
 	}
 	if err != nil {
 		return Preferences{}, fmt.Errorf("read preferences: %w", err)
 	}
-	p := Preferences{Language: defaultLanguage}
+	p := Preferences{UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage}
 	if err = json.Unmarshal(data, &p); err == nil {
 		err = validatePreferences(p)
 	}
@@ -84,7 +85,7 @@ func writePreferences(path string, p Preferences) error {
 func (s *System) Preferences() Preferences {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return Preferences{Language: s.preferences.Language, MenuBarItems: append([]string{}, s.preferences.MenuBarItems...)}
+	return Preferences{UpdateUseSystemProxy: s.preferences.UpdateUseSystemProxy, Language: s.preferences.Language, MenuBarItems: append([]string{}, s.preferences.MenuBarItems...)}
 }
 
 func (s *System) SavePreferences(p Preferences) (Preferences, error) {
@@ -93,7 +94,7 @@ func (s *System) SavePreferences(p Preferences) (Preferences, error) {
 		s.mu.Unlock()
 		return Preferences{}, err
 	}
-	s.preferences = Preferences{Language: p.Language, MenuBarItems: append([]string{}, p.MenuBarItems...)}
+	s.preferences = Preferences{UpdateUseSystemProxy: p.UpdateUseSystemProxy, Language: p.Language, MenuBarItems: append([]string{}, p.MenuBarItems...)}
 	s.update(s.monitor.Current())
 	s.mu.Unlock()
 	applyLanguage(p.Language)

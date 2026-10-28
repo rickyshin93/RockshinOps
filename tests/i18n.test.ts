@@ -15,12 +15,14 @@ describe("language selection", () => {
     expect(resolveLanguage(languages)).toBe(expected);
   });
   test("changing only language makes settings saveable", () => {
-    const state: SettingsState = { preferences: { language: "system", menuBarItems: ["disk"] }, languageDraft: "system", menuBarDraft: ["disk"], preferencesBusy: false, preferencesError: "" };
+    const state: SettingsState = { preferences: { language: "system", menuBarItems: ["disk"], updateUseSystemProxy: false }, languageDraft: "system", menuBarDraft: ["disk"], updateProxyDraft: false, preferencesBusy: false, preferencesError: "" };
     expect(preferencesDirty(state)).toBe(false);
     state.languageDraft = "en";
     expect(preferencesDirty(state)).toBe(true);
-    state.preferences = { language: "en", menuBarItems: ["disk"] };
+    state.preferences = { language: "en", menuBarItems: ["disk"], updateUseSystemProxy: false };
     expect(preferencesDirty(state)).toBe(false);
+    state.updateProxyDraft = true;
+    expect(preferencesDirty(state)).toBe(true);
   });
   test("switches existing translations without reinitializing the app", async () => {
     await i18n.changeLanguage("zh");

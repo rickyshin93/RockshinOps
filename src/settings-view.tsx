@@ -3,12 +3,13 @@ import { icon } from "./icons";
 import { menuBarChoices, preferencesDirty, type SettingsState } from "./settings";
 import type { Language } from "./i18n";
 
-export function SettingsView({ state, onLanguage }: { state: SettingsState; onLanguage: (language: Language) => void }) {
+export function SettingsView({ state, onLanguage, showUpdateProxy }: { state: SettingsState; onLanguage: (language: Language) => void; showUpdateProxy: boolean }) {
   const { t } = useTranslation();
   if (!state.preferences) return <div className="empty-state"><h2>{t("读取设置")}</h2><p>{state.preferencesError || t("正在读取本机偏好…")}</p>{state.preferencesError && <button className="secondary-button" data-action="load-settings">{t("重试")}</button>}</div>;
   return <div className="settings-page">
     <section className="settings-options" aria-labelledby="updates-title">
       <div className="setting-row"><div className="setting-copy"><h2 id="updates-title">{t("软件更新")}</h2><p>{t("启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。")}</p></div><button className="secondary-button" data-action="check-updates">{t("检查更新…")}</button></div>
+      {showUpdateProxy && <div className="setting-row"><div className="setting-copy"><label id="update-proxy-label">{t("更新时使用系统代理")}</label><p>{t("使用 macOS 网络设置中的代理连接更新服务器。保存后立即生效。")}</p></div><button type="button" className="switch" role="switch" aria-checked={state.updateProxyDraft} aria-labelledby="update-proxy-label" data-action="toggle-update-proxy" disabled={state.preferencesBusy}><span /></button></div>}
     </section>
     <section className="settings-options language-settings" aria-labelledby="language-title">
       <div className="setting-copy"><h2 id="language-title">{t("显示语言")}</h2><p>{t("默认跟随系统语言；不支持的语言使用英文。")}</p></div>
