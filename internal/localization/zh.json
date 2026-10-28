@@ -362,5 +362,9 @@
   "Invalid GPU counters": "GPU 计数无效",
   "CPU counters unavailable": "CPU 计数不可用",
   "%s counters unavailable": "%s 计数不可用",
-  "运行摘要": "LocalOps {{version}} · 指标每 {{metrics}} 秒 · 进程每 {{processes}} 秒 · 历史仅保留本次运行最近 {{hours}} 小时"
+  "运行摘要": "LocalOps {{version}} · 指标每 {{metrics}} 秒 · 进程每 {{processes}} 秒 · 历史仅保留本次运行最近 {{hours}} 小时",
+  "软件更新": "软件更新",
+  "检查更新…": "检查更新…",
+  "启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。": "启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。",
+  "无法打开更新窗口：": "无法打开更新窗口："
 }

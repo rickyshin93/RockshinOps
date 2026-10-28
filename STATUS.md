@@ -2,6 +2,7 @@
 
 ## Doing
 
+- 2026-10-28: Implemented signed GitHub Releases updates for v0.2.1, with Settings/menu checks and user-confirmed installation. Local Go/frontend checks and signed macOS packaging passed. Native macOS checks, rejection of a tampered archive, installation and relaunch passed using an isolated old-version fixture and loopback feed; the installed executable matches the candidate. Four-target CI/public release verification pending.
 - 2026-10-27: Final native tray appearance regression remains unverified: the menu-bar preview tool returns an old cached image. Sampling, preferences, language persistence, window close/reopen, Lucide rendering and native App icons are verified.
 
 ## Next

@@ -239,6 +239,9 @@ export interface Volume {
 // ---- Services ----
 
 export const System = {
+  checkForUpdates(): Promise<void> {
+    return call("System.CheckForUpdates");
+  },
   connections(): Promise<Connections> {
     return call("System.Connections");
   },

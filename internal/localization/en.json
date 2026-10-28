@@ -362,5 +362,9 @@
   "Invalid GPU counters": "Invalid GPU counters",
   "CPU counters unavailable": "CPU counters unavailable",
   "%s counters unavailable": "%s counters unavailable",
-  "运行摘要": "LocalOps {{version}} · Metrics every {{metrics}} s · Processes every {{processes}} s · Session history: {{hours}} h"
+  "运行摘要": "LocalOps {{version}} · Metrics every {{metrics}} s · Processes every {{processes}} s · Session history: {{hours}} h",
+  "软件更新": "Software updates",
+  "检查更新…": "Check for Updates…",
+  "启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。": "Checks for updates after launch and asks before installing by default. Update system packages through your package manager.",
+  "无法打开更新窗口：": "Could not open the update window: "
 }
