@@ -14,10 +14,11 @@ export interface SettingsState {
   preferences: Preferences | null;
   menuBarDraft: string[];
   languageDraft: Language;
+  updateProxyDraft: boolean;
   preferencesBusy: boolean;
   preferencesError: string;
 }
 
 export function preferencesDirty(state: SettingsState): boolean {
-  return !!state.preferences && (state.languageDraft !== state.preferences.language || JSON.stringify(state.menuBarDraft) !== JSON.stringify(state.preferences.menuBarItems));
+  return !!state.preferences && (state.updateProxyDraft !== state.preferences.updateUseSystemProxy || state.languageDraft !== state.preferences.language || JSON.stringify(state.menuBarDraft) !== JSON.stringify(state.preferences.menuBarItems));
 }

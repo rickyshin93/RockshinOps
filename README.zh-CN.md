@@ -40,7 +40,7 @@ CPU 温度和 App 级瓦特计量尚未实现；GPU 与系统功率取决于硬�
 
 每次发布附带 `SHA256SUMS.txt`。从 v0.2.1 开始，应用启动后及持续运行期间每天检查 GitHub Releases；也可通过**设置 → 检查更新…**、应用菜单或托盘菜单手动检查。更新窗口提供说明、下载进度、签名验证和重启选择；默认确认后安装，主动勾选后才启用自动安装。
 
-v0.2.0 用户需先手动安装一次 v0.2.1。自动更新要求安装位置可写；Linux 系统软件包通过包管理器升级。检查和下载需要能访问 GitHub；更新签名不改变上述操作系统签名和公证状态。
+v0.2.0 用户需先手动安装一次 v0.2.1。自动更新要求安装位置可写；Linux 系统软件包通过包管理器升级。macOS 用户可在设置中开启“更新使用系统代理”，保存后生效；不支持 PAC 自动代理脚本和需要认证的代理。检查和下载需要能访问 GitHub；更新签名不改变上述操作系统签名和公证状态。
 
 ## 开发和验证
 
@@ -73,7 +73,7 @@ bun run build
 
 ## 参数、偏好与数据
 
-根目录 `localops.json` 集中配置刷新周期、历史长度、超时、扫描目录与数量上限；嵌入应用，修改后需重新构建。`defaultMenuBarItems` 和 `defaultLanguage` 定义首次运行默认值。`scanTargets` 按 `darwin`、`windows`、`linux` 分别配置；`~/` 展开为当前用户目录。
+根目录 `localops.json` 集中配置刷新周期、历史长度、超时、扫描目录与数量上限；嵌入应用，修改后需重新构建。`defaultMenuBarItems`、`defaultLanguage` 和 `defaultUpdateUseSystemProxy` 定义首次运行默认值。`scanTargets` 按 `darwin`、`windows`、`linux` 分别配置；`~/` 展开为当前用户目录。
 
 用户偏好保存在 `os.UserConfigDir()/LocalOps/preferences.json`；macOS 对应 `~/Library/Application Support/LocalOps/preferences.json`。旧设置没有语言字段时默认跟随系统；损坏设置或保存失败会明确报错，不静默重置。
 

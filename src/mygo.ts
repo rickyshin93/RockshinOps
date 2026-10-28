@@ -162,6 +162,7 @@ export interface NetworkInterface {
 }
 
 export interface Preferences {
+  updateUseSystemProxy: boolean;
   language: string;
   menuBarItems: string[];
 }

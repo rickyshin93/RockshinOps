@@ -14,18 +14,19 @@ import (
 var configJSON []byte
 
 type Config struct {
-	DefaultLanguage          string                          `json:"defaultLanguage"`
-	UpdateIntervalSeconds    int                             `json:"updateIntervalSeconds"`
-	DefaultMenuBarItems      []string                        `json:"defaultMenuBarItems"`
-	SampleIntervalSeconds    int                             `json:"sampleIntervalSeconds"`
-	MetricsIntervalSeconds   int                             `json:"metricsIntervalSeconds"`
-	ProcessIntervalSeconds   int                             `json:"processIntervalSeconds"`
-	HistorySeconds           int                             `json:"historySeconds"`
-	ConnectionTimeoutSeconds int                             `json:"connectionTimeoutSeconds"`
-	ScanTimeoutSeconds       int                             `json:"scanTimeoutSeconds"`
-	ScanMaxEntries           int                             `json:"scanMaxEntries"`
-	ScanMaxItems             int                             `json:"scanMaxItems"`
-	ScanTargets              map[string][]metrics.ScanTarget `json:"scanTargets"`
+	DefaultUpdateUseSystemProxy bool                            `json:"defaultUpdateUseSystemProxy"`
+	DefaultLanguage             string                          `json:"defaultLanguage"`
+	UpdateIntervalSeconds       int                             `json:"updateIntervalSeconds"`
+	DefaultMenuBarItems         []string                        `json:"defaultMenuBarItems"`
+	SampleIntervalSeconds       int                             `json:"sampleIntervalSeconds"`
+	MetricsIntervalSeconds      int                             `json:"metricsIntervalSeconds"`
+	ProcessIntervalSeconds      int                             `json:"processIntervalSeconds"`
+	HistorySeconds              int                             `json:"historySeconds"`
+	ConnectionTimeoutSeconds    int                             `json:"connectionTimeoutSeconds"`
+	ScanTimeoutSeconds          int                             `json:"scanTimeoutSeconds"`
+	ScanMaxEntries              int                             `json:"scanMaxEntries"`
+	ScanMaxItems                int                             `json:"scanMaxItems"`
+	ScanTargets                 map[string][]metrics.ScanTarget `json:"scanTargets"`
 }
 
 func parseConfig(data []byte) (Config, error) {

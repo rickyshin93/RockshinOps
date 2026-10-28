@@ -255,7 +255,7 @@ func main() {
 		log.Fatal(err)
 	}
 	preferencesPath := filepath.Join(configDir, "LocalOps", "preferences.json")
-	preferences, err := readPreferences(preferencesPath, cfg.DefaultMenuBarItems, cfg.DefaultLanguage)
+	preferences, err := readPreferences(preferencesPath, cfg.DefaultMenuBarItems, cfg.DefaultLanguage, cfg.DefaultUpdateUseSystemProxy)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -275,6 +275,7 @@ func main() {
 	}), info: AppInfo{Machine: metrics.ReadMachine(), Version: mygo.App.Version(), RefreshSeconds: cfg.MetricsIntervalSeconds,
 		DiskRefreshSeconds: cfg.SampleIntervalSeconds, ProcessRefreshSeconds: cfg.ProcessIntervalSeconds,
 		HistorySeconds: cfg.HistorySeconds, ScanTargets: targets}}
+	configureUpdateProxy(service, systemUpdateProxy)
 	mygo.Bind(service)
 	if err := mygo.Protocol.Handle(appicon.Scheme, appicon.Handler()); err != nil {
 		log.Fatal(err)

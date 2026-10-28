@@ -1,5 +1,6 @@
 {
   "defaultLanguage": "system",
+  "defaultUpdateUseSystemProxy": false,
   "updateIntervalSeconds": 86400,
   "defaultMenuBarItems": [
     "disk"

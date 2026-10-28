@@ -431,5 +431,7 @@
   "软件更新": "Software updates",
   "检查更新…": "Check for Updates…",
   "启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。": "Checks for updates after launch and asks before installing by default. Update system packages through your package manager.",
-  "无法打开更新窗口：": "Could not open the update window: "
+  "无法打开更新窗口：": "Could not open the update window: ",
+  "更新时使用系统代理": "Use system proxy for updates",
+  "使用 macOS 网络设置中的代理连接更新服务器。保存后立即生效。": "Use the proxy from macOS network settings to connect to update servers. Takes effect after saving."
 }

@@ -43,7 +43,7 @@ Download the package for your architecture from [Releases](https://github.com/ri
 
 Each release includes `SHA256SUMS.txt`. Starting with v0.2.1, LocalOps checks GitHub Releases after launch and daily while running. Use **Settings → Check for Updates…**, the app menu or the tray menu to check manually. The update window shows release notes, downloads with progress, verifies the signature and lets you choose when to relaunch. Installation requires confirmation unless you explicitly opt into automatic installation.
 
-Install v0.2.1 manually once if you currently use v0.2.0. Updates require a writable install location; Linux system packages must be upgraded with the package manager. GitHub must be reachable. Update signing does not change the OS signing/notarization status above.
+Install v0.2.1 manually once if you currently use v0.2.0. Updates require a writable install location; Linux system packages must be upgraded with the package manager. On macOS, **Settings → Use system proxy for updates** uses the system network proxy after saving; PAC scripts and authenticated proxies are not supported. GitHub must be reachable. Update signing does not change the OS signing/notarization status above.
 
 ## Develop
 
@@ -86,7 +86,7 @@ The public key and release repository are in `mygo.config.ts`. Keep the original
 
 ## Configuration and data
 
-`localops.json` is the single file for the update check interval (`updateIntervalSeconds`, default 86400 seconds), sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems` and `defaultLanguage` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
+`localops.json` is the single file for the update check interval (`updateIntervalSeconds`, default 86400 seconds), sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems`, `defaultLanguage`, and `defaultUpdateUseSystemProxy` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
 
 User settings are stored at `os.UserConfigDir()/LocalOps/preferences.json` (on macOS: `~/Library/Application Support/LocalOps/preferences.json`). Existing settings without a language field follow the system. Invalid settings or failed saves report errors; saved preferences are not silently reset.
 
