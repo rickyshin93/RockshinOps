@@ -121,7 +121,6 @@ dd { margin: 2px 0 0; font-size: var(--fs-body); font-weight: 500; font-variant-
 .rank-track { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: var(--fill); overflow: hidden; }
 .rank-track i { display: block; height: 100%; background: var(--tone); width: 100%; transform-origin: left; border-radius: inherit; }
 .source-note { color: var(--muted); font-size: var(--fs-caption); line-height: 1.6; margin-top: 16px; overflow-wrap: anywhere; }
-.page-footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 24px; color: var(--muted); font-size: var(--fs-caption); }
 .muted { color: var(--muted); }.unavailable { color: var(--muted); font-size: var(--fs-small); }.number, .mono { font-variant-numeric: tabular-nums; }
 .path, .endpoint { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; font-size: var(--fs-caption); }
 .notice { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-card); color: var(--muted); font-size: var(--fs-small); line-height: 1.6; margin-bottom: 16px; overflow-wrap: anywhere; }
@@ -132,6 +131,8 @@ dd { margin: 2px 0 0; font-size: var(--fs-body); font-weight: 500; font-variant-
 .empty-state button, .secondary-button, .primary-button { padding: 4px 12px; background: var(--surface); border-radius: var(--r-sm); box-shadow: var(--shadow-thumb); font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background-color 150ms ease; }
 .primary-button { background: var(--accent); color: #fff; box-shadow: none; }
 .primary-button:hover:not([aria-disabled="true"]) { background: var(--accent-hover); }
+.scan-spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: scan-spin 0.8s linear infinite; }
+@keyframes scan-spin { to { transform: rotate(360deg); } }
 .loading-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: breathe 1.2s ease-in-out infinite alternate; }
 @keyframes breathe { to { opacity: .25; } }
 
@@ -232,7 +233,7 @@ button.app-row:hover { background: var(--fill); }
 @media (max-width: 760px) {
   .sidebar { width: 165px; }.content-scroll { padding: 0 16px 16px; }.page-heading { flex-direction: column; gap: 12px; }.overview-grid, .detail-grid, .about-grid { grid-template-columns: 1fr; }.detail-grid > .span-two { grid-column: auto; }.page-filters { flex-wrap: wrap; }.search-field { flex-basis: 100%; }.core-grid { grid-template-columns: repeat(2, 1fr); }.sort-menu { left: 0; right: auto; }
 }
-@media (prefers-reduced-motion: reduce) { .loading-dot { animation: none; } button, .switch, .switch > span, .rank-heading strong { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .loading-dot, .scan-spinner { animation: none; } button, .switch, .switch > span, .rank-heading strong { transition: none !important; } }
 
 .language-settings { padding: 20px; }
 .language-settings h2 { margin: 0 0 6px; font-size: 15px; }
@@ -243,3 +244,48 @@ button.app-row:hover { background: var(--fill); }
 .language-choices input:checked + span { color: #fff; background: #007aff; border-color: #007aff; }
 .language-choices input:focus-visible + span { outline: 3px solid #80bfff; outline-offset: 2px; }
 .language-choices input:disabled + span { opacity: .55; cursor: default; }
+.cleanup-action { flex-shrink: 0; color: var(--accent); padding: 4px 8px; border-radius: var(--r-sm); }
+.cleanup-action:hover:not(:disabled) { background: var(--fill); }
+.space-toolbar { display: flex; gap: 8px; margin: 12px 0; }
+.app-mode-toolbar { margin: 0 0 12px; }
+.installed-hint { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: var(--fs-small); margin: 0 0 12px; }
+.space-share { display: block; width: var(--share); max-width: 120px; min-width: 0; height: 4px; border-radius: var(--r-sm); background: var(--disk); }
+.installed-list > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--line); }
+.installed-list .app-icon { width: 40px; height: 40px; object-fit: contain; }
+.installed-list > button:hover { background: var(--fill); }
+.installed-list > button > span { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.installed-list small, .uninstall-list small { color: var(--muted); overflow-wrap: anywhere; }
+.uninstall-back { margin: 4px 0 10px; }
+.uninstall-review { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-card); padding: 20px; }
+.uninstall-heading { display: flex; align-items: center; gap: 12px; }
+.uninstall-heading .app-icon { width: 40px; height: 40px; }
+.uninstall-heading h2 { font-size: 16px; }
+.uninstall-heading p, .uninstall-guidance, .uninstall-list-heading span, .uninstall-actions > span { color: var(--muted); }
+.uninstall-guidance { margin: 16px 0; line-height: 1.6; max-width: 75ch; }
+.uninstall-progress { display: flex; align-items: center; gap: 9px; padding: 10px 12px; background: var(--fill); border-radius: var(--r-sm); }
+.uninstall-progress .loading-dot { width: 7px; height: 7px; flex: 0 0 auto; }
+.uninstall-progress .cleanup-action { margin-left: auto; }
+.disk-access-prompt { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 16px 0; padding: 12px 0; border-block: 1px solid var(--line); }
+.disk-access-prompt > div { flex: 1 1 280px; min-width: 0; }
+.disk-access-prompt strong { font-size: var(--fs-small); }
+.disk-access-prompt p { margin-top: 4px; max-width: 75ch; color: var(--muted); font-size: var(--fs-small); line-height: 1.6; }
+.uninstall-coverage { margin: 12px 0; font-size: var(--fs-small); }
+.uninstall-coverage summary { color: var(--warning); cursor: pointer; }
+.uninstall-coverage summary span { margin-left: 8px; }
+.uninstall-coverage summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.uninstall-coverage p { color: var(--muted); margin-top: 8px; max-width: 75ch; line-height: 1.6; }
+.uninstall-coverage ul { list-style: none; padding: 0; margin-top: 12px; }
+.uninstall-coverage li { display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.uninstall-coverage small { color: var(--muted); font-size: inherit; }
+.uninstall-list-heading { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 20px 4px 9px; border-bottom: 1px solid var(--line); }
+.uninstall-list-heading label { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.uninstall-list-heading input { margin: 0; accent-color: var(--accent); flex: 0 0 auto; }
+.uninstall-list-heading .uninstall-list-title { color: var(--text); font-size: var(--fs-body); font-weight: 600; }
+.uninstall-list-heading span { font-size: var(--fs-small); }
+.uninstall-list label { display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.uninstall-list label:hover { background: var(--fill); }
+.uninstall-list input { margin: 3px 0 0; accent-color: var(--accent); flex: 0 0 auto; }
+.uninstall-list label span { display: grid; gap: 3px; min-width: 0; }
+.uninstall-list strong { font-weight: 400; overflow-wrap: anywhere; }
+.uninstall-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 18px; }
+.uninstall-actions > span { font-size: var(--fs-small); }

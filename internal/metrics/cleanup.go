@@ -18,10 +18,12 @@ type ScanTarget struct {
 	Path string `json:"path"`
 }
 type SpaceItem struct {
-	Name  string `json:"name"`
-	Path  string `json:"path"`
-	Bytes int64  `json:"bytes"`
-	Files int    `json:"files"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	Bytes     int64  `json:"bytes"`
+	Files     int    `json:"files"`
+	Directory bool   `json:"directory"`
+	Scanned   bool   `json:"scanned"`
 }
 type ScanGroup struct {
 	Name    string      `json:"name"`
@@ -43,19 +45,54 @@ type ScanResult struct {
 // ScanSpace only measures ordinary file sizes. It does not follow symbolic links,
 // delete files, or label application data as safely reclaimable.
 func ScanSpace(ctx context.Context, targets []ScanTarget, maxEntries, maxItems int, timeout time.Duration) ScanResult {
+	return scanSpace(ctx, targets, maxEntries, maxItems, timeout, nil)
+}
+
+// ScanSpaceWithProgress counts directory entries first, then reports entries
+// visited while measuring. The filesystem can change between the two passes.
+func ScanSpaceWithProgress(ctx context.Context, target ScanTarget, counting func(), ready func(int64), visited func()) ScanResult {
+	var total int64
+	_ = filepath.WalkDir(target.Path, func(_ string, _ fs.DirEntry, _ error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		total++
+		counting()
+		return nil
+	})
+	ready(total)
+	return scanSpace(ctx, []ScanTarget{target}, 0, 0, 0, visited)
+}
+
+func scanSpace(ctx context.Context, targets []ScanTarget, maxEntries, maxItems int, timeout time.Duration, visited func()) ScanResult {
 	result := ScanResult{Groups: []ScanGroup{}, StartedAt: time.Now().UTC(), Complete: true}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	entries := 0
 	for _, target := range targets {
 		group := ScanGroup{Name: target.Name, Path: target.Path, Items: []SpaceItem{}}
 		items := map[string]*SpaceItem{}
+		// List all immediate children before traversing any one of them. A large
+		// child can exhaust the scan budget before WalkDir reaches its siblings.
+		if children, err := os.ReadDir(target.Path); err == nil {
+			for _, child := range children {
+				if child.Type()&os.ModeSymlink == 0 {
+					items[child.Name()] = &SpaceItem{Name: child.Name(), Path: filepath.Join(target.Path, child.Name()), Directory: child.IsDir()}
+				}
+			}
+		}
 		err := filepath.WalkDir(target.Path, func(path string, entry fs.DirEntry, walkErr error) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
+			if visited != nil {
+				visited()
+			}
 			entries++
-			if entries > maxEntries {
+			if maxEntries > 0 && entries > maxEntries {
 				return fmt.Errorf(localization.T("扫描已达到 %d 项上限"), maxEntries)
 			}
 			if walkErr != nil {
@@ -64,6 +101,11 @@ func ScanSpace(ctx context.Context, targets []ScanTarget, maxEntries, maxItems i
 					return walkErr
 				}
 				return nil
+			}
+			if path != target.Path && filepath.Dir(path) == filepath.Clean(target.Path) && entry.Type()&os.ModeSymlink == 0 {
+				if item := items[entry.Name()]; item != nil {
+					item.Scanned = true
+				}
 			}
 			if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() {
 				return nil
@@ -111,10 +153,16 @@ func ScanSpace(ctx context.Context, targets []ScanTarget, maxEntries, maxItems i
 			}
 			return strings.Compare(a.Path, b.Path)
 		})
-		group.Items = group.Items[:min(maxItems, len(group.Items))]
+		if maxItems > 0 && len(group.Items) > maxItems {
+			group.Items = group.Items[:maxItems]
+		}
 		result.Groups = append(result.Groups, group)
-		if ctx.Err() != nil || entries > maxEntries {
-			result.Warning = localization.T("扫描提前停止，当前仅为已读部分。可缩小 localops.json 中的扫描范围后重试。")
+		if ctx.Err() != nil || (maxEntries > 0 && entries > maxEntries) {
+			if timeout == 0 && maxEntries == 0 {
+				result.Warning = localization.T("扫描已中止，当前仅为已读部分。")
+			} else {
+				result.Warning = localization.T("扫描提前停止，当前仅为已读部分。可缩小 localops.json 中的扫描范围后重试。")
+			}
 			break
 		}
 	}

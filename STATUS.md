@@ -2,6 +2,9 @@
 
 ## Doing
 
+- 2026-10-27: Added macOS Full Disk Access settings access in the installed-app list and visible permission-error guidance, including add-app and quit/reopen instructions. Native System Settings navigation verified; Go tests, frontend tests/typecheck/build and generated binding passed. LocalOps button interaction remains unverified after the prior automatic approval rejection; continuing in dev mode without packaging.
+- 2026-10-27: REA verified AppDelete's selected-app branches, protection guards, auxiliary modes, 15 mode/sort combinations and nine special-filename cases. LocalOps fixes include unlimited name depth, missing-ID/cache detection and canonical Unicode matching. Shared permission failures now appear as expandable path/error coverage details, separately from candidates. Current real-app scans retain all 27 captured AppDelete paths; quick results take 49–73 ms and complete scans 11.3–13.5 s. Automated validation passed; LocalOps native validation remains blocked by the prior control rejection.
+- 2026-10-27: Implemented unlimited system-disk exploration with recursive folder navigation, stable scan animation, item-based progress, removed page footer, selected-item cleanup, confirmed permanent trash emptying, and macOS app uninstall with quick candidate display, unlimited parallel background search, select all, an independent operation lock, and a denser installed-app list with larger icons. Desktop validation remains blocked because computer control was not approved for LocalOps Dev.
 - 2026-10-27: Final native tray appearance regression remains unverified: the menu-bar preview tool returns an old cached image. Sampling, preferences, language persistence, window close/reopen, Lucide rendering and native App icons are verified.
 
 ## Next
@@ -30,6 +33,6 @@
 ## Known issues
 
 - CPU temperature and App-level watt measurements are not implemented; GPU/system power availability depends on hardware.
-- Space analysis can be partial when macOS denies directory access. Results are logical file sizes, not guaranteed reclaimable space; no deletion is implemented.
+- Space and uninstall scans can be partial when macOS denies directory access; the current uninstall comparison encountered 371 protected locations. Full Disk Access may improve coverage but does not guarantee access to all system directories. Name matches do not prove ownership or complete residual detection; REA coverage is representative, not exhaustive. Space results are logical file sizes, not guaranteed reclaimable space.
 - Actual sleep/wake and direct tray-menu interaction remain untested; tray capacity and configurable text/icon-only states were observed in earlier builds through Ice; its cached preview cannot establish current release appearance. Error recovery used a browser fixture, not native fault injection. The interface now uses fixed light styling.
 - Windows/Linux interactive desktop behavior and battery/GPU hardware remain outside local acceptance. macOS packages are ad-hoc signed and not notarized; Windows packages are unsigned.

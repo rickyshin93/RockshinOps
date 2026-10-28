@@ -4,6 +4,11 @@ import { call, event } from "mygo-runtime";
 
 // ---- Types ----
 
+export interface AppFile {
+  path: string;
+  reason: string;
+}
+
 export interface AppInfo {
   machine: Machine;
   version: string;
@@ -12,6 +17,20 @@ export interface AppInfo {
   processRefreshSeconds: number;
   historySeconds: number;
   scanTargets: ScanTarget[];
+}
+
+export interface AppReview {
+  app: InstalledApp;
+  bundleId: string;
+  files: AppFile[];
+  scanIssues: AppScanIssue[];
+  reviewId: number;
+}
+
+export interface AppScanIssue {
+  path: string;
+  kind: string;
+  error: string;
 }
 
 export interface AppUsage {
@@ -86,6 +105,11 @@ export interface GPU {
   memory: number;
   available: boolean;
   error: string;
+}
+
+export interface InstalledApp {
+  name: string;
+  path: string;
 }
 
 export interface Machine {
@@ -179,6 +203,12 @@ export interface ScanGroup {
   items: SpaceItem[];
 }
 
+export interface ScanProgress {
+  phase: string;
+  total: number;
+  visited: number;
+}
+
 export interface ScanResult {
   groups: ScanGroup[];
   startedAt: string;
@@ -213,6 +243,8 @@ export interface SpaceItem {
   path: string;
   bytes: number;
   files: number;
+  directory: boolean;
+  scanned: boolean;
 }
 
 export interface Trend {
@@ -239,8 +271,14 @@ export interface Volume {
 // ---- Services ----
 
 export const System = {
+  cancelAppReview(id: number): Promise<void> {
+    return call("System.CancelAppReview", id);
+  },
   connections(): Promise<Connections> {
     return call("System.Connections");
+  },
+  emptyCleanupTrash(path: string): Promise<void> {
+    return call("System.EmptyCleanupTrash", path);
   },
   hideWindow(): Promise<void> {
     return call("System.HideWindow");
@@ -251,6 +289,12 @@ export const System = {
   initialize(): Promise<Bootstrap> {
     return call("System.Initialize");
   },
+  installedApps(): Promise<InstalledApp[]> {
+    return call("System.InstalledApps");
+  },
+  openFullDiskAccessSettings(): Promise<void> {
+    return call("System.OpenFullDiskAccessSettings");
+  },
   preferences(): Promise<Preferences> {
     return call("System.Preferences");
   },
@@ -260,11 +304,29 @@ export const System = {
   refresh(): Promise<Snapshot> {
     return call("System.Refresh");
   },
+  removeAppFiles(paths: string[]): Promise<void> {
+    return call("System.RemoveAppFiles", paths);
+  },
+  reviewApp(path: string, id: number): Promise<AppReview> {
+    return call("System.ReviewApp", path, id);
+  },
+  reviewAppQuick(path: string): Promise<AppReview> {
+    return call("System.ReviewAppQuick", path);
+  },
   savePreferences(p: Preferences): Promise<Preferences> {
     return call("System.SavePreferences", p);
   },
   scanCleanup(): Promise<ScanResult> {
     return call("System.ScanCleanup");
+  },
+  scanDisk(path: string): Promise<ScanResult> {
+    return call("System.ScanDisk", path);
+  },
+  scanProgress(): Promise<ScanProgress> {
+    return call("System.ScanProgress");
+  },
+  trashCleanupItem(path: string): Promise<void> {
+    return call("System.TrashCleanupItem", path);
   },
 } as const;
 

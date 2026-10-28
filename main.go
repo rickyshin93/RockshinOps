@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -47,6 +48,33 @@ type System struct {
 	config          Config
 	info            AppInfo
 	update          func(metrics.Snapshot)
+	cleanupMu       sync.Mutex
+	appRemovalMu    sync.Mutex
+	cleanupItems    map[string]os.FileInfo
+	trashPath       string
+	trashInfo       os.FileInfo
+	appRemoval      appRemoval
+	appReviewSeq    uint64
+	scanPhase       atomic.Int32
+	scanTotal       atomic.Int64
+	scanVisited     atomic.Int64
+}
+
+type ScanProgress struct {
+	Phase   string `json:"phase"`
+	Total   int64  `json:"total"`
+	Visited int64  `json:"visited"`
+}
+
+func (s *System) ScanProgress() ScanProgress {
+	phase := "idle"
+	switch s.scanPhase.Load() {
+	case 1:
+		phase = "counting"
+	case 2:
+		phase = "scanning"
+	}
+	return ScanProgress{Phase: phase, Total: s.scanTotal.Load(), Visited: s.scanVisited.Load()}
 }
 
 func (s *System) Initialize() Bootstrap {
@@ -62,7 +90,139 @@ func (s *System) Connections(ctx context.Context) (metrics.Connections, error) {
 	return metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second)
 }
 func (s *System) ScanCleanup(ctx context.Context) metrics.ScanResult {
-	return metrics.ScanSpace(ctx, s.info.ScanTargets, s.config.ScanMaxEntries, s.config.ScanMaxItems, time.Duration(s.config.ScanTimeoutSeconds)*time.Second)
+	s.cleanupMu.Lock()
+	defer s.cleanupMu.Unlock()
+	result := metrics.ScanSpace(ctx, s.info.ScanTargets, s.config.ScanMaxEntries, s.config.ScanMaxItems, time.Duration(s.config.ScanTimeoutSeconds)*time.Second)
+	s.cleanupItems = make(map[string]os.FileInfo)
+	s.trashPath = ""
+	s.trashInfo = nil
+	for _, group := range result.Groups {
+		if group.Error != "" || group.Skipped != 0 {
+			continue
+		}
+		if group.Name == "废纸篓" {
+			if info, err := os.Lstat(group.Path); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+				s.trashPath, s.trashInfo = group.Path, info
+			}
+			continue
+		}
+		for _, item := range group.Items {
+			if info, err := os.Lstat(item.Path); err == nil && info.Mode()&os.ModeSymlink == 0 {
+				s.cleanupItems[item.Path] = info
+			}
+		}
+	}
+	return result
+}
+
+func (s *System) ScanDisk(ctx context.Context, path string) (metrics.ScanResult, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return metrics.ScanResult{}, err
+	}
+	root := filepath.VolumeName(home) + string(filepath.Separator)
+	return s.scanDisk(ctx, root, path)
+}
+
+func (s *System) scanDisk(ctx context.Context, root, path string) (metrics.ScanResult, error) {
+	if path == "" {
+		path = root
+	}
+	path = filepath.Clean(path)
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return metrics.ScanResult{}, fmt.Errorf("directory is outside the disk root")
+	}
+	current := root
+	if rel != "." {
+		for _, part := range strings.Split(rel, string(filepath.Separator)) {
+			current = filepath.Join(current, part)
+			info, err := os.Lstat(current)
+			if err != nil {
+				return metrics.ScanResult{}, err
+			}
+			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return metrics.ScanResult{}, fmt.Errorf("directory is not a real folder")
+			}
+		}
+	}
+	s.cleanupMu.Lock()
+	defer s.cleanupMu.Unlock()
+	s.scanTotal.Store(0)
+	s.scanVisited.Store(0)
+	s.scanPhase.Store(1)
+	defer s.scanPhase.Store(0)
+	result := metrics.ScanSpaceWithProgress(ctx, metrics.ScanTarget{Name: "磁盘", Path: path}, func() { s.scanVisited.Add(1) }, func(total int64) {
+		s.scanTotal.Store(total)
+		s.scanVisited.Store(0)
+		s.scanPhase.Store(2)
+	}, func() { s.scanVisited.Add(1) })
+	s.cleanupItems = make(map[string]os.FileInfo)
+	s.trashPath, s.trashInfo = "", nil
+	group := result.Groups[0]
+	if group.Error == "" && group.Skipped == 0 {
+		for _, item := range group.Items {
+			inTrash := false
+			for _, target := range s.info.ScanTargets {
+				if target.Name != "废纸篓" {
+					continue
+				}
+				rel, err := filepath.Rel(target.Path, item.Path)
+				if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+					inTrash = true
+				}
+			}
+			if !inTrash {
+				if info, err := os.Lstat(item.Path); err == nil && info.Mode()&os.ModeSymlink == 0 {
+					s.cleanupItems[item.Path] = info
+				}
+			}
+		}
+	}
+	return result, nil
+}
+
+func (s *System) TrashCleanupItem(path string) error {
+	s.cleanupMu.Lock()
+	defer s.cleanupMu.Unlock()
+	old, ok := s.cleanupItems[path]
+	if !ok {
+		return fmt.Errorf("item is not in a complete scan; scan again")
+	}
+	current, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(old, current) {
+		return fmt.Errorf("item changed since the scan; scan again")
+	}
+	if err := mygo.Shell.TrashItem(path); err != nil {
+		return err
+	}
+	delete(s.cleanupItems, path)
+	return nil
+}
+
+func (s *System) EmptyCleanupTrash(path string) error {
+	s.cleanupMu.Lock()
+	defer s.cleanupMu.Unlock()
+	if path == "" || path != s.trashPath {
+		return fmt.Errorf("trash is not in a complete scan; scan again")
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(s.trashInfo, info) {
+		return fmt.Errorf("trash changed since the scan; scan again")
+	}
+	return emptyTrash(path, runtime.GOOS)
+}
+func (s *System) OpenFullDiskAccessSettings() error {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("Full Disk Access settings are available on macOS only")
+	}
+	return mygo.Shell.OpenExternal("x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles")
 }
 func (s *System) HideWindow(ctx context.Context) { mygo.CallerWindow(ctx).Hide() }
 func (s *System) refresh(force bool) metrics.Snapshot {

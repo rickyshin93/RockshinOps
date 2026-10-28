@@ -1,4 +1,5 @@
 import { t, i18n, resolveLanguage, type Language } from "./i18n";
+import { toggleAllAppFiles, reconcileAppFiles } from "./app-selection";
 import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
 import { I18nextProvider } from "react-i18next";
@@ -15,7 +16,8 @@ const el = (id: string) => document.getElementById(id)!;
 const state: ViewState = {
   page: "overview", info: null, snapshot: null, history: [], range: 60, paused: false,
   processes: null, connections: null, scan: null, query: "", sort: "cpu", onlyMine: false,
-  busy: false, processError: "", connectionError: "", scanError: "", scanning: false,
+  busy: false, processError: "", connectionError: "", scanError: "", scanning: false, cleanupBusy: false, cleanupMessage: "", spaceMode: false, spaceHistory: [],
+  appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
   preferences: null, menuBarDraft: [], languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
 let settingsRoot: Root | null = null;
@@ -25,6 +27,11 @@ let updating = false;
 let processTime = "";
 let stopped = false;
 let renderedActions = "";
+let renderedScan = "";
+let renderedAppReview = "";
+let scanProgressText = "";
+let appReviewEpoch = 0;
+let appSelectAll = false;
 let errorKind: "data" | "action" = "data";
 el("navigation").innerHTML = navigation();
 el("device-mark").innerHTML = icon("about");
@@ -38,7 +45,7 @@ function render(filters = false) {
   const page = pages.find(p => p.id === state.page)!;
   const focused = document.activeElement as HTMLElement | null;
   const focusArea = focused?.closest("#page-actions, #page-body");
-  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.process || focused?.dataset.metric : undefined;
+  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.metric : undefined;
   el("page-title").textContent = t(page.title);
   el("page-subtitle").textContent = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
   if (state.page === "settings") el("page-subtitle").textContent = t("让菜单栏只显示你关心的信息");
@@ -50,17 +57,27 @@ function render(filters = false) {
     el("page-filters").hidden = !html;
   }
   if (state.page === "settings") {
+    renderedScan = "";
+    renderedAppReview = "";
     if (!settingsRoot) { el("page-body").replaceChildren(); settingsRoot = createRoot(el("page-body")); }
     settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, onLanguage: (language: Language) => { state.languageDraft = language; render(); } })));
   } else {
     settingsRoot?.unmount(); settingsRoot = null;
-    el("page-body").innerHTML = renderBody(state);
+    const body = renderBody(state);
+    const unchangedScan = state.scanning && state.page === "cleanup" && renderedScan === body;
+    const unchangedReview = state.page === "apps" && !!state.appReview && renderedAppReview === body;
+    if (!unchangedScan && !unchangedReview) el("page-body").innerHTML = body;
+    renderedScan = state.scanning && state.page === "cleanup" ? body : "";
+    renderedAppReview = state.page === "apps" && state.appReview ? body : "";
+    const progress = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
+    if (progress) progress.textContent = scanProgressText || t("正在统计扫描项目…");
+    const selectAll = el("page-body").querySelector<HTMLInputElement>("[data-app-select-all]");
+    if (selectAll && state.appReview) selectAll.indeterminate = state.appSelection.length > 0 && state.appSelection.length < state.appReview.files.length;
   }
   el("page-body").setAttribute("aria-busy", String(state.busy || state.scanning));
-  if (focusKey) for (const button of focusArea!.querySelectorAll<HTMLElement>("button")) {
-    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.process, button.dataset.metric].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
+  if (focusKey) for (const button of focusArea!.querySelectorAll<HTMLElement>("button, input")) {
+    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.metric].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
   }
-  el("page-footer").textContent = state.info ? t("运行摘要", { version: state.info.version, metrics: state.info.refreshSeconds, processes: state.info.processRefreshSeconds, hours: state.info.historySeconds / 3600 }) : t("LocalOps · 数据仅在本机读取");
   for (const button of el("navigation").querySelectorAll<HTMLButtonElement>("button")) {
     if (button.dataset.page === state.page) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
@@ -104,11 +121,95 @@ async function initialize() {
   el("machine-detail").textContent = result.info.machine.chip || result.info.machine.architecture;
 }
 async function scan() {
-  if (state.scanning) return;
-  state.scanning = true; state.scanError = ""; render();
-  try { state.scan = await System.scanCleanup(); }
+  if (state.scanning || state.cleanupBusy) return;
+  state.scanning = true; state.scanError = ""; scanProgressText = ""; render();
+  let polling = false, active = true;
+  const timer = state.spaceMode ? window.setInterval(async () => {
+    if (polling) return;
+    polling = true;
+    try {
+      const progress = await System.scanProgress();
+      if (!active) return;
+      scanProgressText = progress.phase === "scanning" && progress.total > 0
+        ? t("已扫描 {{percent}}%（{{visited}} / {{total}} 项）", { percent: Math.min(99, Math.floor(progress.visited / progress.total * 100)), visited: progress.visited, total: progress.total })
+        : progress.phase === "counting" ? t("正在统计扫描项目：已发现 {{visited}} 项", { visited: progress.visited }) : t("正在统计扫描项目…");
+      const element = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
+      if (element) element.textContent = scanProgressText;
+    } catch {
+      if (!active) return;
+      scanProgressText = t("无法读取扫描进度，扫描仍在进行。");
+      const element = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
+      if (element) element.textContent = scanProgressText;
+    } finally { polling = false; }
+  }, 500) : undefined;
+  try { state.scan = state.spaceMode ? await System.scanDisk(state.spaceHistory.at(-1) || "") : await System.scanCleanup(); }
   catch (reason) { state.scanError = String(reason); }
-  finally { state.scanning = false; render(); }
+  finally { active = false; if (timer !== undefined) window.clearInterval(timer); state.scanning = false; render(); }
+}
+async function cleanup(path: string, emptyTrash: boolean) {
+  if (state.cleanupBusy || state.scanning || !state.scan) return;
+  const prompt = emptyTrash
+    ? t("永久删除废纸篓中的所有内容？此操作不可恢复。路径：{{path}}", { path })
+    : t("将此项目移入系统废纸篓？目录内的全部内容都会移动，包括扫描未统计的内容。路径：{{path}}", { path });
+  if (!window.confirm(prompt)) return;
+  state.cleanupBusy = true; state.cleanupMessage = ""; render();
+  try {
+    if (emptyTrash) await System.emptyCleanupTrash(path); else await System.trashCleanupItem(path);
+    state.cleanupMessage = emptyTrash ? t("废纸篓已清空。") : t("项目已移入废纸篓；清空废纸篓后才会释放空间。");
+  } catch (reason) { state.cleanupMessage = `${t("清理未完全完成，请检查后重试：")}${String(reason)}`; }
+  finally { state.cleanupBusy = false; await scan(); }
+}
+async function openFullDiskAccessSettings() {
+  try { await System.openFullDiskAccessSettings(); if (errorKind === "action") error("", "action"); }
+  catch (reason) { error(t("无法打开系统设置：{{error}}", { error: String(reason) }), "action"); }
+}
+async function installedApps() {
+  if (state.appBusy) return;
+  state.appMode = true; state.appReview = null; state.appSelection = []; state.appBusy = true; state.appMessage = ""; render(true);
+  try { state.installedApps = await System.installedApps(); }
+  catch (reason) { state.installedApps = null; state.appMessage = String(reason); }
+  finally { state.appBusy = false; render(); }
+}
+async function reviewApp(path: string) {
+  if (state.appBusy) return;
+  const epoch = ++appReviewEpoch;
+  appSelectAll = false;
+  state.appBusy = true; state.appSearching = true; state.appReview = null; state.appMessage = ""; state.appSelection = []; render();
+  try {
+    const quick = await System.reviewAppQuick(path);
+    if (epoch !== appReviewEpoch) { await System.cancelAppReview(quick.reviewId); return; }
+    state.appReview = quick; render(true);
+    const review = await System.reviewApp(path, state.appReview.reviewId);
+    if (epoch !== appReviewEpoch) return;
+    state.appReview = review;
+    state.appSelection = reconcileAppFiles(state.appReview.files.map(file => file.path), state.appSelection, appSelectAll);
+  }
+  catch (reason) { if (epoch === appReviewEpoch) state.appMessage = String(reason); }
+  finally { if (epoch === appReviewEpoch) { state.appBusy = false; state.appSearching = false; render(true); } }
+}
+async function stopAppSearch() {
+  if (!state.appSearching || !state.appReview) return;
+  try {
+    await System.cancelAppReview(state.appReview.reviewId);
+    if (!state.appSearching) return;
+    appReviewEpoch++;
+    state.appBusy = false;
+    state.appSearching = false;
+    state.appMessage = t("已停止搜索，仅保留常见位置的首批项目。");
+    render();
+  } catch (reason) { state.appMessage = String(reason); render(); }
+}
+async function removeAppFiles() {
+  if (state.appBusy || !state.appReview || !state.appSelection.length) return;
+  if (!window.confirm(`${t("将以下选中项目移入系统废纸篓？请确认 App 已退出。") }\n\n${state.appSelection.join("\n")}`)) return;
+  const path = state.appReview.app.path;
+  state.appBusy = true; state.appMessage = ""; render();
+  try { await System.removeAppFiles([...state.appSelection]); state.appMessage = t("选中项目已移入废纸篓。"); }
+  catch (reason) { state.appMessage = `${t("清理未完全完成，请检查后重试：")}${String(reason)}`; }
+  state.appSelection = []; state.appReview = null;
+  try { state.installedApps = await System.installedApps(); }
+  catch (reason) { state.appMessage += ` ${String(reason)}`; state.installedApps = null; }
+  state.appBusy = false; render();
 }
 async function connections() {
   try { state.connections = await System.connections(); state.connectionError = ""; }
@@ -164,6 +265,10 @@ async function hide() {
 document.addEventListener("click", event => {
   const button = (event.target as Element).closest<HTMLButtonElement>("button");
   if (!button || button.disabled) return;
+  if (button.dataset.cleanupPath) { void cleanup(button.dataset.cleanupPath, false); return; }
+  if (button.dataset.emptyTrash) { void cleanup(button.dataset.emptyTrash, true); return; }
+  if (button.dataset.spacePath) { state.spaceHistory.push(button.dataset.spacePath); void scan(); return; }
+  if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
   if (button.dataset.metric) {
     if (state.preferencesBusy) return;
     const selected = new Set(state.menuBarDraft);
@@ -178,6 +283,17 @@ document.addEventListener("click", event => {
     case "pause": state.paused = !state.paused; render(); if (!state.paused) void refresh(); break;
     case "refresh": void refresh(); break;
     case "scan": void scan(); break;
+    case "space-start": state.spaceMode = true; state.spaceHistory = []; state.scan = null; void scan(); break;
+    case "space-back": state.spaceHistory.pop(); void scan(); break;
+    case "cleanup-targets": state.spaceMode = false; state.spaceHistory = []; state.scan = null; void scan(); break;
+    case "installed-apps": void installedApps(); break;
+    case "open-full-disk-access": void openFullDiskAccessSettings(); break;
+    case "running-apps":
+      if (state.appSearching && state.appReview) void stopAppSearch();
+      else if (state.appSearching) { appReviewEpoch++; state.appBusy = false; state.appSearching = false; }
+      state.appMode = false; state.appReview = null; render(true); break;
+    case "remove-app-files": void removeAppFiles(); break;
+    case "stop-app-search": void stopAppSearch(); break;
     case "hide": void hide(); break;
     case "load-settings": void loadSettings(); break;
     case "save-settings": void saveSettings(); break;
@@ -195,6 +311,20 @@ el("page-filters").addEventListener("change", event => {
 installSortControl(value => { state.sort = value; render(true); });
 document.addEventListener("keydown", event => {
   if ((event.metaKey || event.ctrlKey) && event.key === ",") { event.preventDefault(); void navigate("settings"); }
+});
+el("page-body").addEventListener("change", event => {
+  const input = event.target as HTMLInputElement;
+  if (input.dataset.appSelectAll && state.appReview) {
+    appSelectAll = input.checked;
+    state.appSelection = toggleAllAppFiles(state.appReview.files.map(file => file.path), !input.checked);
+    render(); return;
+  }
+  if (!input.dataset.appFile) return;
+  const selected = new Set(state.appSelection);
+  if (input.checked) selected.add(input.dataset.appFile); else selected.delete(input.dataset.appFile);
+  state.appSelection = [...selected];
+  appSelectAll = !!state.appReview?.files.length && state.appSelection.length === state.appReview.files.length;
+  render();
 });
 document.querySelector(".sidebar")!.setAttribute("aria-label", t("LocalOps 导航"));
 el("navigation").setAttribute("aria-label", t("监控页面"));

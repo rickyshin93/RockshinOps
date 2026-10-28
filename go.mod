@@ -6,6 +6,7 @@ require (
 	github.com/egoist/mygo v0.6.4
 	github.com/shirou/gopsutil/v4 v4.26.9
 	golang.org/x/sys v0.48.0
+	golang.org/x/text v0.43.0
 )
 
 require (
@@ -17,5 +18,4 @@ require (
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
 )
