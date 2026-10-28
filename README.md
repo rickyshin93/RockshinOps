@@ -41,7 +41,9 @@ Download the package for your architecture from [Releases](https://github.com/ri
 - **Debian/Ubuntu:** install the `.deb` with `sudo apt install ./localops_…_amd64.deb`; the package declares its GTK/WebKitGTK dependencies. A desktop tray implementation is needed to expose the tray menu.
 - **Other Linux desktops:** extract the `.tar.gz` and use its included `install.sh`. Install GTK 3, WebKitGTK 4.1 and an AppIndicator-compatible tray through your distribution. The archive's installer reports missing WebKitGTK dependencies.
 
-Each release includes `SHA256SUMS.txt`. There is no automatic updater.
+Each release includes `SHA256SUMS.txt`. Starting with v0.2.1, LocalOps checks GitHub Releases after launch and daily while running. Use **Settings → Check for Updates…**, the app menu or the tray menu to check manually. The update window shows release notes, downloads with progress, verifies the signature and lets you choose when to relaunch. Installation requires confirmation unless you explicitly opt into automatic installation.
+
+Install v0.2.1 manually once if you currently use v0.2.0. Updates require a writable install location; Linux system packages must be upgraded with the package manager. GitHub must be reachable. Update signing does not change the OS signing/notarization status above.
 
 ## Develop
 
@@ -78,11 +80,13 @@ sh scripts/mygo.sh build -platform linux/amd64
 
 [GitHub Actions](.github/workflows/build.yml) runs tests and builds all four targets on pushes to `main`, pull requests and manual dispatches. Download per-platform packages from each run's artifacts.
 
-To publish, update `package.json`'s version, commit it, then push the matching `v<version>` tag. CI checks the tag, builds and tests every target, and publishes installers plus SHA-256 checksums only after all builds pass. No personal token or signing secret is required; the release job uses the repository's `GITHUB_TOKEN`.
+To publish, update `package.json`'s version, commit it, then push the matching `v<version>` tag. Add the matching `## <version>` entry to `CHANGELOG.md`. CI checks the tag, builds and tests every target, verifies signed update manifests/archives, and publishes installers, updates and SHA-256 checksums only after all builds pass. The release job uses the repository's `GITHUB_TOKEN`; tagged builds require the `MYGO_UPDATER_PRIVATE_KEY` repository secret. Pull requests and untagged builds do not receive the signing key.
+
+The public key and release repository are in `mygo.config.ts`. Keep the original private key in a secure backup outside Git: replacing it strands existing installations. For a local signed build, supply it through MyGo's `MYGO_UPDATER_PRIVATE_KEY` credential input; never commit it. Update manifests use the standard `releases/latest/download/update-<platform>.json` feed, with full archives and no delta patches. See [MyGo's update documentation](https://github.com/egoist/mygo/blob/v0.6.4/docs/updates.md).
 
 ## Configuration and data
 
-`localops.json` is the single file for sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems` and `defaultLanguage` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
+`localops.json` is the single file for the update check interval (`updateIntervalSeconds`, default 86400 seconds), sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems` and `defaultLanguage` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
 
 User settings are stored at `os.UserConfigDir()/LocalOps/preferences.json` (on macOS: `~/Library/Application Support/LocalOps/preferences.json`). Existing settings without a language field follow the system. Invalid settings or failed saves report errors; saved preferences are not silently reset.
 

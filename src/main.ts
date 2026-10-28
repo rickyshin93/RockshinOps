@@ -297,6 +297,7 @@ document.addEventListener("click", event => {
     case "hide": void hide(); break;
     case "load-settings": void loadSettings(); break;
     case "save-settings": void saveSettings(); break;
+    case "check-updates": void System.checkForUpdates().catch(reason => error(`${t("无法打开更新窗口：")}${String(reason)}`, "action")); break;
   }
 });
 el("page-filters").addEventListener("input", event => {

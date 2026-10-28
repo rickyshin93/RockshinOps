@@ -59,12 +59,24 @@ jobs:
         run: sh scripts/go.sh test -v ./...
       - name: Frontend tests
         run: bun run test:web
+      - name: Require update signing key for releases
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: test -n "$MYGO_UPDATER_PRIVATE_KEY" || { echo "Missing MYGO_UPDATER_PRIVATE_KEY secret" >&2; exit 1; }
       - name: Build application and installer
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/') && secrets.MYGO_UPDATER_PRIVATE_KEY || '' }}
         run: sh scripts/mygo.sh build -platform "${{ matrix.target }}"
       - name: Check generated bindings
         run: git diff --exit-code -- src/mygo.ts
       - name: Collect release files
-        run: bun scripts/collect-release.ts "${{ matrix.target }}"
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            bun scripts/collect-release.ts "${{ matrix.target }}" --signed
+          else
+            bun scripts/collect-release.ts "${{ matrix.target }}"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: localops-${{ matrix.artifact }}

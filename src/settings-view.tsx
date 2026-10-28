@@ -7,6 +7,9 @@ export function SettingsView({ state, onLanguage }: { state: SettingsState; onLa
   const { t } = useTranslation();
   if (!state.preferences) return <div className="empty-state"><h2>{t("读取设置")}</h2><p>{state.preferencesError || t("正在读取本机偏好…")}</p>{state.preferencesError && <button className="secondary-button" data-action="load-settings">{t("重试")}</button>}</div>;
   return <div className="settings-page">
+    <section className="settings-options" aria-labelledby="updates-title">
+      <div className="setting-row"><div className="setting-copy"><h2 id="updates-title">{t("软件更新")}</h2><p>{t("启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。")}</p></div><button className="secondary-button" data-action="check-updates">{t("检查更新…")}</button></div>
+    </section>
     <section className="settings-options language-settings" aria-labelledby="language-title">
       <div className="setting-copy"><h2 id="language-title">{t("显示语言")}</h2><p>{t("默认跟随系统语言；不支持的语言使用英文。")}</p></div>
       <div className="language-choices" role="radiogroup" aria-labelledby="language-title">

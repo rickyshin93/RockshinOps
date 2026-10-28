@@ -274,6 +274,9 @@ export const System = {
   cancelAppReview(id: number): Promise<void> {
     return call("System.CancelAppReview", id);
   },
+  checkForUpdates(): Promise<void> {
+    return call("System.CheckForUpdates");
+  },
   connections(): Promise<Connections> {
     return call("System.Connections");
   },

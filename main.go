@@ -14,6 +14,7 @@ import (
 
 	"github.com/egoist/mygo"
 	_ "github.com/egoist/mygo/locales/zh-Hans"
+	"github.com/egoist/mygo/plugins/updater"
 	"localops/internal/appicon"
 	"localops/internal/localization"
 	"localops/internal/metrics"
@@ -23,6 +24,8 @@ import (
 
 var MetricsChanged = mygo.NewEvent[metrics.Snapshot]("metricsChanged")
 var SettingsOpened = mygo.NewEvent[bool]("settingsOpened")
+
+func (s *System) CheckForUpdates() { updater.CheckForUpdates() }
 
 type AppInfo struct {
 	Machine               metrics.Machine      `json:"machine"`
@@ -276,6 +279,7 @@ func main() {
 	}
 
 	mygo.App.SetLanguages("en", "zh")
+	mygo.Use(updater.New(updater.Options{Interval: time.Duration(cfg.UpdateIntervalSeconds) * time.Second}))
 	mygo.App.WhenReady(func() {
 		applyLanguage(preferences.Language)
 		localization.SetLanguage(mygo.App.Locale())
@@ -298,7 +302,8 @@ func main() {
 		}
 		mygo.App.SetMenu(localizedMenu([]*mygo.MenuItem{
 			{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{
-				{Role: mygo.RoleAbout}, mygo.Separator(),
+				{Role: mygo.RoleAbout},
+				{Label: "检查更新…", Click: func(*mygo.MenuItem, *mygo.Window) { updater.CheckForUpdates() }}, mygo.Separator(),
 				{Label: "设置…", Accelerator: "CmdOrCtrl+,", Click: openSettings}, mygo.Separator(),
 				{Role: mygo.RoleServices}, mygo.Separator(), {Role: mygo.RoleHide}, {Role: mygo.RoleHideOthers}, {Role: mygo.RoleUnhide}, mygo.Separator(), {Role: mygo.RoleQuit},
 			}},
@@ -314,6 +319,7 @@ func main() {
 				capacityItem, activityItem, updatedItem, mygo.Separator(),
 				{Label: "打开 LocalOps", Click: func(*mygo.MenuItem, *mygo.Window) { openWindow() }},
 				{Label: "设置…", Click: openSettings},
+				{Label: "检查更新…", Click: func(*mygo.MenuItem, *mygo.Window) { updater.CheckForUpdates() }},
 				{Label: "立即刷新", Click: func(*mygo.MenuItem, *mygo.Window) { go service.refresh(true) }},
 				mygo.Separator(), {Role: mygo.RoleQuit, Label: "退出 LocalOps"},
 			}),

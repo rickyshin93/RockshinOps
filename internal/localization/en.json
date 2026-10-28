@@ -425,5 +425,11 @@
   "部分位置需要访问权限": "Some locations need access",
   "开启完全磁盘访问权限可扩大搜索范围。在系统设置中允许 LocalOps；若列表里没有，点“+”添加。开启后退出并重新打开 LocalOps，再重新搜索。部分系统目录仍可能受限。": "Full Disk Access can expand search coverage. Enable LocalOps in System Settings; if it is missing, use “+” to add it. Then quit and reopen LocalOps before searching again. Some system directories may remain restricted.",
   "打开完全磁盘访问权限": "Open Full Disk Access",
-  "无法打开系统设置：{{error}}": "Unable to open System Settings: {{error}}"
+  "无法打开系统设置：{{error}}": "Unable to open System Settings: {{error}}",
+  "LocalOps · 数据仅在本机读取": "LocalOps · Data is read locally",
+  "运行摘要": "LocalOps {{version}} · Metrics every {{metrics}} s · Processes every {{processes}} s · Session history: {{hours}} h",
+  "软件更新": "Software updates",
+  "检查更新…": "Check for Updates…",
+  "启动后自动检查更新，默认确认后安装。系统软件包请通过包管理器更新。": "Checks for updates after launch and asks before installing by default. Update system packages through your package manager.",
+  "无法打开更新窗口：": "Could not open the update window: "
 }

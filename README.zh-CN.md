@@ -38,7 +38,9 @@ CPU 温度和 App 级瓦特计量尚未实现；GPU 与系统功率取决于硬�
 - Debian/Ubuntu：`sudo apt install ./localops_…_amd64.deb`，由包管理器处理声明的 GTK/WebKitGTK 依赖。
 - 其他 Linux 桌面：解压 `.tar.gz`，使用其中的 `install.sh`；系统需提供 GTK 3、WebKitGTK 4.1 和兼容 AppIndicator 的托盘。安装脚本会报告缺失的 WebKitGTK 依赖。
 
-每次发布附带 `SHA256SUMS.txt`。当前没有自动更新器。
+每次发布附带 `SHA256SUMS.txt`。从 v0.2.1 开始，应用启动后及持续运行期间每天检查 GitHub Releases；也可通过**设置 → 检查更新…**、应用菜单或托盘菜单手动检查。更新窗口提供说明、下载进度、签名验证和重启选择；默认确认后安装，主动勾选后才启用自动安装。
+
+v0.2.0 用户需先手动安装一次 v0.2.1。自动更新要求安装位置可写；Linux 系统软件包通过包管理器升级。检查和下载需要能访问 GitHub；更新签名不改变上述操作系统签名和公证状态。
 
 ## 开发和验证
 
@@ -65,7 +67,9 @@ bun run build
 
 推送 `main`、提交 PR 或手动触发后，GitHub Actions 会测试并构建 macOS arm64、macOS amd64、Windows amd64 和 Linux amd64。安装包保留为构建产物。
 
-发布时修改 `package.json` 的版本并提交，再推送对应 `v<版本>` 标签。CI 会核对标签版本，等待四个平台全部成功后自动创建 Release、上传安装包和校验文件。发布使用仓库内置 `GITHUB_TOKEN`，无需配置个人令牌或签名密钥。
+发布时修改 `package.json` 的版本并提交，再推送对应 `v<版本>` 标签。同时在 `CHANGELOG.md` 增加对应的 `## <版本>` 条目。CI 核对标签版本，等待四个平台的测试、构建和更新包验签全部通过后，再创建 Release、上传安装包、更新包和校验文件。发布使用仓库内置 `GITHUB_TOKEN`；标签构建还需要仓库 Secret `MYGO_UPDATER_PRIVATE_KEY`。PR 和非标签构建不注入签名密钥。
+
+更新公钥和发布仓库位于 `mygo.config.ts`；原始私钥须在 Git 之外安全备份，更换密钥会使已安装版本无法接受后续更新。本机签名构建通过 MyGo 的 `MYGO_UPDATER_PRIVATE_KEY` 凭据入口提供私钥，禁止提交私钥。检查间隔由 `localops.json` 的 `updateIntervalSeconds` 定义，默认 86400 秒。首版通过 GitHub 的 `releases/latest/download/update-<平台>.json` 分发完整更新包，不生成增量补丁。
 
 ## 参数、偏好与数据
 
