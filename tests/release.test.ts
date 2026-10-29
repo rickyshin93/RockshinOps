@@ -10,6 +10,7 @@ test("release preflight rejects absent or empty update notes", () => {
   expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\n\n## 0.2.3\n\nOld notes")).toThrow("no notes");
   expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\n\n## 0.2.4\n\n## 0.2.3\nOld notes")).toThrow("no notes");
   expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\n\n## 0.2.4\n\nNew notes")).not.toThrow();
+  expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\r\n\r\n## 0.2.4\r\n\r\nNew notes")).not.toThrow();
   expect(() => checkRelease("v0.2.3", "0.2.4", "## 0.2.4\nNew notes")).toThrow("must match");
 });
 
