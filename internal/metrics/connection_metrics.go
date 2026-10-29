@@ -101,7 +101,7 @@ func parseConnectionMetrics(reader io.Reader) (map[connectionKey]ConnectionMetri
 			}
 			pid, err = strconv.Atoi(label[i+1:])
 			if err != nil {
-				return nil, fmt.Errorf("nettop: invalid PID: %w", err)
+				return nil, fmt.Errorf("nettop: invalid process label %q: %w", label, err)
 			}
 			continue // Never apply per-process totals to individual sockets.
 		}
