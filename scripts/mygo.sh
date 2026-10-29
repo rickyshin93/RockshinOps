@@ -9,7 +9,7 @@ if ! command -v go >/dev/null 2>&1; then
   printf '%s\n' 'Go 1.27.3+ is required. See README.md.' >&2
   exit 1
 fi
-# LocalOps uses C/Objective-C system APIs on macOS. Other targets use pure Go.
+# RockshinOps uses C/Objective-C system APIs on macOS. Other targets use pure Go.
 case "$(go env GOOS)" in
   darwin) export CGO_ENABLED=1 ;;
   *) export CGO_ENABLED=0 ;;

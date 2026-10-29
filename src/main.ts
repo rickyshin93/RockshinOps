@@ -4,31 +4,38 @@ import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
 import { I18nextProvider } from "react-i18next";
 import { SettingsView } from "./settings-view";
+import { MenuBarView } from "./menu-bar-view";
 import { isMyGo, locale, onLocaleChange } from "mygo-runtime";
-import { System, events, type Snapshot } from "./mygo";
-import { formatCapacity, percent, timeLabel } from "./format";
+import { System, events, type Preferences, type Snapshot } from "./mygo";
+import { formatCapacity, formatRate, percent, timeLabel } from "./format";
 import { icon } from "./icons";
 import { installSortControl } from "./dropdown";
+import { nextConnectionSort, type ConnectionSortKey } from "./connections";
 import { menuBarChoices, preferencesDirty } from "./settings";
-import { actionControls, filterControls, metricPages, navigation, pages, renderBody, type Page, type ViewState } from "./views";
+import { actionControls, connectionSubtitle, processSubtitle, filterControls, metricPages, navigation, pages, renderBody, type Page, type ViewState } from "./views";
 
 const el = (id: string) => document.getElementById(id)!;
 const state: ViewState = {
   page: "overview", info: null, snapshot: null, history: [], range: 60, paused: false,
-  processes: null, connections: null, scan: null, query: "", sort: "cpu", onlyMine: false,
+  processes: null, connections: null, connectionSort: null, selectedProcess: null, processOrder: { key: "cpu", descending: true }, scan: null, query: "", sort: "cpu", onlyMine: false,
   busy: false, processError: "", connectionError: "", scanError: "", scanning: false, cleanupBusy: false, cleanupMessage: "", spaceMode: false, spaceHistory: [],
   appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
-  preferences: null, updateProxyDraft: false, menuBarDraft: [], languageDraft: "system", preferencesBusy: false, preferencesError: "",
+  preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
 let settingsRoot: Root | null = null;
+let renderedMenuProps: { isMacOS: boolean; refreshSeconds: number } | null = null;
 void i18n.changeLanguage(isMyGo() ? locale() : resolveLanguage(navigator.languages));
 document.documentElement.lang = i18n.language;
 let updating = false;
 let processTime = "";
+let connectionTime = 0;
+let connectionsLoading = false;
 let stopped = false;
 let renderedActions = "";
 let renderedScan = "";
 let renderedAppReview = "";
+let renderedAboutLanguage = "";
+let renderedAboutInfo: ViewState["info"] = null;
 let scanProgressText = "";
 let appReviewEpoch = 0;
 let appSelectAll = false;
@@ -43,12 +50,26 @@ function error(message: string, kind: "data" | "action" = "data") {
 }
 function render(filters = false) {
   const page = pages.find(p => p.id === state.page)!;
+  const activityScroll = el("page-body").querySelector<HTMLElement>(".activity-scroll");
+  const activityPosition = activityScroll ? [activityScroll.scrollLeft, activityScroll.scrollTop] : null;
   const focused = document.activeElement as HTMLElement | null;
-  const focusArea = focused?.closest("#page-actions, #page-body");
-  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.metric : undefined;
-  el("page-title").textContent = t(page.title);
-  el("page-subtitle").textContent = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
-  if (state.page === "settings") el("page-subtitle").textContent = t("让菜单栏只显示你关心的信息");
+  const focusArea = focused?.closest("#page-actions, #page-filters, #page-body");
+  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.selectProcess || focused?.dataset.metric || focused?.dataset.connectionSort || focused?.dataset.processSort || focused?.dataset.processScope : undefined;
+  const title = t(page.title);
+  let subtitle = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
+  if (state.page === "settings") subtitle = t("更改会自动保存");
+  if (state.page === "menubar") subtitle = t("管理系统菜单栏图标、分区与外观");
+  if (state.page === "about" && state.info) subtitle = state.info.machine.name || state.info.machine.model;
+  if (state.page === "connections") subtitle = connectionSubtitle(state);
+  if (state.page === "processes") subtitle = processSubtitle(state);
+  if (el("page-title").textContent !== title) el("page-title").textContent = title;
+  if (el("page-subtitle").textContent !== subtitle) el("page-subtitle").textContent = subtitle;
+  if (el("content-scroll").dataset.page !== state.page) {
+    el("content-scroll").dataset.page = state.page;
+    el("content-scroll").parentElement!.dataset.page = state.page;
+    if (["processes", "connections"].includes(state.page)) el("page-actions").before(el("page-filters"));
+    else el("page-body").before(el("page-filters"));
+  }
   const actions = actionControls(state);
   if (renderedActions !== actions) { el("page-actions").innerHTML = actions; renderedActions = actions; }
   if (filters) {
@@ -56,17 +77,40 @@ function render(filters = false) {
     el("page-filters").innerHTML = html;
     el("page-filters").hidden = !html;
   }
-  if (state.page === "settings") {
+  if (state.page === "settings" || state.page === "menubar") {
     renderedScan = "";
     renderedAppReview = "";
     if (!settingsRoot) { el("page-body").replaceChildren(); settingsRoot = createRoot(el("page-body")); }
-    settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, showUpdateProxy: state.info?.machine.platform === "darwin", onLanguage: (language: Language) => { state.languageDraft = language; render(); } })));
+    if (state.page === "menubar") {
+      const props = { isMacOS: state.info?.machine.platform === "darwin", refreshSeconds: state.info?.refreshSeconds ?? 2 };
+      if (props.isMacOS !== renderedMenuProps?.isMacOS || props.refreshSeconds !== renderedMenuProps?.refreshSeconds) {
+        settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(MenuBarView, props)));
+        renderedMenuProps = props;
+      }
+    } else {
+      renderedMenuProps = null;
+      settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, version: state.info?.version ?? "", isMacOS: state.info?.machine.platform === "darwin", onLanguage: (language: Language) => { state.languageDraft = language; render(); void saveSettings(); } })));
+    }
   } else {
+    renderedMenuProps = null;
     settingsRoot?.unmount(); settingsRoot = null;
     const body = renderBody(state);
     const unchangedScan = state.scanning && state.page === "cleanup" && renderedScan === body;
     const unchangedReview = state.page === "apps" && !!state.appReview && renderedAppReview === body;
-    if (!unchangedScan && !unchangedReview) el("page-body").innerHTML = body;
+    const about = el("page-body").querySelector(".about-page");
+    if (state.page === "about" && about && renderedAboutLanguage === i18n.language && renderedAboutInfo === state.info && body.includes('class="about-page"')) {
+      const template = document.createElement("template");
+      template.innerHTML = body;
+      const currentValues = about.querySelectorAll(".about-status span, .about-section dt, .about-section dd");
+      const nextValues = template.content.querySelectorAll(".about-status span, .about-section dt, .about-section dd");
+      if (currentValues.length === nextValues.length) {
+        currentValues.forEach((value, index) => {
+          if (value.innerHTML !== nextValues[index]!.innerHTML) value.innerHTML = nextValues[index]!.innerHTML;
+        });
+      } else el("page-body").innerHTML = body;
+    } else if (!unchangedScan && !unchangedReview) el("page-body").innerHTML = body;
+    renderedAboutLanguage = state.page === "about" ? i18n.language : "";
+    renderedAboutInfo = state.page === "about" ? state.info : null;
     renderedScan = state.scanning && state.page === "cleanup" ? body : "";
     renderedAppReview = state.page === "apps" && state.appReview ? body : "";
     const progress = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
@@ -74,9 +118,14 @@ function render(filters = false) {
     const selectAll = el("page-body").querySelector<HTMLInputElement>("[data-app-select-all]");
     if (selectAll && state.appReview) selectAll.indeterminate = state.appSelection.length > 0 && state.appSelection.length < state.appReview.files.length;
   }
-  el("page-body").setAttribute("aria-busy", String(state.busy || state.scanning));
+  if (activityPosition) {
+    const scroll = el("page-body").querySelector<HTMLElement>(".activity-scroll");
+    if (scroll) { scroll.scrollLeft = activityPosition[0]!; scroll.scrollTop = activityPosition[1]!; }
+  }
+  const bodyBusy = String(state.busy || state.scanning);
+  if (el("page-body").getAttribute("aria-busy") !== bodyBusy) el("page-body").setAttribute("aria-busy", bodyBusy);
   if (focusKey) for (const button of focusArea!.querySelectorAll<HTMLElement>("button, input")) {
-    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.metric].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
+    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.selectProcess, button.dataset.metric, button.dataset.connectionSort, button.dataset.processSort, button.dataset.processScope].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
   }
   for (const button of el("navigation").querySelectorAll<HTMLButtonElement>("button")) {
     if (button.dataset.page === state.page) button.setAttribute("aria-current", "page");
@@ -87,10 +136,26 @@ function render(filters = false) {
     el("nav-cpu").textContent = s.cpu.ready ? percent(s.cpu.usage) : "—";
     el("nav-memory").textContent = !s.memory.error ? percent(s.memory.used / s.memory.total * 100) : "—";
     el("nav-disk").textContent = s.disk.capacityError ? "—" : formatCapacity(s.disk.volume.available);
+    el("nav-gpu").textContent = s.gpu.available ? percent(s.gpu.usage) : "—";
+    el("nav-gpu").title = s.gpu.available ? t("GPU 使用率") : s.gpu.error || t("不可用");
+    const networkReady = s.network.ready && !s.network.error;
+    el("nav-network").textContent = networkReady ? `↓ ${formatRate(s.network.download)}` : "—";
+    el("nav-network").title = networkReady ? t("下载") : s.network.error || t("采样中");
+    const batteryAvailable = !s.battery.error && s.battery.present;
+    el("nav-energy").textContent = batteryAvailable ? percent(s.battery.percent) : "—";
+    el("nav-energy").title = batteryAvailable ? t("电池电量") : s.battery.error || t("未检测到内置电池");
   }
 }
+function recordProcessSample() {
+  const process = state.processes?.items.find(item => item.pid === state.selectedProcess);
+  if (!process || !state.processes) return;
+  const at = state.processes.updatedAt;
+  const history = (state.processHistory || []).filter(point => Date.parse(point.at) > Date.parse(at) - 60_000);
+  if (history.at(-1)?.at !== at) history.push({ at, cpu: process.cpuReady ? process.cpu : null, memory: process.memory, gpu: null, diskRead: null, diskWrite: null, download: null, upload: null, battery: null, power: null });
+  state.processHistory = history;
+}
 async function loadProcesses() {
-  try { state.processes = await System.processes(); state.processError = state.processes.error; }
+  try { state.processes = await System.processes(); state.processError = state.processes.error; recordProcessSample(); }
   catch (reason) { state.processError = String(reason); }
   processTime = state.processes?.updatedAt || "";
 }
@@ -105,9 +170,11 @@ async function receive(snapshot: Snapshot) {
       state.snapshot = snapshot;
       state.history = history.filter(p => Date.parse(p.at) <= Date.parse(snapshot.updatedAt));
     }
-    if (["processes", "apps"].includes(state.page) && Date.parse(snapshot.updatedAt) - Date.parse(processTime || "1970-01-01") >= state.info.processRefreshSeconds * 1000) await loadProcesses();
+    if (["processes", "apps", "connections"].includes(state.page) && Date.parse(snapshot.updatedAt) - Date.parse(processTime || "1970-01-01") >= state.info.processRefreshSeconds * 1000) await loadProcesses();
+    if (state.page === "connections" && !state.paused && Date.parse(snapshot.updatedAt) - connectionTime >= state.info.processRefreshSeconds * 1000) await connections(true);
     if (errorKind === "data") error("");
     render();
+    if (state.page === "settings" && state.preferences) void refreshTrayPreview();
   } catch (reason) { error(`${t("读取历史失败：")}${String(reason)}${t("。当前显示上次成功的数据。")}`); render(); }
   finally { updating = false; }
 }
@@ -211,13 +278,21 @@ async function removeAppFiles() {
   catch (reason) { state.appMessage += ` ${String(reason)}`; state.installedApps = null; }
   state.appBusy = false; render();
 }
-async function connections() {
-  try { state.connections = await System.connections(); state.connectionError = ""; }
-  catch (reason) { state.connectionError = String(reason); }
+async function connections(live = false) {
+  if (connectionsLoading) return;
+  connectionsLoading = true;
+  connectionTime = Date.now();
+  try {
+    const result = await System.connections();
+    if (live && (state.paused || state.page !== "connections")) return;
+    state.connections = result; state.connectionError = "";
+  } catch (reason) {
+    if (!live || (!state.paused && state.page === "connections")) state.connectionError = String(reason);
+  } finally { connectionsLoading = false; }
 }
 async function refresh() {
   if (state.busy) return;
-  if (!isMyGo()) { error(t("实时数据仅在 LocalOps 桌面应用中可用。请运行 bun run dev 启动应用。")); return; }
+  if (!isMyGo()) { error(t("实时数据仅在 RockshinOps 桌面应用中可用。请运行 bun run dev 启动应用。")); return; }
   state.busy = true; error(""); render();
   try {
     if (!state.info) await initialize();
@@ -228,59 +303,102 @@ async function refresh() {
         state.snapshot = snapshot; state.history = history.filter(p => Date.parse(p.at) <= Date.parse(snapshot.updatedAt));
       }
     }
-    if (["processes", "apps"].includes(state.page)) await loadProcesses();
+    if (["processes", "apps", "connections"].includes(state.page)) await loadProcesses();
     if (state.page === "connections") await connections();
     if (state.page === "cleanup") await scan();
   } catch (reason) { error(`${t("连接采集服务失败：")}${String(reason)}${t("。可再次点击刷新重试。")}`); }
   finally { state.busy = false; render(); }
 }
 async function navigate(page: Page, query = "") {
-  state.page = page; state.query = query;
+  state.page = page; state.query = query; state.selectedProcess = null;
   if (!metricPages.includes(page)) state.paused = false;
   if (page === "apps" && !["cpu", "memory", "name"].includes(state.sort)) state.sort = "cpu";
   el("content-scroll").scrollTop = 0; render(true);
   if (page === "settings" && !state.preferences) await loadSettings();
   if (!isMyGo() || !state.info) return;
-  if (["processes", "apps"].includes(page)) { await loadProcesses(); render(); }
-  if (page === "connections" && !state.connections) { await connections(); render(); }
+  if (["processes", "apps", "connections"].includes(page)) { await loadProcesses(); render(); }
+  if (page === "connections") { await connections(true); render(); }
 }
 async function loadSettings() {
   try {
     state.preferences = await System.preferences();
-    state.updateProxyDraft = state.preferences.updateUseSystemProxy; state.menuBarDraft = [...state.preferences.menuBarItems]; state.languageDraft = state.preferences.language as Language; state.preferencesError = "";
+    resetSettingsDrafts(state.preferences); state.preferencesError = "";
   } catch (reason) { state.preferencesError = `${t("无法读取设置：")}${String(reason)}`; }
   render();
+  void refreshTrayPreview();
 }
+let trayPreviewRequest = 0;
+async function refreshTrayPreview() {
+  const request = ++trayPreviewRequest;
+  const preview = await System.menuBarPreview([...state.menuBarDraft]).catch(() => null);
+  if (request === trayPreviewRequest) { state.trayPreview = preview; render(); }
+}
+function resetSettingsDrafts(saved: Preferences) {
+  state.hideDockDraft = saved.hideDockOnClose;
+  state.updateProxyDraft = saved.updateUseSystemProxy; state.menuBarDraft = [...saved.menuBarItems]; state.languageDraft = saved.language as Language;
+}
+// Settings save on every change; changes made while a save is in flight are picked up by the loop.
 async function saveSettings() {
   if (state.preferencesBusy || !preferencesDirty(state)) return;
-  state.preferencesBusy = true; state.preferencesError = ""; render();
-  try { state.preferences = await System.savePreferences({ menuBarItems: [...state.menuBarDraft], language: state.languageDraft, updateUseSystemProxy: state.updateProxyDraft }); }
-  catch (reason) { state.preferencesError = `${t("保存失败，当前菜单栏保持原设置：")}${String(reason)}${t("。请重试。")}`; }
-  finally { state.preferencesBusy = false; render(); }
+  state.preferencesBusy = true; state.preferencesError = "";
+  try { while (preferencesDirty(state)) state.preferences = await System.savePreferences({ hideDockOnClose: state.hideDockDraft, menuBarItems: [...state.menuBarDraft], language: state.languageDraft, updateUseSystemProxy: state.updateProxyDraft }); }
+  catch (reason) { if (state.preferences) resetSettingsDrafts(state.preferences); state.preferencesError = `${t("保存失败，设置已恢复：")}${String(reason)}${t("。请重试。")}`; }
+  finally { state.preferencesBusy = false; render(); void refreshTrayPreview(); }
+}
+async function terminateSelectedProcess(force: boolean) {
+  if (state.processAction?.busy) return;
+  const process = state.processes?.items.find(item => item.pid === state.selectedProcess);
+  if (!process) return;
+  const prompt = force
+    ? t("强制退出 {{name}}（PID {{pid}}）？未保存的数据可能丢失。", { name: process.name, pid: process.pid })
+    : t("请求退出 {{name}}（PID {{pid}}）？进程可能拒绝或延迟退出。", { name: process.name, pid: process.pid });
+  if (!window.confirm(prompt)) return;
+  const action = { pid: process.pid, busy: true, error: false, message: t("正在发送退出请求…") };
+  state.processAction = action; render();
+  try {
+    await System.terminateProcess(process.pid, process.identity, force);
+    action.message = force ? t("强制退出请求已发送，等待进程列表更新。") : t("退出请求已发送；若进程仍在运行，可稍后强制退出。");
+    try { await System.refresh(); await loadProcesses(); }
+    catch (reason) { action.message += ` ${t("刷新进程列表失败：")}${String(reason)}`; }
+  } catch (reason) {
+    action.error = true; action.message = `${t("退出失败：")}${String(reason)}`;
+  } finally { action.busy = false; render(); }
 }
 async function hide() {
   try { await System.hideWindow(); }
   catch (reason) { error(`${t("无法收起窗口：")}${String(reason)}`, "action"); }
 }
 document.addEventListener("click", event => {
+  const processRow = (event.target as Element).closest<HTMLElement>("[data-select-process]");
+  if (processRow) {
+    const pid = Number(processRow.dataset.selectProcess);
+    if (state.selectedProcess !== pid) state.processHistory = [];
+    state.selectedProcess = pid; recordProcessSample(); render(); return;
+  }
   const button = (event.target as Element).closest<HTMLButtonElement>("button");
   if (!button || button.disabled) return;
   if (button.dataset.cleanupPath) { void cleanup(button.dataset.cleanupPath, false); return; }
   if (button.dataset.emptyTrash) { void cleanup(button.dataset.emptyTrash, true); return; }
   if (button.dataset.spacePath) { state.spaceHistory.push(button.dataset.spacePath); void scan(); return; }
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
-  if (button.dataset.action === "toggle-update-proxy") { state.updateProxyDraft = !state.updateProxyDraft; render(); return; }
+  if (button.dataset.action === "toggle-hide-dock") { state.hideDockDraft = !state.hideDockDraft; render(); void saveSettings(); return; }
+  if (button.dataset.action === "toggle-update-proxy") { state.updateProxyDraft = !state.updateProxyDraft; render(); void saveSettings(); return; }
   if (button.dataset.metric) {
-    if (state.preferencesBusy) return;
     const selected = new Set(state.menuBarDraft);
     if (selected.has(button.dataset.metric)) selected.delete(button.dataset.metric); else selected.add(button.dataset.metric);
-    state.menuBarDraft = menuBarChoices.map(([id]) => id).filter(id => selected.has(id)); render(); return;
+    state.menuBarDraft = menuBarChoices.map(([id]) => id).filter(id => selected.has(id)); render(); void saveSettings(); return;
   }
   if (button.dataset.page) { void navigate(button.dataset.page as Page); return; }
   if (button.dataset.app) { void navigate("processes", button.dataset.app); return; }
   if (button.dataset.process) { void navigate("processes", button.dataset.process); return; }
+  if (button.dataset.processScope) { state.processScope = button.dataset.processScope as ViewState["processScope"]; state.onlyMine = false; render(true); return; }
+  if (button.dataset.processSort) { const key = button.dataset.processSort as NonNullable<ViewState["processOrder"]>["key"]; state.processOrder = { key, descending: state.processOrder?.key === key ? !state.processOrder.descending : key !== "name" }; render(); return; }
+  if (button.dataset.connectionSort) { state.connectionSort = nextConnectionSort(state.connectionSort, button.dataset.connectionSort as ConnectionSortKey); render(); return; }
   if (button.dataset.range) { state.range = Number(button.dataset.range); render(); return; }
   switch (button.dataset.action) {
+    case "quit-process": void terminateSelectedProcess(false); break;
+    case "force-quit-process": void terminateSelectedProcess(true); break;
+    case "close-process": state.selectedProcess = null; render(); break;
     case "pause": state.paused = !state.paused; render(); if (!state.paused) void refresh(); break;
     case "refresh": void refresh(); break;
     case "scan": void scan(); break;
@@ -297,7 +415,6 @@ document.addEventListener("click", event => {
     case "stop-app-search": void stopAppSearch(); break;
     case "hide": void hide(); break;
     case "load-settings": void loadSettings(); break;
-    case "save-settings": void saveSettings(); break;
     case "check-updates": void System.checkForUpdates().catch(reason => error(`${t("无法打开更新窗口：")}${String(reason)}`, "action")); break;
   }
 });
@@ -328,7 +445,7 @@ el("page-body").addEventListener("change", event => {
   appSelectAll = !!state.appReview?.files.length && state.appSelection.length === state.appReview.files.length;
   render();
 });
-document.querySelector(".sidebar")!.setAttribute("aria-label", t("LocalOps 导航"));
+document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
 el("navigation").setAttribute("aria-label", t("监控页面"));
 el("machine-detail").textContent = t("正在连接本机…");
 render(true);
@@ -338,7 +455,7 @@ if (isMyGo()) {
     document.documentElement.lang = language;
     el("navigation").innerHTML = navigation();
     el("machine-name").textContent = t("本机");
-    document.querySelector(".sidebar")!.setAttribute("aria-label", t("LocalOps 导航"));
+    document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
     el("navigation").setAttribute("aria-label", t("监控页面"));
     state.info = null; state.processes = null; state.connections = null; state.scan = null;
     state.processError = ""; state.connectionError = ""; state.scanError = "";
@@ -346,9 +463,10 @@ if (isMyGo()) {
   });
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });
-  window.addEventListener("pagehide", () => { stopped = true; off(); offSettings(); offLocale(); }, { once: true });
+  const offMenuBarSettings = events.menuBarSettingsOpened.on(() => { void navigate("menubar"); });
+  window.addEventListener("pagehide", () => { stopped = true; off(); offSettings(); offMenuBarSettings(); offLocale(); }, { once: true });
   void refresh();
 } else {
   el("machine-detail").textContent = t("浏览器预览");
-  error(t("实时数据仅在 LocalOps 桌面应用中可用。请运行 bun run dev 启动应用。"));
+  error(t("实时数据仅在 RockshinOps 桌面应用中可用。请运行 bun run dev 启动应用。"));
 }

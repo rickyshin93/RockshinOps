@@ -1,4 +1,4 @@
-import type { Preferences } from "./mygo";
+import type { MenuBarPreview, Preferences } from "./mygo";
 import type { Language } from "./i18n";
 
 export const menuBarChoices = [
@@ -13,12 +13,14 @@ export const menuBarChoices = [
 export interface SettingsState {
   preferences: Preferences | null;
   menuBarDraft: string[];
+  trayPreview: MenuBarPreview | null;
   languageDraft: Language;
   updateProxyDraft: boolean;
+  hideDockDraft: boolean;
   preferencesBusy: boolean;
   preferencesError: string;
 }
 
 export function preferencesDirty(state: SettingsState): boolean {
-  return !!state.preferences && (state.updateProxyDraft !== state.preferences.updateUseSystemProxy || state.languageDraft !== state.preferences.language || JSON.stringify(state.menuBarDraft) !== JSON.stringify(state.preferences.menuBarItems));
+  return !!state.preferences && (state.hideDockDraft !== state.preferences.hideDockOnClose || state.updateProxyDraft !== state.preferences.updateUseSystemProxy || state.languageDraft !== state.preferences.language || JSON.stringify(state.menuBarDraft) !== JSON.stringify(state.preferences.menuBarItems));
 }

@@ -2,6 +2,7 @@ import { defineConfig } from "mygo-cli";
 import pkg from "./package.json";
 
 export default defineConfig({
+  // The updater relaunches the original executable path; keep its installed identity.
   name: "LocalOps",
   identifier: "dev.localops.desktop",
   version: pkg.version,
@@ -17,5 +18,5 @@ export default defineConfig({
   resources: ["LICENSE", "THIRD_PARTY_NOTICES.md"],
   bindings: "src/mygo.ts",
   out: "build",
-  macos: { infoPlist: { CFBundleDevelopmentRegion: "en", CFBundleLocalizations: ["en", "zh-Hans"] } },
+  macos: { infoPlist: { CFBundleName: "RockshinOps", CFBundleDisplayName: "RockshinOps", CFBundleDevelopmentRegion: "en", CFBundleLocalizations: ["en", "zh-Hans"] } },
 });

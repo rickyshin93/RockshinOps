@@ -20,8 +20,14 @@ func render(path string, pixels int) ([]byte, error) {
 	}
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
+	return renderPNG(cpath, pixels)
+}
+
+func renderComputer() ([]byte, error) { return renderPNG(nil, 256) }
+
+func renderPNG(path *C.char, pixels int) ([]byte, error) {
 	var length C.size_t
-	data := C.localops_app_icon_png(cpath, C.int(pixels), &length)
+	data := C.localops_app_icon_png(path, C.int(pixels), &length)
 	if data == nil {
 		return nil, errors.New("icon unavailable")
 	}

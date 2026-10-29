@@ -109,10 +109,11 @@ func readProcesses() ([]rawProcess, int, error) {
 	return items, len(pids), nil
 }
 
-func ReadMachine() Machine {
+func ReadMachine(timeout time.Duration) Machine {
 	m := Machine{Platform: runtime.GOOS, Architecture: runtime.GOARCH}
 	var failures []string
 	if info, err := host.Info(); err == nil {
+		m.Kernel = info.KernelVersion
 		m.Hostname = info.Hostname
 		m.OS = strings.TrimSpace(info.Platform + " " + info.PlatformVersion)
 		m.Model = info.VirtualizationSystem
@@ -144,6 +145,7 @@ func ReadMachine() Machine {
 	if m.Model == "" {
 		m.Model = "—"
 	}
+	m.Name = m.Model
 	m.Error = strings.Join(failures, "; ")
 	return m
 }

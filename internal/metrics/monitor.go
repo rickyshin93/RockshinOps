@@ -3,6 +3,7 @@ package metrics
 import (
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -205,6 +206,7 @@ func (m *Monitor) refreshProcesses(now time.Time) {
 	}
 	for _, raw := range items {
 		p := raw.Process
+		p.Identity = strconv.FormatUint(raw.start, 10)
 		if old, exists := m.processPrevious[p.PID]; exists && old.start == raw.start && continuous && raw.cpuTime >= old.cpuTime {
 			p.CPU = float64(raw.cpuTime-old.cpuTime) / 1e9 / seconds * 100
 			p.CPUReady = true

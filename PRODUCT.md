@@ -1,4 +1,4 @@
-# LocalOps
+# RockshinOps
 
 <!-- impeccable:product-schema 1 -->
 
@@ -28,7 +28,7 @@ Keep current system activity understandable at a glance. Overview cards lead to 
 
 ## Brand Commitments
 
-LocalOps follows a macOS-native direction: real sidebar vibrancy, system blue for selection and actions, Apple system colors for metric identity, Health-style cards and soft shadows. `DESIGN.md` is the interface guide. Keep live data readable, fixed light styling, left navigation, native window controls and one content scroller. Do not invent system-health scores.
+RockshinOps follows a macOS-native direction: real sidebar vibrancy, system blue for selection and actions, Apple system colors for metric identity, Health-style cards and soft shadows. `DESIGN.md` is the interface guide. Keep live data readable, fixed light styling, left navigation, native window controls and one content scroller. Do not invent system-health scores.
 
 ## Evidence on Hand
 

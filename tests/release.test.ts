@@ -3,6 +3,13 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectRelease, verifyUpdate } from "../scripts/collect-release";
+import config from "../mygo.config";
+
+test("branding preserves the installed executable path used by existing updaters", () => {
+  expect(config.name).toBe("LocalOps");
+  expect(config.identifier).toBe("dev.localops.desktop");
+  expect(config.macos?.infoPlist?.CFBundleDisplayName).toBe("RockshinOps");
+});
 
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const key = publicKey.export({ format: "der", type: "spki" }).subarray(-32).toString("base64");

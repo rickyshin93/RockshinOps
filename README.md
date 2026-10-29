@@ -1,4 +1,6 @@
-# LocalOps
+# RockshinOps
+
+Previously LocalOps. Installer filenames, executables and saved settings retain the LocalOps name for update compatibility; the application identifier and signed update feed are unchanged.
 
 [![Build and release](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml/badge.svg)](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -20,15 +22,17 @@ All four targets run real collector smoke tests in CI. Interactive desktop accep
 
 ## Features
 
+- Process details support confirmed Quit (SIGTERM on macOS/Linux) and Force Quit (SIGKILL; Windows uses process termination), with process-identity checks and normal OS permissions. A sent request does not guarantee a process has exited.
 - CPU usage by core, memory composition/pressure/swap, GPU counters, disk capacity and I/O, physical network traffic, battery and available hardware power telemetry.
 - Actual history for the last minute, 5 minutes, 15 minutes or hour. Pausing freezes the view while native sampling continues. History lives only in memory for the current session.
 - Searchable process and running-app lists with CPU and physical-memory usage; on-demand TCP/UDP connection snapshots.
 - Space analysis of configured caches, logs, downloads and trash. Move selected scanned items to the system trash, or confirm permanent emptying of the configured trash directory. Incomplete directories cannot be cleaned; process termination is unavailable.
 - Explore the system disk from its root by logical size and navigate its directories. Disk exploration counts items before showing item-based progress and has no time or entry limit; inaccessible paths are reported, symbolic links are not followed, and mounted paths may be counted more than once. On macOS, review installed app bundles and possible associated files found by identifier across home, Library and system temporary/cache directories, and by app name or declared bundle name at filename boundaries at any depth throughout those locations and application directories, then move selected items to the system trash. Common locations appear first while the remaining search runs independently of disk exploration. Apps without a bundle identifier can still be searched by name; canonically equivalent Unicode names match while original paths are preserved. Search has no time or item limit but can be incomplete due to permissions, skipped symbolic links, application bundles, and files whose names do not identify the app; matches may be shared and must be reviewed. Inaccessible locations and OS errors appear in expandable coverage details, separately from app candidates. Running apps must be quit first. System components, other users, arbitrary names and privileged locations may be missed.
-- macOS app-uninstall scans show a visible permission guide when access is denied. **Open Full Disk Access** goes directly to the system authorization page and is also available in the installed-app list. Enable LocalOps there (use **+** to add it if missing), then quit and reopen LocalOps before searching again. Some system directories may remain restricted.
-- Persistent menu bar metrics: disk space, CPU, memory, GPU, network speed and battery. Close the window to keep sampling; use **Quit** to stop.
+- macOS app-uninstall scans show a visible permission guide when access is denied. **Open Full Disk Access** goes directly to the system authorization page and is also available in the installed-app list. Enable RockshinOps there (use **+** to add it if missing), then quit and reopen RockshinOps before searching again. Some system directories may remain restricted.
+- Persistent menu bar metrics: disk space, CPU, memory, GPU, network speed and battery. Close the window to keep sampling; use **Quit** to stop. On macOS, **Settings → General → Hide Dock icon when closing** optionally removes the Dock icon while the window is closed; reopening restores it.
+- macOS **Menu Bar Management** adds visible, hidden and always-hidden sections, a native overflow/search panel, icon movement, appearance settings and global shortcuts. RockshinOps’ own arrow and metric item can also be dragged in the layout, with positions preserved across restarts. The overflow panel centers under its arrow and shifts inward at screen edges; selecting an item reveals only that icon for you to click manually. **General → Temporary icon duration** defaults to 15 seconds, accepts 5–60 seconds, and keeps items visible while their menu is open. Right-click the arrow to open the app, jump to menu-bar or app settings, refresh icons, search, manage sections or quit. Quit Ice before enabling it. Accessibility permits movement/opening; Screen Recording captures only status-item windows for previews. App-specific accessibility and multi-display limitations are tracked in [STATUS.md](STATUS.md); implementation and local Ice inspection evidence are in [the integration note](docs/menu-bar-management.md).
 - English and Simplified Chinese. Settings defaults to **System default** and matches the OS language preferences; unsupported languages fall back to English. Save **中文** or **English** to override. The UI, native menus and tray labels change together.
-- A compact macOS-style interface with Lucide icons and native app icons on macOS (generic executable icons elsewhere).
+- A compact macOS-style interface built with Tailwind CSS v4, shared panel/control styles, a disk-space cleanup dashboard, Lucide icons and native app icons on macOS (generic executable icons elsewhere).
 
 CPU temperature and per-app watt measurements are not implemented. GPU and system power availability depends on hardware and drivers. Windows supports NVIDIA telemetry through an installed `nvidia-smi`; Linux supports AMD sysfs counters and NVIDIA SMI. The GPU panel shows one device. Linux battery details cover the first system battery in sysfs; Windows uses aggregate system battery status.
 
@@ -36,12 +40,12 @@ CPU temperature and per-app watt measurements are not implemented. GPU and syste
 
 Download the package for your architecture from [Releases](https://github.com/rickyshin93/local-ops/releases).
 
-- **macOS:** open the `.dmg` and drag LocalOps to Applications. Packages are ad-hoc signed, not notarized. If macOS blocks the downloaded app, follow Apple's [instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+- **macOS:** open the `.dmg` and drag the app to Applications. Packages are ad-hoc signed, not notarized. If macOS blocks the downloaded app, follow Apple's [instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
 - **Windows:** run the `LocalOps Setup … amd64.exe` installer. It installs for the current user and requires WebView2. Packages are unsigned, so Windows may display a publisher warning.
 - **Debian/Ubuntu:** install the `.deb` with `sudo apt install ./localops_…_amd64.deb`; the package declares its GTK/WebKitGTK dependencies. A desktop tray implementation is needed to expose the tray menu.
 - **Other Linux desktops:** extract the `.tar.gz` and use its included `install.sh`. Install GTK 3, WebKitGTK 4.1 and an AppIndicator-compatible tray through your distribution. The archive's installer reports missing WebKitGTK dependencies.
 
-Each release includes `SHA256SUMS.txt`. Starting with v0.2.1, LocalOps checks GitHub Releases after launch and daily while running. Use **Settings → Check for Updates…**, the app menu or the tray menu to check manually. The update window shows release notes, downloads with progress, verifies the signature and lets you choose when to relaunch. Installation requires confirmation unless you explicitly opt into automatic installation.
+Each release includes `SHA256SUMS.txt`. Starting with v0.2.1, RockshinOps checks GitHub Releases after launch and daily while running. Use **Settings → Check for Updates…**, the app menu or the tray menu to check manually. The update window shows release notes, downloads with progress, verifies the signature and lets you choose when to relaunch. Installation requires confirmation unless you explicitly opt into automatic installation.
 
 Install v0.2.1 manually once if you currently use v0.2.0. Updates require a writable install location; Linux system packages must be upgraded with the package manager. On macOS, **Settings → Use system proxy for updates** uses the system network proxy after saving; PAC scripts and authenticated proxies are not supported. GitHub must be reachable. Update signing does not change the OS signing/notarization status above.
 
@@ -97,7 +101,7 @@ Data is read locally. No analytics, remote upload, privileged helper or HTTP IPC
 | CPU | Native counter deltas; system usage is weighted across cores. Process usage uses 100% per logical core and may exceed 100%. |
 | Memory | Binary GiB/MiB. macOS uses Mach/sysctl and process `phys_footprint`. Windows/Linux use total minus OS-available memory and process RSS; shared pages can be counted multiple times. Windows swap means page files. |
 | Disk capacity | Space writable by the current user on the home directory's volume, decimal MB/GB/TB. Reclaimable space is excluded; APFS shared volumes are not summed. |
-| Disk I/O | macOS block-driver counters, Windows fixed-volume counters, Linux hardware block devices excluding partitions and virtual layers. Disabled or inaccessible counters are unavailable; LocalOps does not enable them in the registry. |
+| Disk I/O | macOS block-driver counters, Windows fixed-volume counters, Linux hardware block devices excluding partitions and virtual layers. Disabled or inaccessible counters are unavailable; RockshinOps does not enable them in the registry. |
 | Network | 64-bit interface counter deltas. macOS sums `en*`; Windows uses the hardware-interface flag; Linux uses sysfs hardware device identity. Virtual interfaces remain separate to avoid duplicate traffic. |
 | Connections | macOS `lsof`, Windows connection tables or Linux procfs, limited to current permissions; no remote DNS lookup or outgoing connection to displayed addresses. |
 | Space analysis | Logical file sizes, without following symlinks. Hard links/APFS clones may count more than once; results are not guaranteed reclaimable space. |

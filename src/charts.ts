@@ -19,18 +19,19 @@ export function bucketHistory(history: Trend[], keys: TrendKey[], end: number, s
   return buckets.map(bucket => bucket.count ? bucket.sums.map(sum => sum / bucket.count) : null);
 }
 
-export function dots(history: Trend[], keys: TrendKey[], end: number, seconds: number, label: string, max = 100): string {
-  const data = bucketHistory(history, keys, end, seconds, 36);
+export function dots(history: Trend[], keys: TrendKey[], end: number, seconds: number, label: string, max = 100, geometry = { columns: 36, rows: 5, radius: 2.75 }): string {
+  const { columns, rows, radius } = geometry;
+  const data = bucketHistory(history, keys, end, seconds, columns);
   const ceiling = max || Math.max(1, ...data.map(values => values?.reduce((a, b) => a + b, 0) || 0));
   const circles: string[] = [];
-  for (let x = 0; x < 36; x++) {
+  for (let x = 0; x < columns; x++) {
     const values = data[x];
     const total = values?.reduce((a, b) => a + b, 0) || 0;
-    for (let y = 0; y < 5; y++) {
-      const level = (5 - y) / 5;
-      const filled = values != null && total > 0 && level <= Math.max(.2, total / ceiling);
+    for (let y = 0; y < rows; y++) {
+      const level = (rows - y) / rows;
+      const filled = values != null && total > 0 && level <= Math.max(1 / rows, total / ceiling);
       const secondary = filled && values!.length > 1 && level <= values![1]! / ceiling;
-      circles.push(`<circle cx="${((x + .5) / 36 * 100).toFixed(3)}%" cy="${(y + .5) / 5 * 100}%" r="2.75" class="${filled ? secondary ? "dot-secondary" : "dot-active" : values ? "dot-idle" : "dot-empty"}"/>`);
+      circles.push(`<circle cx="${((x + .5) / columns * 100).toFixed(3)}%" cy="${(y + .5) / rows * 100}%" r="${radius}" class="${filled ? secondary ? "dot-secondary" : "dot-active" : values ? "dot-idle" : "dot-empty"}"/>`);
     }
   }
   return `<div class="dot-chart"><svg role="img" aria-label="${e(label)}${t("。淡色空白列表示该时段尚无样本。")}">${circles.join("")}</svg></div>`;

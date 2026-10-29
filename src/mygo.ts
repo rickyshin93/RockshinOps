@@ -11,6 +11,8 @@ export interface AppFile {
 
 export interface AppInfo {
   machine: Machine;
+  displays: DisplayInfo[];
+  goVersion: string;
   version: string;
   refreshSeconds: number;
   diskRefreshSeconds: number;
@@ -40,6 +42,14 @@ export interface AppUsage {
   cpu: number;
   cpuReady: boolean;
   memory: number;
+}
+
+export interface Appearance {
+  tint: string;
+  color: string;
+  shadow: boolean;
+  border: boolean;
+  shape: string;
 }
 
 export interface Battery {
@@ -99,6 +109,14 @@ export interface Disk {
   error: string;
 }
 
+export interface DisplayInfo {
+  name: string;
+  width: number;
+  height: number;
+  scale: number;
+  primary: boolean;
+}
+
 export interface GPU {
   name: string;
   usage: number;
@@ -112,7 +130,26 @@ export interface InstalledApp {
   path: string;
 }
 
+export interface Item {
+  id: number;
+  pid: number;
+  name: string;
+  owner: string;
+  section: string;
+  image: string;
+  x: number;
+  width: number;
+  movable: boolean;
+}
+
 export interface Machine {
+  name: string;
+  osBuild: string;
+  kernel: string;
+  serialNumber: string;
+  performanceCores: number | null;
+  efficiencyCores: number | null;
+  gpuCores: number | null;
   hostname: string;
   model: string;
   chip: string;
@@ -140,6 +177,17 @@ export interface Memory {
   error: string;
 }
 
+export interface MenuBarConfiguration {
+  settings: Settings;
+  state: State;
+}
+
+/** MenuBarPreview is what the menu bar would show for the latest sample. */
+export interface MenuBarPreview {
+  image: string;
+  text: string;
+}
+
 export interface Network {
   received: number;
   sent: number;
@@ -162,12 +210,14 @@ export interface NetworkInterface {
 }
 
 export interface Preferences {
+  hideDockOnClose: boolean;
   updateUseSystemProxy: boolean;
   language: string;
   menuBarItems: string[];
 }
 
 export interface Process {
+  identity: string;
   pid: number;
   name: string;
   path: string;
@@ -223,6 +273,28 @@ export interface ScanTarget {
   path: string;
 }
 
+export interface Settings {
+  enabled: boolean;
+  alwaysHidden: boolean;
+  usePanel: boolean;
+  showOnHover: boolean;
+  hoverDelay: number;
+  rehideDelay: number;
+  revealCheckInterval: number;
+  temporaryRevealSeconds: number;
+  showAllOnDrag: boolean;
+  hideAppMenus: boolean;
+  secondaryMenu: boolean;
+  divider: string;
+  dynamic: boolean;
+  light: Appearance;
+  dark: Appearance;
+  toggleHotkey: string;
+  searchHotkey: string;
+  panelHotkey: string;
+  menusHotkey: string;
+}
+
 export interface Snapshot {
   updatedAt: string;
   cpu: CPU;
@@ -246,6 +318,18 @@ export interface SpaceItem {
   files: number;
   directory: boolean;
   scanned: boolean;
+}
+
+export interface State {
+  capturing: boolean;
+  supported: boolean;
+  accessibility: boolean;
+  screenRecording: boolean;
+  expanded: boolean;
+  panelVisible: boolean;
+  iceRunning: boolean;
+  items: Item[];
+  error: string;
 }
 
 export interface Trend {
@@ -272,6 +356,9 @@ export interface Volume {
 // ---- Services ----
 
 export const System = {
+  activateMenuBarItem(id: number): Promise<State> {
+    return call("System.ActivateMenuBarItem", id);
+  },
   cancelAppReview(id: number): Promise<void> {
     return call("System.CancelAppReview", id);
   },
@@ -296,6 +383,22 @@ export const System = {
   installedApps(): Promise<InstalledApp[]> {
     return call("System.InstalledApps");
   },
+  menuBarAction(action: string): Promise<State> {
+    return call("System.MenuBarAction", action);
+  },
+  menuBarConfiguration(): Promise<MenuBarConfiguration> {
+    return call("System.MenuBarConfiguration");
+  },
+  menuBarPermission(permission: string): Promise<State> {
+    return call("System.MenuBarPermission", permission);
+  },
+  /** MenuBarPreview renders items against the latest snapshot without saving them. */
+  menuBarPreview(items: string[]): Promise<MenuBarPreview> {
+    return call("System.MenuBarPreview", items);
+  },
+  moveMenuBarItem(id: number, pid: number, section: string, before: number): Promise<State> {
+    return call("System.MoveMenuBarItem", id, pid, section, before);
+  },
   openFullDiskAccessSettings(): Promise<void> {
     return call("System.OpenFullDiskAccessSettings");
   },
@@ -317,6 +420,9 @@ export const System = {
   reviewAppQuick(path: string): Promise<AppReview> {
     return call("System.ReviewAppQuick", path);
   },
+  saveMenuBarSettings(next: Settings): Promise<MenuBarConfiguration> {
+    return call("System.SaveMenuBarSettings", next);
+  },
   savePreferences(p: Preferences): Promise<Preferences> {
     return call("System.SavePreferences", p);
   },
@@ -329,6 +435,9 @@ export const System = {
   scanProgress(): Promise<ScanProgress> {
     return call("System.ScanProgress");
   },
+  terminateProcess(pid: number, identity: string, force: boolean): Promise<void> {
+    return call("System.TerminateProcess", pid, identity, force);
+  },
   trashCleanupItem(path: string): Promise<void> {
     return call("System.TrashCleanupItem", path);
   },
@@ -340,4 +449,5 @@ export const System = {
 export const events = {
   metricsChanged: event<Snapshot>("metricsChanged"),
   settingsOpened: event<boolean>("settingsOpened"),
+  menuBarSettingsOpened: event<boolean>("menuBarSettingsOpened"),
 } as const;

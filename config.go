@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"localops/internal/menubar"
 	"localops/internal/metrics"
 )
 
@@ -14,6 +15,8 @@ import (
 var configJSON []byte
 
 type Config struct {
+	MenuBarManager              menubar.Settings                `json:"menuBarManager"`
+	DefaultHideDockOnClose      bool                            `json:"defaultHideDockOnClose"`
 	DefaultUpdateUseSystemProxy bool                            `json:"defaultUpdateUseSystemProxy"`
 	DefaultLanguage             string                          `json:"defaultLanguage"`
 	UpdateIntervalSeconds       int                             `json:"updateIntervalSeconds"`
@@ -23,6 +26,7 @@ type Config struct {
 	ProcessIntervalSeconds      int                             `json:"processIntervalSeconds"`
 	HistorySeconds              int                             `json:"historySeconds"`
 	ConnectionTimeoutSeconds    int                             `json:"connectionTimeoutSeconds"`
+	MachineInfoTimeoutSeconds   int                             `json:"machineInfoTimeoutSeconds"`
 	ScanTimeoutSeconds          int                             `json:"scanTimeoutSeconds"`
 	ScanMaxEntries              int                             `json:"scanMaxEntries"`
 	ScanMaxItems                int                             `json:"scanMaxItems"`
@@ -34,11 +38,17 @@ func parseConfig(data []byte) (Config, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return c, fmt.Errorf("invalid localops.json: %w", err)
 	}
+	if err := c.MenuBarManager.Validate(); err != nil {
+		return c, fmt.Errorf("localops.json: %w", err)
+	}
 	if c.SampleIntervalSeconds <= 0 {
 		return c, fmt.Errorf("localops.json: sampleIntervalSeconds must be positive")
 	}
 	if c.UpdateIntervalSeconds <= 0 {
 		return c, fmt.Errorf("localops.json: updateIntervalSeconds must be positive")
+	}
+	if c.MachineInfoTimeoutSeconds <= 0 {
+		return c, fmt.Errorf("localops.json: machineInfoTimeoutSeconds must be positive")
 	}
 	if c.MetricsIntervalSeconds <= 0 || c.ProcessIntervalSeconds <= 0 || c.HistorySeconds < 3600 || c.ConnectionTimeoutSeconds <= 0 || c.ScanTimeoutSeconds <= 0 || c.ScanMaxEntries <= 0 || c.ScanMaxItems <= 0 {
 		return c, fmt.Errorf("localops.json: monitoring and scan parameters must be positive; historySeconds must be at least 3600")

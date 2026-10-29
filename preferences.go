@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +14,11 @@ import (
 	"localops/internal/localization"
 	"localops/internal/metrics"
 	"localops/internal/storage"
+	"localops/internal/trayimage"
 )
 
 type Preferences struct {
+	HideDockOnClose      bool     `json:"hideDockOnClose"`
 	UpdateUseSystemProxy bool     `json:"updateUseSystemProxy"`
 	Language             string   `json:"language"`
 	MenuBarItems         []string `json:"menuBarItems"`
@@ -44,15 +48,15 @@ func validatePreferences(p Preferences) error {
 	return nil
 }
 
-func readPreferences(path string, defaults []string, defaultLanguage string, defaultProxy bool) (Preferences, error) {
+func readPreferences(path string, defaults []string, defaultLanguage string, defaultProxy, defaultHideDock bool) (Preferences, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return Preferences{UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage, MenuBarItems: append([]string{}, defaults...)}, nil
+		return Preferences{HideDockOnClose: defaultHideDock, UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage, MenuBarItems: append([]string{}, defaults...)}, nil
 	}
 	if err != nil {
 		return Preferences{}, fmt.Errorf("read preferences: %w", err)
 	}
-	p := Preferences{UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage}
+	p := Preferences{HideDockOnClose: defaultHideDock, UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage}
 	if err = json.Unmarshal(data, &p); err == nil {
 		err = validatePreferences(p)
 	}
@@ -85,7 +89,7 @@ func writePreferences(path string, p Preferences) error {
 func (s *System) Preferences() Preferences {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return Preferences{UpdateUseSystemProxy: s.preferences.UpdateUseSystemProxy, Language: s.preferences.Language, MenuBarItems: append([]string{}, s.preferences.MenuBarItems...)}
+	return Preferences{HideDockOnClose: s.preferences.HideDockOnClose, UpdateUseSystemProxy: s.preferences.UpdateUseSystemProxy, Language: s.preferences.Language, MenuBarItems: append([]string{}, s.preferences.MenuBarItems...)}
 }
 
 func (s *System) SavePreferences(p Preferences) (Preferences, error) {
@@ -94,54 +98,106 @@ func (s *System) SavePreferences(p Preferences) (Preferences, error) {
 		s.mu.Unlock()
 		return Preferences{}, err
 	}
-	s.preferences = Preferences{UpdateUseSystemProxy: p.UpdateUseSystemProxy, Language: p.Language, MenuBarItems: append([]string{}, p.MenuBarItems...)}
+	s.preferences = Preferences{HideDockOnClose: p.HideDockOnClose, UpdateUseSystemProxy: p.UpdateUseSystemProxy, Language: p.Language, MenuBarItems: append([]string{}, p.MenuBarItems...)}
 	s.update(s.monitor.Current())
 	s.mu.Unlock()
 	applyLanguage(p.Language)
 	return p, nil
 }
 
-func menuBarTitle(p Preferences, s metrics.Snapshot) string {
-	parts := make([]string, 0, len(p.MenuBarItems))
-	for _, item := range p.MenuBarItems {
-		value := "—"
+type menuBarReading struct{ label, value, symbol string }
+
+// menuBarReadings is shared by the text title and the macOS icon image, which omits labels.
+func menuBarReadings(items []string, s metrics.Snapshot) []menuBarReading {
+	readings := make([]menuBarReading, 0, len(items))
+	for _, item := range items {
+		r := menuBarReading{value: "—"}
 		switch item {
 		case "disk":
+			r.symbol = "internaldrive"
 			if s.Disk.CapacityError == "" && s.Disk.Volume.Total > 0 {
-				value = storage.FormatCapacity(s.Disk.Volume.Available)
+				r.value = storage.FormatCapacity(s.Disk.Volume.Available)
 			}
-			if len(p.MenuBarItems) > 1 {
-				value = localization.T("磁盘 ") + value
+			if len(items) > 1 {
+				r.label = localization.T("磁盘 ")
 			}
 		case "cpu":
+			r.symbol, r.label = "cpu", "CPU "
 			if s.CPU.Ready && s.CPU.Error == "" {
-				value = fmt.Sprintf("%.0f%%", s.CPU.Usage)
+				r.value = fmt.Sprintf("%.0f%%", s.CPU.Usage)
 			}
-			value = "CPU " + value
 		case "memory":
+			r.symbol, r.label = "memorychip", localization.T("内存 ")
 			if s.Memory.Error == "" && s.Memory.Total > 0 {
-				value = fmt.Sprintf("%.0f%%", float64(s.Memory.Used)/float64(s.Memory.Total)*100)
+				r.value = fmt.Sprintf("%.0f%%", float64(s.Memory.Used)/float64(s.Memory.Total)*100)
 			}
-			value = localization.T("内存 ") + value
 		case "gpu":
+			r.symbol, r.label = "cube", "GPU "
 			if s.GPU.Available && s.GPU.Error == "" {
-				value = fmt.Sprintf("%.0f%%", s.GPU.Usage)
+				r.value = fmt.Sprintf("%.0f%%", s.GPU.Usage)
 			}
-			value = "GPU " + value
 		case "network":
+			r.symbol, r.label = "network", localization.T("网速 ")
 			if s.Network.Ready && s.Network.Error == "" {
-				value = "↓" + menuBarRate(s.Network.Download) + " ↑" + menuBarRate(s.Network.Upload)
+				r.value = "↓" + menuBarRate(s.Network.Download) + " ↑" + menuBarRate(s.Network.Upload)
 			}
-			value = localization.T("网速 ") + value
 		case "battery":
+			r.symbol, r.label = batterySymbol(s.Battery), localization.T("电池 ")
 			if s.Battery.Present && s.Battery.Error == "" {
-				value = fmt.Sprintf("%.0f%%", s.Battery.Percent)
+				r.value = fmt.Sprintf("%.0f%%", s.Battery.Percent)
 			}
-			value = localization.T("电池 ") + value
 		}
-		parts = append(parts, value)
+		readings = append(readings, r)
+	}
+	return readings
+}
+
+func batterySymbol(b metrics.Battery) string {
+	if b.Charging {
+		return "battery.100.bolt"
+	}
+	if !b.Present || b.Error != "" {
+		return "battery.0"
+	}
+	return fmt.Sprintf("battery.%.0f", math.Min(100, math.Round(b.Percent/25)*25))
+}
+
+func menuBarTitle(p Preferences, s metrics.Snapshot) string {
+	parts := make([]string, 0, len(p.MenuBarItems))
+	for _, r := range menuBarReadings(p.MenuBarItems, s) {
+		parts = append(parts, r.label+r.value)
 	}
 	return strings.Join(parts, " · ")
+}
+
+// menuBarImage draws the readings as SF Symbols with values; nil where no image renderer exists.
+func menuBarImage(items []string, s metrics.Snapshot) []byte {
+	readings := menuBarReadings(items, s)
+	tray := make([]trayimage.Item, len(readings))
+	for i, r := range readings {
+		tray[i] = trayimage.Item{Symbol: r.symbol, Text: r.value}
+	}
+	png, err := trayimage.Render(tray)
+	if err != nil {
+		return nil
+	}
+	return png
+}
+
+// MenuBarPreview is what the menu bar would show for the latest sample.
+type MenuBarPreview struct {
+	Image string `json:"image"`
+	Text  string `json:"text"`
+}
+
+// MenuBarPreview renders items against the latest snapshot without saving them.
+func (s *System) MenuBarPreview(items []string) MenuBarPreview {
+	snapshot := s.monitor.Current()
+	preview := MenuBarPreview{Text: menuBarTitle(Preferences{MenuBarItems: items}, snapshot)}
+	if png := menuBarImage(items, snapshot); png != nil {
+		preview.Image = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+	}
+	return preview
 }
 
 func menuBarRate(v float64) string {

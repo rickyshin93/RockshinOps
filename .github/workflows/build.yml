@@ -106,5 +106,5 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           gh release create "$GITHUB_REF_NAME" * \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "LocalOps $GITHUB_REF_NAME" \
+            --title "RockshinOps $GITHUB_REF_NAME" \
             --notes-file ../.github/RELEASE_NOTES.md

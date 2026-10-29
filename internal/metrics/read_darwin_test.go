@@ -7,6 +7,38 @@ import (
 	"time"
 )
 
+func TestDecodeMachineProfile(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		data      string
+		wantCores int
+		wantError bool
+	}{
+		{"Apple silicon", `{"SPHardwareDataType":[{"machine_name":"MacBook Pro","serial_number":"TEST-SERIAL"}],"SPDisplaysDataType":[{"sppci_cores":"32"}]}`, 32, false},
+		{"GPU cores unavailable", `{"SPHardwareDataType":[{"machine_name":"MacBook Pro","serial_number":"TEST-SERIAL"}],"SPDisplaysDataType":[{}]}`, 0, false},
+		{"missing hardware", `{}`, 0, true},
+		{"invalid GPU cores", `{"SPHardwareDataType":[{}],"SPDisplaysDataType":[{"sppci_cores":"unknown"}]}`, 0, true},
+		{"malformed output", `{`, 0, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var machine Machine
+			err := decodeMachineProfile([]byte(test.data), &machine)
+			if (err != nil) != test.wantError {
+				t.Fatalf("error = %v, wantError = %v", err, test.wantError)
+			}
+			if test.wantError {
+				return
+			}
+			if machine.Name != "MacBook Pro" || machine.SerialNumber != "TEST-SERIAL" {
+				t.Fatalf("unexpected identity: %+v", machine)
+			}
+			if test.wantCores == 0 && machine.GPUCores != nil || test.wantCores > 0 && (machine.GPUCores == nil || *machine.GPUCores != test.wantCores) {
+				t.Fatalf("unexpected GPU cores: %v", machine.GPUCores)
+			}
+		})
+	}
+}
+
 func TestNativeSnapshot(t *testing.T) {
 	raw := readNative(time.Second)
 	if raw.cpuError != "" || len(raw.cpu) == 0 {
@@ -28,7 +60,7 @@ func TestNativeSnapshot(t *testing.T) {
 	if err != nil || len(processes) == 0 || total < len(processes) {
 		t.Fatalf("Processes: %d/%d %v", len(processes), total, err)
 	}
-	info := ReadMachine()
+	info := ReadMachine(5 * time.Second)
 	if info.Error != "" || info.LogicalCPUs == 0 {
 		t.Fatalf("Machine: %+v", info)
 	}

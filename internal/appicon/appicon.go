@@ -18,6 +18,17 @@ var cache sync.Map
 
 func Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/computer" {
+			data, err := renderComputer()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "image/png")
+			w.Header().Set("Cache-Control", "max-age=86400")
+			w.Write(data)
+			return
+		}
 		path := r.URL.Query().Get("path")
 		if !filepath.IsAbs(path) || filepath.Clean(path) != path || !strings.HasSuffix(path, ".app") {
 			http.Error(w, "an absolute .app path is required", http.StatusBadRequest)

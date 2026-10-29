@@ -85,6 +85,7 @@ type Battery struct {
 }
 
 type Process struct {
+	Identity   string  `json:"identity"`
 	PID        int     `json:"pid"`
 	Name       string  `json:"name"`
 	Path       string  `json:"path"`
@@ -150,16 +151,23 @@ type Trend struct {
 }
 
 type Machine struct {
-	Hostname     string `json:"hostname"`
-	Model        string `json:"model"`
-	Chip         string `json:"chip"`
-	OS           string `json:"os"`
-	Architecture string `json:"architecture"`
-	LogicalCPUs  int    `json:"logicalCPUs"`
-	PhysicalCPUs int    `json:"physicalCPUs"`
-	Memory       uint64 `json:"memory"`
-	Platform     string `json:"platform"`
-	Error        string `json:"error"`
+	Name             string `json:"name"`
+	OSBuild          string `json:"osBuild"`
+	Kernel           string `json:"kernel"`
+	SerialNumber     string `json:"serialNumber"`
+	PerformanceCores *int   `json:"performanceCores"`
+	EfficiencyCores  *int   `json:"efficiencyCores"`
+	GPUCores         *int   `json:"gpuCores"`
+	Hostname         string `json:"hostname"`
+	Model            string `json:"model"`
+	Chip             string `json:"chip"`
+	OS               string `json:"os"`
+	Architecture     string `json:"architecture"`
+	LogicalCPUs      int    `json:"logicalCPUs"`
+	PhysicalCPUs     int    `json:"physicalCPUs"`
+	Memory           uint64 `json:"memory"`
+	Platform         string `json:"platform"`
+	Error            string `json:"error"`
 }
 
 type cpuTicks struct{ user, system, idle, nice uint64 }

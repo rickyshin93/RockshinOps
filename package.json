@@ -1,6 +1,6 @@
 {
-  "name": "localops",
-  "version": "0.2.3",
+  "name": "rockshinops",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,15 +22,17 @@
     "react-i18next": "17.1.9"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "mygo-cli": "0.6.4",
+    "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.5"
   },
   "description": "A local desktop system monitor with persistent menu bar metrics",
   "license": "MIT",
-  "author": "LocalOps contributors",
+  "author": "RockshinOps contributors",
   "repository": {
     "type": "git",
     "url": "https://github.com/rickyshin93/local-ops.git"

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <title>RockshinOps</title>
+  <defs>
+    <linearGradient id="tile" x1="512" y1="48" x2="512" y2="976" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#58AAFF"/>
+      <stop offset=".48" stop-color="#338EF5"/>
+      <stop offset="1" stop-color="#1767D4"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="770" y1="208" x2="770" y2="352" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#77E08A"/>
+      <stop offset="1" stop-color="#24B73F"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="216" fill="url(#tile)"/>
+  <path d="M298 754V278H474C590 278 654 328 654 418C654 508 590 558 474 558H298M474 558L676 754" stroke="#FFFFFF" stroke-width="100" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="774" cy="272" r="72" fill="url(#signal)"/>
+</svg>

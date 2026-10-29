@@ -5,7 +5,7 @@
 // Returns malloc'ed PNG bytes of the Finder icon for path, or NULL.
 void *localops_app_icon_png(const char *path, int pixels, size_t *length) {
 	@autoreleasepool {
-		NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:[NSString stringWithUTF8String:path]];
+		NSImage *icon = path ? [[NSWorkspace sharedWorkspace] iconForFile:[NSString stringWithUTF8String:path]] : [NSImage imageNamed:NSImageNameComputer];
 		NSBitmapImageRep *rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:pixels pixelsHigh:pixels
 			bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
 		if (!icon || !rep) return NULL;

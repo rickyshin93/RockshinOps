@@ -1,15 +1,16 @@
 import {
   AppWindow, ArrowDownToLine, ArrowLeftRight, Battery, BrushCleaning,
   Check, ChevronDown, ChevronRight, Cpu, Folder, Globe, Gpu, HardDrive,
-  Laptop, LayoutDashboard, List, MemoryStick, Pause, Play, RefreshCw,
-  Search, Settings, Zap, createElement, type IconNode,
+  Gauge, PanelTop, Laptop, List, MemoryStick, Pause, Play, RefreshCw,
+  Search, Settings, X, Zap, createElement, type IconNode,
 } from "lucide";
 
 const icons: Record<string, IconNode> = {
   settings: Settings,
+  menubar: PanelTop,
   down: ChevronDown,
   check: Check,
-  overview: LayoutDashboard,
+  overview: Gauge,
   processes: List,
   connections: ArrowLeftRight,
   cpu: Cpu,
@@ -28,6 +29,7 @@ const icons: Record<string, IconNode> = {
   chevron: ChevronRight,
   hide: ArrowDownToLine,
   search: Search,
+  close: X,
   folder: Folder,
 };
 

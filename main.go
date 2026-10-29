@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/egoist/mygo/plugins/updater"
 	"localops/internal/appicon"
 	"localops/internal/localization"
+	"localops/internal/menubar"
 	"localops/internal/metrics"
 	"localops/internal/storage"
 	"localops/internal/windowchrome"
@@ -24,17 +26,28 @@ import (
 
 var MetricsChanged = mygo.NewEvent[metrics.Snapshot]("metricsChanged")
 var SettingsOpened = mygo.NewEvent[bool]("settingsOpened")
+var MenuBarSettingsOpened = mygo.NewEvent[bool]("menuBarSettingsOpened")
 
 func (s *System) CheckForUpdates() { updater.CheckForUpdates() }
 
 type AppInfo struct {
 	Machine               metrics.Machine      `json:"machine"`
+	Displays              []DisplayInfo        `json:"displays"`
+	GoVersion             string               `json:"goVersion"`
 	Version               string               `json:"version"`
 	RefreshSeconds        int                  `json:"refreshSeconds"`
 	DiskRefreshSeconds    int                  `json:"diskRefreshSeconds"`
 	ProcessRefreshSeconds int                  `json:"processRefreshSeconds"`
 	HistorySeconds        int                  `json:"historySeconds"`
 	ScanTargets           []metrics.ScanTarget `json:"scanTargets"`
+}
+
+type DisplayInfo struct {
+	Name    string  `json:"name"`
+	Width   int     `json:"width"`
+	Height  int     `json:"height"`
+	Scale   float64 `json:"scale"`
+	Primary bool    `json:"primary"`
 }
 
 type Bootstrap struct {
@@ -83,7 +96,11 @@ func (s *System) ScanProgress() ScanProgress {
 func (s *System) Initialize() Bootstrap {
 	snapshot := s.refresh(true)
 	info := s.info
-	info.Machine = metrics.ReadMachine()
+	info.GoVersion = runtime.Version()
+	info.Displays = []DisplayInfo{}
+	for _, display := range mygo.Screen.Displays() {
+		info.Displays = append(info.Displays, DisplayInfo{Name: display.Label, Width: display.Bounds.Width, Height: display.Bounds.Height, Scale: display.ScaleFactor, Primary: display.Primary})
+	}
 	return Bootstrap{Info: info, Snapshot: snapshot, History: s.monitor.History()}
 }
 func (s *System) Refresh() metrics.Snapshot      { return s.refresh(true) }
@@ -255,7 +272,7 @@ func main() {
 		log.Fatal(err)
 	}
 	preferencesPath := filepath.Join(configDir, "LocalOps", "preferences.json")
-	preferences, err := readPreferences(preferencesPath, cfg.DefaultMenuBarItems, cfg.DefaultLanguage, cfg.DefaultUpdateUseSystemProxy)
+	preferences, err := readPreferences(preferencesPath, cfg.DefaultMenuBarItems, cfg.DefaultLanguage, cfg.DefaultUpdateUseSystemProxy, cfg.DefaultHideDockOnClose)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -272,7 +289,7 @@ func main() {
 		DiskInterval:    time.Duration(cfg.SampleIntervalSeconds) * time.Second,
 		ProcessInterval: time.Duration(cfg.ProcessIntervalSeconds) * time.Second,
 		HistorySeconds:  cfg.HistorySeconds,
-	}), info: AppInfo{Machine: metrics.ReadMachine(), Version: mygo.App.Version(), RefreshSeconds: cfg.MetricsIntervalSeconds,
+	}), info: AppInfo{Machine: metrics.ReadMachine(time.Duration(cfg.MachineInfoTimeoutSeconds) * time.Second), Version: mygo.App.Version(), RefreshSeconds: cfg.MetricsIntervalSeconds,
 		DiskRefreshSeconds: cfg.SampleIntervalSeconds, ProcessRefreshSeconds: cfg.ProcessIntervalSeconds,
 		HistorySeconds: cfg.HistorySeconds, ScanTargets: targets}}
 	configureUpdateProxy(service, systemUpdateProxy)
@@ -287,7 +304,7 @@ func main() {
 		applyLanguage(preferences.Language)
 		localization.SetLanguage(mygo.App.Locale())
 		win := mygo.NewWindow(mygo.WindowOptions{
-			Title: "LocalOps", URL: "/", Width: 1250, Height: 820,
+			Title: "RockshinOps", URL: "/", Width: 1250, Height: 820,
 			MinWidth: 900, MinHeight: 600, StateKey: "main", Hidden: true,
 			TitleBarStyle:        mygo.TitleBarHiddenInset,
 			TrafficLightPosition: &mygo.Point{X: 18, Y: 20},
@@ -296,13 +313,36 @@ func main() {
 		})
 		windowchrome.InstallTopDrag(win.NativeHandle())
 		win.Show()
-		openWindow := func() { win.Show(); win.Focus(); go service.refresh(true) }
+		openWindow := func() {
+			mygo.App.Dock.Show()
+			win.Show()
+			win.Focus()
+			go service.refresh(true)
+		}
 		openSettings := func(*mygo.MenuItem, *mygo.Window) {
 			openWindow()
 			if err := SettingsOpened.Broadcast(true); err != nil {
 				log.Printf("open settings: %v", err)
 			}
 		}
+		menubar.SetActionHandler(func(action string) {
+			mygo.RunOnMain(func() {
+				switch action {
+				case "open":
+					openWindow()
+				case "settings":
+					openSettings(nil, nil)
+				case "menuBarSettings":
+					openWindow()
+					if err := MenuBarSettingsOpened.Broadcast(true); err != nil {
+						log.Printf("open menu bar settings: %v", err)
+					}
+				case "quit":
+					mygo.App.Quit()
+				}
+			})
+		})
+		startMenuBar(cfg.MenuBarManager, filepath.Dir(preferencesPath))
 		mygo.App.SetMenu(localizedMenu([]*mygo.MenuItem{
 			{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{
 				{Role: mygo.RoleAbout},
@@ -313,41 +353,59 @@ func main() {
 			{Role: mygo.RoleEditMenu}, {Role: mygo.RoleViewMenu}, {Role: mygo.RoleWindowMenu},
 		}))
 		capacityItem := &mygo.MenuItem{Label: "正在读取磁盘容量…", Disabled: true}
-		updatedItem := &mygo.MenuItem{Label: "LocalOps · 本机监控", Disabled: true}
+		updatedItem := &mygo.MenuItem{Label: "RockshinOps · 本机监控", Disabled: true}
 		activityItem := &mygo.MenuItem{Label: "正在采样…", Disabled: true}
 		tray, err := mygo.NewTray(mygo.TrayOptions{
 			ID: "localops.storage", Icon: diskIcon(), IconIsTemplate: true,
-			Title: "—", ToolTip: localization.T("LocalOps · 剩余可写空间"),
+			Title: "—", ToolTip: localization.T("RockshinOps · 剩余可写空间"),
 			Menu: localizedMenu([]*mygo.MenuItem{
 				capacityItem, activityItem, updatedItem, mygo.Separator(),
-				{Label: "打开 LocalOps", Click: func(*mygo.MenuItem, *mygo.Window) { openWindow() }},
+				{Label: "打开 RockshinOps", Click: func(*mygo.MenuItem, *mygo.Window) { openWindow() }},
 				{Label: "设置…", Click: openSettings},
 				{Label: "检查更新…", Click: func(*mygo.MenuItem, *mygo.Window) { updater.CheckForUpdates() }},
 				{Label: "立即刷新", Click: func(*mygo.MenuItem, *mygo.Window) { go service.refresh(true) }},
-				mygo.Separator(), {Role: mygo.RoleQuit, Label: "退出 LocalOps"},
+				mygo.Separator(), {Role: mygo.RoleQuit, Label: "退出 RockshinOps"},
 			}),
 		})
 		if err != nil {
-			log.Fatalf("create LocalOps tray: %v", err)
+			log.Fatalf("create RockshinOps tray: %v", err)
 		}
 		lastTitle := "—"
+		var lastImage []byte
 		service.update = func(s metrics.Snapshot) {
 			selectedTitle := menuBarTitle(service.preferences, s)
+			selectedItems := append([]string{}, service.preferences.MenuBarItems...)
 			mygo.RunOnMain(func() {
 				title := "—"
 				if s.Disk.CapacityError == "" {
 					title = storage.FormatCapacity(s.Disk.Volume.Available)
 					capacityItem.SetLabel(localization.T("剩余 ") + title + localization.T(" / 共 ") + storage.FormatCapacity(s.Disk.Volume.Total))
-					tray.SetToolTip(localization.T("LocalOps · 剩余可写空间 ") + title)
+					tray.SetToolTip(localization.T("RockshinOps · 剩余可写空间 ") + title)
 				} else {
 					capacityItem.SetLabel(localization.T("容量读取失败"))
-					tray.SetToolTip("LocalOps · " + s.Disk.CapacityError)
+					tray.SetToolTip("RockshinOps · " + s.Disk.CapacityError)
 				}
-				if selectedTitle != lastTitle {
+				// macOS shows icons with values as one template image; elsewhere, or if drawing fails, the labeled text title.
+				image := menuBarImage(selectedItems, s)
+				if image != nil && !bytes.Equal(image, lastImage) {
+					if err := tray.SetIcon(image, true); err != nil {
+						log.Printf("set menu bar image: %v", err)
+						image = nil
+					} else {
+						tray.SetTitle("")
+						lastImage, lastTitle = image, ""
+					}
+				}
+				if image == nil && (selectedTitle != lastTitle || lastImage != nil) {
+					if lastImage != nil {
+						if err := tray.SetIcon(diskIcon(), true); err != nil {
+							log.Printf("restore menu bar icon: %v", err)
+						}
+					}
 					tray.SetTitle(selectedTitle)
-					lastTitle = selectedTitle
+					lastImage, lastTitle = nil, selectedTitle
 				}
-				tray.SetToolTip("LocalOps" + func() string {
+				tray.SetToolTip("RockshinOps" + func() string {
 					if selectedTitle == "" {
 						return localization.T(" · 本机监控")
 					}
@@ -367,11 +425,14 @@ func main() {
 		})
 		ctx, cancel := context.WithCancel(context.Background())
 		quitting := false
-		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting = true; cancel() })
+		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting = true; cancel(); _, _ = menubar.Native("stop", nil) })
 		win.OnClose(func(e *mygo.CloseEvent) {
 			if !quitting {
 				e.PreventDefault()
 				win.Hide()
+				if service.Preferences().HideDockOnClose {
+					mygo.App.Dock.Hide()
+				}
 			}
 		})
 		mygo.App.OnActivate(func(visible bool) {

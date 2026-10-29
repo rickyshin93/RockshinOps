@@ -1,0 +1,93 @@
+# Menu bar management
+
+## Local Ice analysis
+
+Inspected `/Applications/Ice.app` version `0.11.13-dev.2` with rea-lab as an analysis tool. rea-lab is not a runtime dependency.
+
+- Universal Mach-O SHA-256: `19297ef972e4142d0ac2d57ff2c0677978ceb8da381a0b3913c2cef178ea7a85`.
+- Extracted arm64 SHA-256: `5fe28a59439a253435397105e9e735c110b25a266618b22caa30d2c13075b7e3`.
+- REA `inspect_macho` identified arm64/x86_64 slices and a macOS 14 minimum. `inspect_native_dispatch_metadata` identified ControlItem, EventManager and menu-bar state/image services. Imports and strings identify accessibility, screen capture, native windows, event monitors and shortcuts.
+- REA/Ghidra `analyze_function` resolved `ControlItem::performAction` at `0x1000501fc` through `0x100050f44` to `0x10004fcf0`; this reads the current AppKit event and modifiers, then dispatches work through Swift MainActor. This establishes the control/event mechanism, not every hidden-section algorithm.
+- Raw local evidence lives in ignored `work/ice/`: `macho.json`, `dispatch-arm64.json`, `control-action.json`, `control-behavior.json`, `imports.txt` and `strings.txt`. No Ice executable or decompiled source is shipped.
+- Cross-checked the event-routing contract against Ice's [official item manager](https://github.com/jordanbaird/Ice/blob/main/Ice/MenuBar/MenuBarItems/MenuBarItemManager.swift): status-item moves carry source/target window identifiers and route through the owning process and session event stream. A plain coordinate-based Command drag was unreliable in native testing.
+
+## RockshinOps implementation
+
+`internal/menubar` implements independent Go settings and AppKit behavior. `menu_bar.go` exposes MyGo bindings and registers global shortcuts. `src/menu-bar-view.tsx` renders the bilingual configuration page. No HTTP IPC or JavaScript native sampling is introduced.
+
+Native status-item boundaries hide icons to their left by expanding separator width. Command-drag events move actual status items; results are checked against observed sections. AppKit handles expansion, hover, delayed collapse, context menus, appearance overlays and display/Space changes. ScreenCaptureKit captures individual status-item windows; image data stays local. Native panel selections move only the chosen item to the left edge of the visible status items without simulating a click or activating its app. The layout’s explicit Open Menu action still clicks the resolved item. Both paths require Accessibility and return explicit errors for vanished or offscreen items. Gesture timing runs outside AppKit's queue.
+
+Settings live in the existing user configuration directory as `menu-bar.json`; root `localops.json` defines first-run defaults. Management is disabled by default. The macOS status bar owns ordering persistence; no private preference database is edited. Disabling management removes its boundary items and reveals hidden items. Existing metric sampling remains independent.
+
+## Usage and boundaries
+
+1. Quit Ice, open **Menu Bar Management**, and enable management.
+2. Grant Accessibility for movement and activation, and Screen Recording for actual icon previews. Refresh/restart as macOS requests.
+3. Select an icon and move it to a section, or drag it within the layout. RockshinOps’ own arrow and metric item are included. Command-drag is also available in the native menu bar; restart and re-enabling preserve the saved positions.
+4. The solid arrow opens the overflow panel centered under its anchor, clamped to 12 pt inside the current screen’s visible edges. Selecting an icon reveals only that item; click it in the system menu bar to open its menu.
+5. **General → Temporary icon duration** defaults to 15 seconds and accepts 5–60 seconds. An open menu/popover keeps the icon visible beyond that duration; afterward it returns to its original section and neighbor. The general panel-collapse delay is separate. Escape closes the overflow panel; the search shortcut searches native icon names and owners.
+
+This is a macOS implementation. Windows/Linux retain ordinary monitoring and report management as unsupported. It uses ScreenCaptureKit screenshot APIs available on macOS 14 and newer. Native item clicks are delivered to actual status-item coordinates; app-specific menu/popover behavior still requires compatibility testing. Hidden items are resolved by window ID even when their windows are offscreen. Multi-display, notch/fullscreen/auto-hide and sleep/wake behavior still require acceptance; see the single current progress record in `STATUS.md`.
+
+## Stable icon previews — 2026-10-29
+
+- Reproduced cache loss with a native harness: calling the production item scanner discarded a successful capture when that window was absent from the current layout. The same check passes after retaining captures for the native manager’s lifetime. State reads now schedule missing-only captures, skip capture during moves/activation, and leave existing images untouched on capture failure.
+- Layout and overflow buttons use an icon placeholder while no capture is available; the web component also handles image decoding failure without exposing alt text as visible content. Names remain in accessible labels, hover hints and the selection detail; native search rows still show their names.
+- Native regression also verifies missing captures are scheduled and cached icons are not recaptured by state reads. Two frontend regressions cover missing and captured images. A browser fixture verified empty image → placeholder, malformed image → placeholder, and valid replacement → decoded image, all with empty visible button text.
+- The rebuilt Dev app displayed Flux and the other 24 entries as real images after initial entry, expand/collapse, and navigating away/back. Go tests, 50 web tests, typecheck, frontend build and macOS arm64 app/DMG build passed. Direct SystemUIServer inspection timed out; a close-button check returned a visible window, so it does not establish hidden-window lifecycle acceptance. Other platforms, Spaces and sleep/wake were not tested. No commit, push or publication. Local logs and the reproducible native/browser harnesses are in ignored `work/menu-icon-stability/`.
+
+## Movement and presentation refinement — 2026-10-29
+
+- Reproduced Wi-Fi hidden → visible failure in the native layout page. Offscreen separator windows were missing from `IncludingWindow` queries; explicit window-ID descriptions retain them. Moves now use a process/session event acknowledgement and observed frame changes, without the old fixed 900 ms wait or expand/collapse cycle.
+- Read separators and items from the same WindowServer snapshot, preventing transient section misclassification. Encode each captured icon once and reuse its data URL in state reads.
+- Seed the toggle and metric entry in the rightmost application slots only when no saved position exists, before the fixed macOS system items. Snapshot all owned positions before removing any item; restore them from an app-owned key when recreating the item, because AppKit can delete its own position keys during teardown. Native window inspection confirmed toggle x=1495, metric x=1402 and hidden boundary ending at x=1402 on the current 1728-point display.
+- The layout previews a drop immediately, highlights only the target icon without inserting layout elements, pauses polling during drag/move, animates adjacent icons within the same section for 160 ms and reconciles native failures. Identical snapshots preserve component state; pointer-over feedback does not rerender the component. Moving keeps global controls and the current selection visually stable.
+- Layout previews are 38 px high with at least 48 px hit areas, previously 26 / 36 px. The compact overflow panel draws captured icons at their original point size, bypassing NSButton image-cell scaling. It uses AppKit popover material, native shadow, a rounded material mask and short fades; reduced motion disables animations.
+- Browser fixture comparison: a cross-section drop previously caused 12 disabled-attribute changes on six global controls; the updated component caused zero with the same 160 ms pending request. Seventeen identical state snapshots caused zero menu-subtree DOM mutations. These checks establish reduced UI churn, not a frame-rate guarantee; evidence is in ignored `work/menu-drag/verification.md`.
+- Native acceptance: Wi-Fi hidden → visible and back passed (82.0 / 79.0 ms backend request durations); CC Switch moved after Flux (128.7 ms). The earlier failing Wi-Fi request took 994.9 ms. State-read median changed from 33.0 ms (120 samples) to 24.0 ms (332 samples). These are local request measurements, not frame-time benchmarks; one baseline move is insufficient for a general speedup claim. Logs and timing summaries are in ignored `work/ice-refine/`.
+- Native overflow rendering, larger icons and Escape dismissal passed. The window screenshot is flattened/opaque, so it does not establish corner transparency against the desktop. Expand/collapse requests completed in 31.0 / 11.6 ms, but animation frame pacing was not measured. Automated pointer dragging did not reliably trigger WebKit drag events, so continuous drag feel still requires manual acceptance. SystemUIServer inspection timed out; exact tray pixels and tray-only reopen remain unverified.
+- Final checks passed: `bun run test:go`, `bun run test:web` (47 tests), `bun run typecheck`, `bun run build:web`, `bun run build` (macOS arm64 app/DMG) and `git diff --check`. Debug instrumentation was removed. This build was not signed as an update release or published. Windows/Linux desktop behavior was not revalidated.
+
+## Single-item reveal and entry icon — 2026-10-29
+
+- Replaced the SF Symbol chevron with one filled template-image arrow. Status-button highlight and focus-ring drawing are disabled. The overflow panel centers under the entry button when it fits and shifts inward at display edges.
+- Removed whole-section expansion from item activation. Panel selection temporarily moves one item, preserves its return neighbor, and does not synthesize a click or activate its owner. A second selection returns the first item before revealing another. Return failures remain explicit and leave the item visible for manual recovery.
+- The native reveal timer respects the configured minimum duration and checks the selected app’s newly visible menu/popover windows before returning it. `localops.json` owns the 15-second default and the 0.5-second check interval. Existing preferences inherit the new defaults; 5–60-second validation runs before saving.
+- Go tests cover default inheritance, duration bounds and persistence. Browser component checks saved 5/60 seconds, rejected 4/61, and displayed the default 15 seconds. The production AppKit drawing function rendered the solid icon at native size and 3× for inspection. Go/web tests, typecheck, frontend build and macOS arm64 packaging passed; logs/previews are in ignored `work/menu-reveal/`.
+- Native interaction verification stopped when the user took control of the app. The final 15-second timing, menu-open retention, automatic return, pointer-focus behavior and right-edge placement have not been independently verified end to end. These limits are separate from earlier native movement acceptance above.
+
+- Cursor correction: removed global cursor hide/show calls from moves and guaranteed pointer-position restoration in a `finally` block. Temporary items now use the visible side of the hidden separator, placing them leftmost among visible items. Native CC Switch selection placed only that item at x=1198, directly before the prior leftmost item Qoder at x=1232; other hidden items stayed offscreen. The cursor was visible during reveal and after automatic return, and all third-party window positions returned to their baseline. An initial selection reported an exited icon; it did not recur after the Dev restart, and its cause remains unconfirmed. Evidence: ignored `work/menu-cursor/native-{before,during,returned}.json`.
+
+## Own-icon positioning — 2026-10-29
+
+- Include the current arrow in the layout and native capture; exclude removed control windows and separator internals. First-run placement remains rightmost, while existing metric/arrow positions are retained.
+- The app-owned position snapshot follows the removal behavior documented in [Hammerspoon’s implementation](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/menubar/libmenubar.m#L768-L780), using the existing AppKit defaults store.
+- Native left-move passed: arrow x=1495 → 1402, metric x=1402 → 1444. The restarted Dev app retained arrow x=1402 and metric x=1444. Go/web tests, typecheck and macOS package checks passed.
+- During the earlier disable/re-enable test, the old implementation reset the arrow and moved the hidden boundary from right edge x=1232 to x=604. The new snapshot fix is implemented, but final disable/re-enable acceptance and restoring that test-side-effect boundary were interrupted by user control. The saved pre-test and subsequent snapshots are under ignored `work/menu-own-position/`; direct drag, exact tray appearance and close/reopen were not revalidated.
+
+## Context menu and anchored placement — 2026-10-29
+
+- The panel centers below the arrow when it fits, clamping to 12 pt inside the screen’s visible bounds. Wider rows reach the right edge naturally; the existing horizontal overflow remains.
+- Right-click actions are grouped into Open RockshinOps / Menu Bar Settings / App Settings; overflow / toggle / search / all sections / refresh icons; and Quit. Native app actions cross into Go asynchronously before dispatching window operations on AppKit’s main queue. Menu Bar Settings uses a dedicated frontend navigation event.
+- Native Dev inspection measured the arrow at x=1402, width=42, and the panel at x=1343, width=160: both centers are x=1423. Evidence: ignored `work/menu-context/native-panel.json`. No icon positions were changed for this check.
+- Go tests, 47 frontend tests, type checking, frontend build and macOS arm64 packaging passed. SystemUIServer inspection timed out, so right-click action navigation, wide-panel placement, tray pixels and tray-only close/reopen remain unverified natively. This is local implementation only; no release or commit.
+
+## Layout selection and typography — 2026-10-29
+
+- Pointer-down selects immediately; clicking the same icon again, clicking layout whitespace, Escape or Deselect clears it. Drag start retains the dragged item as the selection. Keyboard activation still toggles it. Removed implicit double-click menu opening; Open item menu remains explicit.
+- Escape is handled for the active layout page, including when macOS leaves keyboard focus on the WebView instead of the clicked button.
+- The selection row keeps its baseline height; duplicate owner/name text and the repeated setup footer are removed. Buttons and section titles use 13px/500; counts use 12px/400; explanatory text and Deselect use regular weight. Narrow layouts place search on its own row. Permission restart instructions appear only while a permission is missing.
+- Reproduced a stale native move error trapping the entire layout behind Retry. State reads now return their valid snapshot and the retained error for display; failed actions and malformed responses still reject. A native decoder regression covers these distinctions.
+- Native Dev checks: 30ms selection and repeated-click deselection, Escape, Deselect, and visual layout passed. Browser fixtures covered keyboard activation, whitespace dismissal, double-click without menu activation, zero selection-induced vertical shift at the tested wide size, successful drag, move failure recovery, duplicate-name removal, and English at 670px content viewport. Real native icon rearrangement and tray lifecycle were not repeated in this polish pass. Evidence: ignored `work/menu-selection/`.
+
+- Final validation passed: Go tests, 47 frontend tests, type checking, frontend build, macOS arm64 packaging and whitespace checks. No commit, push or publication.
+
+## Action flicker and polling work — 2026-10-29
+
+- Reproduction: click Show All / Collapse with a 200ms native-response fixture. The previous shared busy flag dimmed six controls and toggled every movable icon's draggable attribute. Pending controls now retain their normal contrast while remaining disabled; truly unavailable controls stay dimmed. An immediate operation lock prevents duplicate submissions, including two clicks before React commits.
+- Polls schedule the next read after completion, skip hidden documents, and ignore results invalidated by operations or dragging. Unchanged snapshots retain the state object; expansion-only changes retain the item array and grouped search results. System metric events no longer resubmit the menu React root or replace unchanged page headings.
+- Reproducible browser fixture in ignored `work/menu-performance/preview.html`: use `?before` for the preserved implementation, `?slow` for a 1.2-second state read with a 100ms polling interval, and Run action benchmark for ten alternating Show All / Collapse actions. The fixture is synthetic and does not move real icons.
+- Ten actions before / after: 670 / 330 DOM mutations; 460 / 0 draggable-attribute changes; 6 / 0 temporarily dimmed controls; zero image-source changes in both. All icon nodes and their geometry were retained. React profiler totals were 136.2ms / 134.3ms in this run, so no material rendering-time improvement is claimed. Results: `work/menu-performance/before.json` and `after.json`.
+- Slow-read regression: maximum concurrent state reads fell from 13 to 1; two synchronous clicks fell from two submitted actions to one. An expanded result was not overwritten by the older read. Twenty-six identical idle snapshots caused zero React commits and zero DOM mutations. Action-error retry and move failure rollback retained the selected item.
+- Native Dev Show All / Collapse was exercised; the title and permission nodes stayed intact across metric samples. This is interaction/structure validation, not a frame-by-frame compositor benchmark. Exact tray rendering, tray-only reopening, sustained native dragging and other platforms remain outside this change's verified scope.
+- Frontend tests and type checking passed. Application Go packages passed via `sh scripts/go.sh test . ./internal/...`; the full `bun run test:go` invocation fails in unrelated concurrent `work/pulse-analysis` helpers because both declare `main`. Those helpers were left unchanged. Final macOS package result is tracked in STATUS.md.

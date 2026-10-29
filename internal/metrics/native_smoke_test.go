@@ -73,7 +73,7 @@ func TestNativeCollectorSmoke(t *testing.T) {
 	if !found {
 		t.Fatalf("known listening socket missing on %s", runtime.GOOS)
 	}
-	machine := ReadMachine()
+	machine := ReadMachine(5 * time.Second)
 	if machine.Error != "" || machine.LogicalCPUs == 0 || machine.Memory == 0 || machine.OS == "" {
 		t.Fatalf("machine: %+v", machine)
 	}

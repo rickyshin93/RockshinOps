@@ -1,7 +1,7 @@
 package windowchrome
 
 /*
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework QuartzCore
 #include <stdint.h>
 void localops_install_top_drag(uintptr_t handle);
 */

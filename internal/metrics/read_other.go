@@ -18,7 +18,7 @@ func readNative(timeout time.Duration) rawSample {
 func readProcesses() ([]rawProcess, int, error) {
 	return nil, 0, errors.New(localization.T("当前平台尚未实现进程采集"))
 }
-func ReadMachine() Machine {
+func ReadMachine(timeout time.Duration) Machine {
 	return Machine{Platform: runtime.GOOS, Architecture: runtime.GOARCH, Error: localization.T("当前平台尚未实现本机信息采集")}
 }
 

@@ -8,6 +8,32 @@ const state = {
   cleanupMessage: "", cleanupBusy: false,
 } as unknown as ViewState;
 
+test.each([false, true])("cleanup landing keeps capacity truthful when collection fails: %s", (failed) => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {}, outerHTML: "<svg></svg>" }) } as unknown as Document;
+  try {
+    const html = renderBody({ ...state, scanning: false,
+      info: { scanTargets: [{ name: "应用缓存", path: "/Users/example/Cache<&>" }] },
+      snapshot: { disk: { volume: { name: "Data", mount: "/", total: 1e12, available: 250e9 }, capacityError: failed ? "Permission denied" : "" } },
+    } as unknown as ViewState);
+    expect(html).toContain('data-action="space-start"');
+    expect(html).toContain('data-action="cleanup-targets"');
+    expect(html).toContain("/Users/example/Cache&lt;&amp;&gt;");
+    expect(html).not.toContain("data-cleanup-path");
+    if (failed) {
+      expect(html).toContain("Permission denied");
+      expect(html).not.toContain("250.0 GB");
+      expect(html).not.toContain("scaleX(");
+    } else {
+      expect(html).toContain("250.0 GB");
+      expect(html).toContain("750.0 GB");
+      expect(html).toContain("scaleX(0.75)");
+    }
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("shows an accessible loading indicator while recursively scanning a folder", () => {
   const html = renderBody(state);
   expect(html).toContain('role="status"');
@@ -63,7 +89,7 @@ test("reports inaccessible scan locations separately from app candidates and kee
   expect(html).toContain("Full Disk Access");
   expect(html).toContain('data-action="open-full-disk-access"');
   expect(html.indexOf('data-action="open-full-disk-access"')).toBeLessThan(html.indexOf('<details class="uninstall-coverage">'));
-  expect(html).toContain("quit and reopen LocalOps");
+  expect(html).toContain("quit and reopen RockshinOps");
   expect(html).not.toContain('data-action="remove-app-files" disabled');
   expect(html).not.toContain("items could not be read; search results are incomplete");
 });

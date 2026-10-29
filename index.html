@@ -4,28 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>LocalOps</title>
+    <title>RockshinOps</title>
+    <link rel="icon" type="image/svg+xml" href="/resources/logo.svg" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <!--
-    THESIS: A quiet instrument: a neutral shell recedes so live readings lead.
-    OWN-WORLD: See DESIGN.md. Neutral structure, one orange accent for current/actionable, data colors only inside charts. Keep real circular dot histories and truthful data.
+    THESIS: A coherent native monitoring workspace: compact readings and grouped tools replace oversized empty landing pages.
+    OWN-WORLD: System blue actions, light neutral canvas, white panels, system typography, 16px grids and 20px panel padding; a white R monogram with a green brand dot on a blue tile identifies RockshinOps. Tailwind CSS v4 owns shared tokens and components.
     STORY: Overview -> hardware/process/connection details -> return to the persistent disk-capacity menu bar.
     FIRST VIEWPORT: Left navigation below native traffic lights; right overview grid with period/pause controls inside the content. No standalone top bar or centered window title.
-    FORM: Operate mode, code-led. Every reading comes from the local system; unavailable values and unrecorded history stay explicit.
+    FORM: Operate mode, code-led, agent-selected refinement of the existing macOS identity. Every reading comes from the local system; unavailable values and unrecorded history stay explicit.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
     -->
-    <div class="app-shell">
-      <aside class="sidebar" aria-label="LocalOps">
+    <div class="app-shell flex h-dvh min-h-0 overflow-hidden">
+      <aside class="sidebar" aria-label="RockshinOps">
         <div class="window-drag" aria-hidden="true"></div>
-        <nav id="navigation" aria-label="LocalOps"></nav>
+        <div class="brand-row"><img src="/resources/logo.svg" width="28" height="28" alt="" /><span class="brand-wordmark" aria-label="RockshinOps"><span aria-hidden="true">Rockshin<span class="brand-wordmark-ops">Ops</span></span></span></div>
+        <nav id="navigation" aria-label="RockshinOps"></nav>
         <div class="sidebar-footer">
           <span id="device-mark" class="device-mark" aria-hidden="true"></span>
-          <div><strong id="machine-name">LocalOps</strong><p id="machine-detail"></p></div>
+          <div><strong id="machine-name">RockshinOps</strong><p id="machine-detail"></p></div>
         </div>
       </aside>
-      <main class="main-panel">
+      <main class="main-panel flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg">
         <div class="main-drag-strip" aria-hidden="true"></div>
         <div class="content-scroll" id="content-scroll">
           <div class="page-heading">

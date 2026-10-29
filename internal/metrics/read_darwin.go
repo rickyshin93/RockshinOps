@@ -7,10 +7,13 @@ package metrics
 import "C"
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -128,7 +131,7 @@ func readProcesses() ([]rawProcess, int, error) {
 	return result, int(total), nil
 }
 
-func ReadMachine() Machine {
+func ReadMachine(timeout time.Duration) Machine {
 	info := Machine{Platform: runtime.GOOS, Architecture: runtime.GOARCH}
 	var failures []string
 	var err error
@@ -152,6 +155,40 @@ func ReadMachine() Machine {
 	if info.LogicalCPUs == 0 || info.Memory == 0 {
 		failures = append(failures, localization.T("本机硬件信息读取不完整"))
 	}
+	info.OSBuild, err = syscall.Sysctl("kern.osversion")
+	if err != nil {
+		failures = append(failures, err.Error())
+	}
+	if release, err := syscall.Sysctl("kern.osrelease"); err == nil {
+		info.Kernel = "Darwin " + release
+	} else {
+		failures = append(failures, err.Error())
+	}
+	for level := 0; level < int(sysNumber("hw.nperflevels")); level++ {
+		prefix := fmt.Sprintf("hw.perflevel%d.", level)
+		name, err := syscall.Sysctl(prefix + "name")
+		if err != nil {
+			continue
+		}
+		count := int(sysNumber(prefix + "physicalcpu"))
+		if count <= 0 {
+			continue
+		}
+		switch name {
+		case "Performance":
+			info.PerformanceCores = &count
+		case "Efficiency":
+			info.EfficiencyCores = &count
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "/usr/sbin/system_profiler", "-json", "SPHardwareDataType", "SPDisplaysDataType").Output()
+	if err != nil {
+		failures = append(failures, "system_profiler: "+err.Error())
+	} else if err := decodeMachineProfile(output, &info); err != nil {
+		failures = append(failures, err.Error())
+	}
 	info.Error = strings.Join(failures, "; ")
 	return info
 }
@@ -160,4 +197,31 @@ func sysNumber(key string) uint64 {
 	name := C.CString(key)
 	defer C.lo_free(unsafe.Pointer(name))
 	return uint64(C.lo_sysctl_number(name))
+}
+
+func decodeMachineProfile(data []byte, info *Machine) error {
+	var profile struct {
+		Hardware []struct {
+			Name   string `json:"machine_name"`
+			Serial string `json:"serial_number"`
+		} `json:"SPHardwareDataType"`
+		Displays []struct {
+			Cores string `json:"sppci_cores"`
+		} `json:"SPDisplaysDataType"`
+	}
+	if err := json.Unmarshal(data, &profile); err != nil {
+		return fmt.Errorf("system_profiler: %w", err)
+	}
+	if len(profile.Hardware) == 0 {
+		return fmt.Errorf("system_profiler: missing hardware information")
+	}
+	info.Name, info.SerialNumber = profile.Hardware[0].Name, profile.Hardware[0].Serial
+	if len(profile.Displays) > 0 && profile.Displays[0].Cores != "" {
+		cores, err := strconv.Atoi(profile.Displays[0].Cores)
+		if err != nil || cores <= 0 {
+			return fmt.Errorf("system_profiler: invalid GPU core count")
+		}
+		info.GPUCores = &cores
+	}
+	return nil
 }
