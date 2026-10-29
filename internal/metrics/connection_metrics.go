@@ -94,6 +94,10 @@ func parseConnectionMetrics(reader io.Reader) (map[connectionKey]ConnectionMetri
 		}
 		label := row[1]
 		kind, endpoints, socket := strings.Cut(label, " ")
+		// QUIC flows have no corresponding lsof TCP/UDP socket identity.
+		if kind == "quic4" || kind == "quic6" {
+			continue
+		}
 		if !socket || (kind != "tcp4" && kind != "tcp6" && kind != "udp4" && kind != "udp6") {
 			i := strings.LastIndex(label, ".")
 			if i < 0 {

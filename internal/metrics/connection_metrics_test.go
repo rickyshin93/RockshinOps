@@ -49,6 +49,33 @@ func TestConnectionMetricsRTTFormats(t *testing.T) {
 	}
 }
 
+func TestConnectionMetricsSkipsQUICFlowRows(t *testing.T) {
+	// macOS 15 CI exposes QUIC flows alongside TCP/UDP sockets. They cannot
+	// be matched to the lsof TCP/UDP rows, but must not discard other metrics.
+	for _, flow := range []string{
+		"quic4 192.168.64.19:50488<->17.248.192.28:443",
+		"quic6 fe80::1%en0.50488<->fe80::2%en0.443",
+	} {
+		t.Run(flow[:5], func(t *testing.T) {
+			input := trafficHeader + "12:00:00.0,App.42,9999,9999,,\n" +
+				"12:00:00.0," + flow + ",9000,9000,5.00 ms,\n" +
+				"12:00:00.0,tcp4 127.0.0.1:5010<->127.0.0.1:80,100,50,5.00 ms,\n" +
+				trafficHeader + "12:00:01.0,App.42,9999,9999,,\n" +
+				"12:00:01.0," + flow + ",9500,9500,6.00 ms,\n" +
+				"12:00:01.0,tcp4 127.0.0.1:5010<->127.0.0.1:80,300,100,6.00 ms,\n"
+			samples, err := parseConnectionMetrics(strings.NewReader(input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			key := connectionKey{42, "TCP", "127.0.0.1:5010", "127.0.0.1:80"}
+			metrics, ok := samples[key]
+			if !ok || len(samples) != 1 || metrics.Download == nil || *metrics.Download != 200 || metrics.Upload == nil || *metrics.Upload != 50 {
+				t.Fatalf("QUIC flow changed TCP ownership or counters: %+v", samples)
+			}
+		})
+	}
+}
+
 func TestConnectionMetricsRatesAndOwnership(t *testing.T) {
 	input := trafficHeader + "12:00:00.0,App.Helper.42,9999999,8888888,,\n" +
 		"12:00:00.0,tcp4 127.0.0.1:5010<->127.0.0.1:80,100,50,5.25 ms,\n" +
