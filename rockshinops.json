@@ -11,6 +11,7 @@
   "processIntervalSeconds": 5,
   "historySeconds": 3600,
   "connectionTimeoutSeconds": 10,
+  "connectionSampleIntervalSeconds": 1,
   "machineInfoTimeoutSeconds": 5,
   "scanTimeoutSeconds": 20,
   "scanMaxEntries": 200000,

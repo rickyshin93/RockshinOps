@@ -12,7 +12,7 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-func readConnections(ctx context.Context, timeout time.Duration) (Connections, error) {
+func readConnections(ctx context.Context, timeout, interval time.Duration) (Connections, error) {
 	r := Connections{Items: []Connection{}, UpdatedAt: time.Now().UTC()}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

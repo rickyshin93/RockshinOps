@@ -4,7 +4,7 @@ import (
 	"errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 	"unsafe"
 )
 

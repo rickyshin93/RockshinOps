@@ -116,11 +116,11 @@ func TestReviewAppFindsCandidatesWithoutSelectingThem(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(app, "Contents"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	plist := `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>test.localops.exampleapp</string><key>CFBundleName</key><string>Different Name</string></dict></plist>`
+	plist := `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>test.rockshinops.exampleapp</string><key>CFBundleName</key><string>Different Name</string></dict></plist>`
 	if err := os.WriteFile(filepath.Join(app, "Contents", "Info.plist"), []byte(plist), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cache := filepath.Join(home, "Library", "Caches", "test.localops.exampleapp.dev")
+	cache := filepath.Join(home, "Library", "Caches", "test.rockshinops.exampleapp.dev")
 	if err := os.MkdirAll(cache, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestReviewAppFindsCandidatesWithoutSelectingThem(t *testing.T) {
 	if slices.ContainsFunc(quick.Files, func(file AppFile) bool { return file.Path == otherBundle }) {
 		t.Fatalf("quick review included a different application bundle: %+v", quick.Files)
 	}
-	review, err := scanAppRoots(context.Background(), []string{filepath.Join(home, "Library")}, home, app, "test.localops.exampleapp", appSearchNames("ExampleApp"), quick)
+	review, err := scanAppRoots(context.Background(), []string{filepath.Join(home, "Library")}, home, app, "test.rockshinops.exampleapp", appSearchNames("ExampleApp"), quick)
 	if err != nil {
 		t.Fatal(err)
 	}

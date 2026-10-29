@@ -16,12 +16,12 @@ import (
 	"github.com/egoist/mygo"
 	_ "github.com/egoist/mygo/locales/zh-Hans"
 	"github.com/egoist/mygo/plugins/updater"
-	"localops/internal/appicon"
-	"localops/internal/localization"
-	"localops/internal/menubar"
-	"localops/internal/metrics"
-	"localops/internal/storage"
-	"localops/internal/windowchrome"
+	"rockshinops/internal/appicon"
+	"rockshinops/internal/localization"
+	"rockshinops/internal/menubar"
+	"rockshinops/internal/metrics"
+	"rockshinops/internal/storage"
+	"rockshinops/internal/windowchrome"
 )
 
 var MetricsChanged = mygo.NewEvent[metrics.Snapshot]("metricsChanged")
@@ -60,6 +60,7 @@ type System struct {
 	preferences     Preferences
 	preferencesPath string
 	mu              sync.Mutex
+	refreshMu       sync.Mutex
 	monitor         *metrics.Monitor
 	config          Config
 	info            AppInfo
@@ -94,7 +95,10 @@ func (s *System) ScanProgress() ScanProgress {
 }
 
 func (s *System) Initialize() Bootstrap {
-	snapshot := s.refresh(true)
+	snapshot := s.monitor.Current()
+	if snapshot.UpdatedAt.IsZero() {
+		snapshot = s.refresh(true)
+	}
 	info := s.info
 	info.GoVersion = runtime.Version()
 	info.Displays = []DisplayInfo{}
@@ -103,11 +107,18 @@ func (s *System) Initialize() Bootstrap {
 	}
 	return Bootstrap{Info: info, Snapshot: snapshot, History: s.monitor.History()}
 }
-func (s *System) Refresh() metrics.Snapshot      { return s.refresh(true) }
-func (s *System) History() []metrics.Trend       { return s.monitor.History() }
+func (s *System) Refresh() metrics.Snapshot { return s.refresh(true) }
+func (s *System) History() []metrics.Trend  { return s.monitor.History() }
+func (s *System) HistorySince(after string) ([]metrics.Trend, error) {
+	at, err := time.Parse(time.RFC3339Nano, after)
+	if err != nil {
+		return nil, fmt.Errorf("invalid history timestamp: %w", err)
+	}
+	return s.monitor.HistorySince(at), nil
+}
 func (s *System) Processes() metrics.ProcessList { return s.monitor.Processes() }
 func (s *System) Connections(ctx context.Context) (metrics.Connections, error) {
-	return metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second)
+	return metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second, time.Duration(s.config.ConnectionSampleIntervalSeconds)*time.Second)
 }
 
 func (s *System) ScanCleanup(ctx context.Context) metrics.ScanResult {
@@ -248,10 +259,12 @@ func (s *System) OpenFullDiskAccessSettings() error {
 }
 func (s *System) HideWindow(ctx context.Context) { mygo.CallerWindow(ctx).Hide() }
 func (s *System) refresh(force bool) metrics.Snapshot {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
 	snapshot := s.monitor.Refresh(force)
+	s.mu.Lock()
 	s.update(snapshot)
+	s.mu.Unlock()
 	if err := MetricsChanged.Broadcast(snapshot); err != nil {
 		log.Printf("publish metrics: %v", err)
 	}
@@ -271,7 +284,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	preferencesPath := filepath.Join(configDir, "LocalOps", "preferences.json")
+	configDir, err = migrateConfigDirectory(configDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	preferencesPath := filepath.Join(configDir, "preferences.json")
 	preferences, err := readPreferences(preferencesPath, cfg.DefaultMenuBarItems, cfg.DefaultLanguage, cfg.DefaultUpdateUseSystemProxy, cfg.DefaultHideDockOnClose)
 	if err != nil {
 		log.Fatal(err)
@@ -350,13 +367,13 @@ func main() {
 				{Label: "设置…", Accelerator: "CmdOrCtrl+,", Click: openSettings}, mygo.Separator(),
 				{Role: mygo.RoleServices}, mygo.Separator(), {Role: mygo.RoleHide}, {Role: mygo.RoleHideOthers}, {Role: mygo.RoleUnhide}, mygo.Separator(), {Role: mygo.RoleQuit},
 			}},
-			{Role: mygo.RoleEditMenu}, {Role: mygo.RoleViewMenu}, {Role: mygo.RoleWindowMenu},
+			{Role: mygo.RoleEditMenu}, viewMenu(mygo.IsDev()), {Role: mygo.RoleWindowMenu},
 		}))
 		capacityItem := &mygo.MenuItem{Label: "正在读取磁盘容量…", Disabled: true}
 		updatedItem := &mygo.MenuItem{Label: "RockshinOps · 本机监控", Disabled: true}
 		activityItem := &mygo.MenuItem{Label: "正在采样…", Disabled: true}
 		tray, err := mygo.NewTray(mygo.TrayOptions{
-			ID: "localops.storage", Icon: diskIcon(), IconIsTemplate: true,
+			ID: "rockshinops.storage", Icon: diskIcon(), IconIsTemplate: true,
 			Title: "—", ToolTip: localization.T("RockshinOps · 剩余可写空间"),
 			Menu: localizedMenu([]*mygo.MenuItem{
 				capacityItem, activityItem, updatedItem, mygo.Separator(),
@@ -458,6 +475,17 @@ func main() {
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func viewMenu(dev bool) *mygo.MenuItem {
+	if dev {
+		return &mygo.MenuItem{Role: mygo.RoleViewMenu}
+	}
+	// MyGo's default View menu includes reload shortcuts even in production.
+	return &mygo.MenuItem{Role: mygo.RoleViewMenu, Submenu: []*mygo.MenuItem{
+		{Role: mygo.RoleResetZoom}, {Role: mygo.RoleZoomIn}, {Role: mygo.RoleZoomOut},
+		mygo.Separator(), {Role: mygo.RoleToggleFullScreen},
+	}}
 }
 
 func localizedMenu(items []*mygo.MenuItem) *mygo.Menu {

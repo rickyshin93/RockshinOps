@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"fmt"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 	"os"
 	"path/filepath"
 	"strconv"

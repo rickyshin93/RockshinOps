@@ -1,5 +1,5 @@
-#ifndef LOCALOPS_NATIVE_H
-#define LOCALOPS_NATIVE_H
+#ifndef ROCKSHINOPS_NATIVE_H
+#define ROCKSHINOPS_NATIVE_H
 #include <stdint.h>
 #include <stddef.h>
 

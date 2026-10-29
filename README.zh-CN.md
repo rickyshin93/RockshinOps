@@ -1,10 +1,10 @@
 # RockshinOps
 
-原名 LocalOps。安装包、可执行文件和用户设置目录沿用 LocalOps 名称以兼容旧版更新；应用标识与签名更新源保持不变。
+[官网](https://rickyshin93.github.io/RockshinOps/zh/) · [English](README.md) · [下载](https://github.com/rickyshin93/RockshinOps/releases) · [构建状态](https://github.com/rickyshin93/RockshinOps/actions/workflows/build.yml)
 
-[官网](https://rickyshin93.github.io/local-ops/?lang=zh) · [English](README.md) · [下载](https://github.com/rickyshin93/local-ops/releases) · [构建状态](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml)
+RockshinOps 是面向 macOS、Windows 和 Linux 的免费开源桌面系统监控工具，使用 Go、MyGo 和 TypeScript 构建：菜单栏常驻关键指标，窗口中查看系统活动、进程、运行中的 App 和磁盘空间。
 
-使用 Go、MyGo 和 TypeScript 构建的本机监控工具：菜单栏常驻关键指标，窗口中查看系统活动、进程、运行中的 App 和磁盘空间。
+实时页面复用 DOM 节点，大型进程/连接表格仅渲染可见区域，历史更新只传新增样本；耗时的进程/连接读取不会阻塞实时指标刷新，原生采集与页面渲染保持独立。详见[性能设计与测量](docs/performance.md)。
 
 ## 平台范围
 
@@ -22,7 +22,7 @@
 - 进程详情支持确认后「退出」（macOS/Linux 的 SIGTERM）与「强制退出」（SIGKILL；Windows 使用终止进程）。操作前核对进程身份，遵循系统权限且不提权；请求已发送不等于进程已退出。
 - CPU 总量与各逻辑核心、内存分类/压力/交换空间、GPU、磁盘容量与 I/O、网络接口、电池及可用的硬件功率遥测。
 - 最近 1 / 5 / 15 分钟和 1 小时的真实历史。暂停仅冻结视图，后台继续采集；历史只保存在本次运行的内存中。
-- 进程和运行中 App 的搜索、排序、CPU/物理内存排行；按需读取 TCP/UDP 连接快照。
+- 进程和运行中 App 的搜索、排序、CPU/物理内存排行；首屏显示后空闲预加载进程与 TCP/UDP 连接快照，切页先显示缓存并后台更新；更新失败会保留上次连接列表并显示错误。macOS 可显示匹配套接字的累计接收/发送、下载/上传速率及可用的 TCP RTT，五列均支持排序；未采集到的数据保持不可用。
 - 分析缓存、日志、下载和废纸篓；可将选中的扫描项目移入系统废纸篓，或确认永久清空配置的废纸篓目录。扫描不完整的目录不能清理；清理操作不终止进程。
 - 从系统磁盘根目录按逻辑大小透视并逐层浏览，先统计项目再显示按项目数计算的进度，透视没有时间或条目数上限；无法读取的位置会被标注，不跟随符号链接，多次挂载的路径可能重复计入。macOS 可检查已安装的应用包及按标识符在主目录、Library 和系统临时及缓存目录发现的关联候选文件；上述目录及应用目录中的各级子目录均按应用名称或声明名称的文件名边界匹配，不限制深度。选中项目可移入系统废纸篓。常见位置的候选项会先显示，其余搜索继续进行，且不受磁盘透视锁阻塞。没有 Bundle ID 的应用也支持按名称搜索，等价 Unicode 编码的名称可以匹配，返回路径保留原样。搜索不设时间或数量上限，但受权限、符号链接、其他应用包和无法通过名称识别的文件影响，结果仍可能不完整，匹配结果可能属于共享数据，需逐项核对；无法读取的位置和系统错误归入可展开的覆盖范围详情，与 App 候选项目分开显示。操作前须退出应用。系统组件、其他用户、任意名称或受限位置中的残留可能遗漏。
 - macOS 卸载搜索遇到权限限制时会显示授权引导。「打开完全磁盘访问权限」直接跳到系统授权页，已安装 App 列表也保留此入口。在系统设置中允许 RockshinOps（若没有则点「+」添加），退出并重新打开 RockshinOps 后再搜索；部分系统目录仍可能受限。
@@ -35,11 +35,11 @@ CPU 温度和 App 级瓦特计量尚未实现；GPU 与系统功率取决于硬�
 
 ## 安装
 
-在 [Releases](https://github.com/rickyshin93/local-ops/releases) 下载对应架构：
+在 [Releases](https://github.com/rickyshin93/RockshinOps/releases) 下载对应架构：
 
 - macOS：打开 `.dmg`，拖入 Applications。当前为 ad-hoc 签名，未做 Apple 公证；如被系统拦截，参照 [Apple 官方说明](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)操作。
-- Windows：运行 `LocalOps Setup … amd64.exe`，按当前用户安装，需要 WebView2。安装包未签名，Windows 可能显示发布者提示。
-- Debian/Ubuntu：`sudo apt install ./localops_…_amd64.deb`，由包管理器处理声明的 GTK/WebKitGTK 依赖。
+- Windows：运行 `RockshinOps Setup … amd64.exe`，按当前用户安装，需要 WebView2。安装包未签名，Windows 可能显示发布者提示。
+- Debian/Ubuntu：`sudo apt install ./rockshinops_…_amd64.deb`，由包管理器处理声明的 GTK/WebKitGTK 依赖。
 - 其他 Linux 桌面：解压 `.tar.gz`，使用其中的 `install.sh`；系统需提供 GTK 3、WebKitGTK 4.1 和兼容 AppIndicator 的托盘。安装脚本会报告缺失的 WebKitGTK 依赖。
 
 每次发布附带 `SHA256SUMS.txt`。从 v0.2.1 开始，应用启动后及持续运行期间每天检查 GitHub Releases；也可通过**设置 → 检查更新…**、应用菜单或托盘菜单手动检查。更新窗口提供说明、下载进度、签名验证和重启选择；默认确认后安装，主动勾选后才启用自动安装。
@@ -67,27 +67,35 @@ bun run build
 
 ## CI 与发布
 
-宣传网站位于 `website/`，默认英文，通过 `?lang=zh` 打开中文。运行 `python3 -m http.server 4177 --directory website` 后访问 `http://localhost:4177/` 即可预览；不需要构建或 CDN。推送网站改动后，`pages.yml` 自动部署到 [GitHub Pages](https://rickyshin93.github.io/local-ops/)。
+宣传网站位于 `website/`，默认英文，`zh/` 为独立静态中文页面（旧 `?lang=zh` 链接会跳转）。修改后执行 `bun run build:website` 生成中文 HTML、元数据、Markdown 与站点地图。运行 `python3 -m http.server 4177 --directory website` 后访问 `http://localhost:4177/` 即可预览；部署后的页面不依赖 CDN 或服务端运行时。推送网站改动后，`pages.yml` 自动部署到 [GitHub Pages](https://rickyshin93.github.io/RockshinOps/)。
 
 推送 `main`、提交 PR 或手动触发后，GitHub Actions 会测试并构建 macOS arm64、macOS amd64、Windows amd64 和 Linux amd64。安装包保留为构建产物。
 
 发布时修改 `package.json` 的版本并提交，再推送对应 `v<版本>` 标签。同时在 `CHANGELOG.md` 增加对应的 `## <版本>` 条目。CI 核对标签版本，等待四个平台的测试、构建和更新包验签全部通过后，再创建 Release、上传安装包、更新包和校验文件。发布使用仓库内置 `GITHUB_TOKEN`；标签构建还需要仓库 Secret `MYGO_UPDATER_PRIVATE_KEY`。PR 和非标签构建不注入签名密钥。
 
-更新公钥和发布仓库位于 `mygo.config.ts`；原始私钥须在 Git 之外安全备份，更换密钥会使已安装版本无法接受后续更新。本机签名构建通过 MyGo 的 `MYGO_UPDATER_PRIVATE_KEY` 凭据入口提供私钥，禁止提交私钥。检查间隔由 `localops.json` 的 `updateIntervalSeconds` 定义，默认 86400 秒。首版通过 GitHub 的 `releases/latest/download/update-<平台>.json` 分发完整更新包，不生成增量补丁。
+更新公钥和发布仓库位于 `mygo.config.ts`；原始私钥须在 Git 之外安全备份，更换密钥会使已安装版本无法接受后续更新。本机签名构建通过 MyGo 的 `MYGO_UPDATER_PRIVATE_KEY` 凭据入口提供私钥，禁止提交私钥。检查间隔由 `rockshinops.json` 的 `updateIntervalSeconds` 定义，默认 86400 秒。首版通过 GitHub 的 `releases/latest/download/update-<平台>.json` 分发完整更新包，不生成增量补丁。
 
 ## 参数、偏好与数据
 
-根目录 `localops.json` 集中配置刷新周期、历史长度、超时、扫描目录与数量上限；嵌入应用，修改后需重新构建。`defaultMenuBarItems`、`defaultLanguage` 和 `defaultUpdateUseSystemProxy` 定义首次运行默认值。`scanTargets` 按 `darwin`、`windows`、`linux` 分别配置；`~/` 展开为当前用户目录。
+根目录 `rockshinops.json` 集中配置刷新周期、历史长度、超时、扫描目录与数量上限；嵌入应用，修改后需重新构建。`defaultMenuBarItems`、`defaultLanguage` 和 `defaultUpdateUseSystemProxy` 定义首次运行默认值。`scanTargets` 按 `darwin`、`windows`、`linux` 分别配置；`~/` 展开为当前用户目录。
 
-用户偏好保存在 `os.UserConfigDir()/LocalOps/preferences.json`；macOS 对应 `~/Library/Application Support/LocalOps/preferences.json`。旧设置没有语言字段时默认跟随系统；损坏设置或保存失败会明确报错，不静默重置。
+用户偏好保存在 `os.UserConfigDir()/RockshinOps/preferences.json`；macOS 对应 `~/Library/Application Support/RockshinOps/preferences.json`。旧设置没有语言字段时默认跟随系统；损坏设置或保存失败会明确报错，不静默重置。
 
 数据仅在本机读取，无分析上报、远端上传、提权辅助程序或 HTTP IPC 服务。权限限制可能导致数据不完整。
 
 - 内存使用二进制 GiB/MiB；macOS 进程使用 `phys_footprint`，Windows/Linux 使用 RSS，共享页可能重复计入。Windows/Linux 系统已用为总内存减去系统报告的可用内存；Windows 交换空间指页面文件。
 - 磁盘容量为用户主目录所在卷当前用户可写的空间，使用十进制 MB/GB/TB，不包含潜在可回收空间，不重复累计 APFS 共享卷。
 - 进程 CPU 以单逻辑核心 100% 计，可以超过 100%；系统 CPU 按全部核心加权。
-- 网络按平台识别硬件接口（macOS `en*`、Windows 硬件标志、Linux sysfs），虚拟接口单列。连接来自 macOS `lsof`、Windows 系统表或 Linux procfs，不提权、不查询远端 DNS、不连接展示的地址。
+- 网络按平台识别硬件接口（macOS `en*`、Windows 硬件标志、Linux sysfs），虚拟接口单列。macOS 连接用 `lsof` 与两次 `nettop` 采样按 PID、协议和两端地址唯一匹配，采样间隔由 `connectionSampleIntervalSeconds` 配置，默认 1 秒；延迟为系统报告的 TCP RTT，不是 ping，新连接或计数器重置时暂无速率。Windows 系统表和 Linux procfs 当前仅提供套接字信息。采集不提权、不查询远端 DNS、不主动探测展示的地址。
 - 磁盘 I/O 使用 macOS 块驱动、Windows 固定卷、Linux 硬件块设备计数；排除分区与虚拟叠加重复。计数关闭或无权限时显示不可用，不通过注册表启用计数。
 - 空间分析读取逻辑文件大小，不跟随符号链接；硬链接或 APFS 克隆可能重复计入，结果不等于可安全释放的空间。
 
 源码结构与完整说明见 [README](README.md#source-layout)，进度和验收边界见 [STATUS.md](STATUS.md)，参与开发见 [CONTRIBUTING.md](CONTRIBUTING.md)。项目使用 [MIT 许可证](LICENSE)，依赖声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 搜索与 Agent 读取
+
+官网中英文页面均直接返回完整 HTML，无需执行 JavaScript。[中文 Markdown 产品说明](https://rickyshin93.github.io/RockshinOps/zh/index.md) 和 [llms.txt](https://rickyshin93.github.io/RockshinOps/llms.txt) 提供与可见页面一致的功能、下载和平台限制。配置了 canonical、双向 hreflang、软件结构化数据和 `sitemap.xml`。Google Search Console 的站点验证与站点地图提交需由拥有者完成；不保证搜索收录、排名或 AI 引用。GitHub Pages 项目目录中的 robots.txt 不能控制域名根目录，因此不放置无效的抓取规则。
+
+## 更名衔接（尚未发布）
+
+新构建的 App、可执行文件、安装包统一使用 RockshinOps，应用标识为 `dev.rockshinops.desktop`。旧更新器会重新启动旧可执行文件路径，因此更名首版需要手动安装一次。启动时仅在新文件不存在时，将旧 `LocalOps/preferences.json` 和 `LocalOps/menu-bar.json` 复制到 RockshinOps 配置目录，并保留原文件。macOS 权限可能需要重新授予。已发布的 0.2.4 文件名保持不变，请以发行页实际附件为准；更新签名公钥不变。

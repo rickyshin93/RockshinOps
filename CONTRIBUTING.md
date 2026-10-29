@@ -5,7 +5,7 @@ Read `AGENTS.md` and `STATUS.md` before changing the implementation. Use the dev
 - Keep changes focused and preserve existing data definitions. Unavailable metrics must remain explicit; do not substitute synthetic readings.
 - Put native sampling in platform-specific Go files. The frontend consumes generated MyGo bindings; run `bun run generate` after changing exported Go contracts.
 - Add English and Chinese entries together in `internal/localization/`. Use i18next in TypeScript and `useTranslation` in React components. Metric status values stay language-independent.
-- Put adjustable app parameters in `localops.json`. Do not commit local preferences, credentials, build output or machine snapshots.
+- Put adjustable app parameters in `rockshinops.json`. Do not commit local preferences, credentials, build output or machine snapshots.
 - For behavior changes, include a focused regression test and run `bun run test:go`, `bun run test:web`, `bun run typecheck`, and `bun run build` on the affected platform. State what you actually verified in the pull request.
 - UI changes should preserve the bounded shell and single main content scroller. Verify keyboard interaction and both languages.
 

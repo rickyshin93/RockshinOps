@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 type ScanTarget struct {
@@ -161,7 +161,7 @@ func scanSpace(ctx context.Context, targets []ScanTarget, maxEntries, maxItems i
 			if timeout == 0 && maxEntries == 0 {
 				result.Warning = localization.T("扫描已中止，当前仅为已读部分。")
 			} else {
-				result.Warning = localization.T("扫描提前停止，当前仅为已读部分。可缩小 localops.json 中的扫描范围后重试。")
+				result.Warning = localization.T("扫描提前停止，当前仅为已读部分。可缩小 rockshinops.json 中的扫描范围后重试。")
 			}
 			break
 		}

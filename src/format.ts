@@ -10,6 +10,12 @@ export function formatCapacity(bytes: number): string {
   return `${value} ${unit}`;
 }
 
+export function formatBytes(bytes: number): string {
+  if (bytes < 1_000) return `${bytes.toFixed(0)} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1_000).toFixed(1)} KB`;
+  return formatCapacity(bytes);
+}
+
 export function memoryParts(bytes: number): { value: string; unit: string } {
   if (bytes >= 1024 ** 3) return { value: (bytes / 1024 ** 3).toFixed(1), unit: "GiB" };
   return { value: (bytes / 1024 ** 2).toFixed(1), unit: "MiB" };

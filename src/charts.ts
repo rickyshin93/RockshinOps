@@ -1,3 +1,4 @@
+import { trendTime } from "./history";
 import { t } from "./i18n";
 import type { Trend } from "./mygo";
 import { escapeHTML as e } from "./format";
@@ -8,7 +9,7 @@ export function bucketHistory(history: Trend[], keys: TrendKey[], end: number, s
   const start = end - seconds * 1000;
   const buckets: { sums: number[]; count: number }[] = Array.from({ length: count }, () => ({ sums: keys.map(() => 0), count: 0 }));
   for (const point of history) {
-    const at = new Date(point.at).getTime();
+    const at = trendTime(point);
     if (at < start || at > end) continue;
     const values = keys.map(key => point[key]);
     if (values.some(value => value == null)) continue;
@@ -40,12 +41,12 @@ export function dots(history: Trend[], keys: TrendKey[], end: number, seconds: n
 export function lineChart(history: Trend[], key: TrendKey, end: number, seconds: number, label: string, max = 100, secondary?: TrendKey, interval = 2): string {
   const keys = secondary ? [key, secondary] : [key];
   const start = end - seconds * 1000;
-  const data = history.filter(p => new Date(p.at).getTime() >= start && new Date(p.at).getTime() <= end);
+  const data = history.filter(p => trendTime(p) >= start && trendTime(p) <= end);
   const ceiling = max || Math.max(1, ...data.flatMap(p => keys.map(k => p[k] || 0)));
   const series = keys.map((key, i) => {
     let path = "", drawing = false, previous = 0;
     for (const point of data) {
-      const value = point[key], at = new Date(point.at).getTime();
+      const value = point[key], at = trendTime(point);
       if (value == null) { drawing = false; continue; }
       if (at - previous > interval * 3000) drawing = false;
       path += `${drawing ? "L" : "M"}${((at - start) / (seconds * 1000) * 900).toFixed(1)},${(160 - Math.min(1, value / ceiling) * 148).toFixed(1)} `;

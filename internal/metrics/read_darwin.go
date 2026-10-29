@@ -19,7 +19,7 @@ import (
 	"time"
 	"unsafe"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 func readNative(timeout time.Duration) rawSample {
@@ -118,7 +118,9 @@ func readProcesses() ([]rawProcess, int, error) {
 	}
 	defer C.lo_free(unsafe.Pointer(items))
 	result := make([]rawProcess, 0, int(count))
-	for _, p := range unsafe.Slice(items, int(count)) {
+	native := unsafe.Slice(items, int(count))
+	for i := range native {
+		p := &native[i]
 		path := C.GoString(&p.path[0])
 		app := ""
 		if index := strings.Index(path, ".app/"); index >= 0 {

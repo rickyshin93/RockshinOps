@@ -1,14 +1,14 @@
 import { t, i18n, resolveLanguage, type Language } from "./i18n";
 import { toggleAllAppFiles, reconcileAppFiles } from "./app-selection";
-import { createRoot, type Root } from "react-dom/client";
-import { createElement } from "react";
-import { I18nextProvider } from "react-i18next";
-import { SettingsView } from "./settings-view";
-import { MenuBarView } from "./menu-bar-view";
 import { isMyGo, locale, onLocaleChange } from "mygo-runtime";
 import { System, events, type Preferences, type Snapshot } from "./mygo";
 import { formatCapacity, formatRate, percent, timeLabel } from "./format";
 import { icon } from "./icons";
+import { mergeHistory } from "./history";
+import { updateLiveContent } from "./live-content";
+import { PageContent } from "./page-content";
+import { tableWindow } from "./table-window";
+import { singleFlight } from "./single-flight";
 import { installSortControl } from "./dropdown";
 import { nextConnectionSort, type ConnectionSortKey } from "./connections";
 import { menuBarChoices, preferencesDirty } from "./settings";
@@ -22,14 +22,23 @@ const state: ViewState = {
   appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
   preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
-let settingsRoot: Root | null = null;
-let renderedMenuProps: { isMacOS: boolean; refreshSeconds: number } | null = null;
+let reactPages: typeof import("./react-pages") | null = null;
+let reactPageError = "";
+const loadReactPages = singleFlight(async () => {
+  if (reactPages || reactPageError) return;
+  try { reactPages = await import("./react-pages"); }
+  catch (reason) { reactPageError = String(reason); }
+  if (["settings", "menubar"].includes(state.page)) render();
+});
 void i18n.changeLanguage(isMyGo() ? locale() : resolveLanguage(navigator.languages));
 document.documentElement.lang = i18n.language;
 let updating = false;
-let processTime = "";
+let queuedSnapshot: Snapshot | null = null;
+
 let connectionTime = 0;
-let connectionsLoading = false;
+const readConnections = singleFlight(() => System.connections());
+const readProcesses = singleFlight(() => System.processes());
+let inspectionPreloadScheduled = false;
 let stopped = false;
 let renderedActions = "";
 let renderedScan = "";
@@ -39,8 +48,16 @@ let renderedAboutInfo: ViewState["info"] = null;
 let scanProgressText = "";
 let appReviewEpoch = 0;
 let appSelectAll = false;
+let navigationEpoch = 0;
+let navigationTarget: { page: Page; query: string } | null = null;
+let renderedBody = "";
+let renderedPage: Page | null = null;
+let renderFrame = 0;
+let renderFilters = false;
+const pageContent = new PageContent(el("page-body"));
 let errorKind: "data" | "action" = "data";
 el("navigation").innerHTML = navigation();
+renderNavigation(state.page);
 el("device-mark").innerHTML = icon("about");
 
 function error(message: string, kind: "data" | "action" = "data") {
@@ -49,6 +66,23 @@ function error(message: string, kind: "data" | "action" = "data") {
   el("connection-error").hidden = !message;
 }
 function render(filters = false) {
+  renderFilters ||= filters;
+  if (renderFrame) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = 0;
+    if (navigationTarget) return;
+    const filters = renderFilters;
+    renderFilters = false;
+    renderNow(filters);
+  });
+}
+function renderNow(filters = false) {
+  if (navigationTarget) return;
+  if (pageContent.page !== state.page) {
+    reactPages?.unmountReactPage();
+    renderedBody = pageContent.activate(state.page, renderedBody);
+    renderedPage = renderedBody ? state.page : null;
+  }
   const page = pages.find(p => p.id === state.page)!;
   const activityScroll = el("page-body").querySelector<HTMLElement>(".activity-scroll");
   const activityPosition = activityScroll ? [activityScroll.scrollLeft, activityScroll.scrollTop] : null;
@@ -67,8 +101,9 @@ function render(filters = false) {
   if (el("content-scroll").dataset.page !== state.page) {
     el("content-scroll").dataset.page = state.page;
     el("content-scroll").parentElement!.dataset.page = state.page;
-    if (["processes", "connections"].includes(state.page)) el("page-actions").before(el("page-filters"));
-    else el("page-body").before(el("page-filters"));
+  }
+  if (state.page === "processes" || state.page === "connections") {
+    state.tableWindow = tableWindow(activityScroll?.scrollTop ?? 0, activityScroll?.clientHeight || el("page-body").clientHeight);
   }
   const actions = actionControls(state);
   if (renderedActions !== actions) { el("page-actions").innerHTML = actions; renderedActions = actions; }
@@ -78,22 +113,18 @@ function render(filters = false) {
     el("page-filters").hidden = !html;
   }
   if (state.page === "settings" || state.page === "menubar") {
+    renderedBody = "";
+    renderedPage = null;
     renderedScan = "";
     renderedAppReview = "";
-    if (!settingsRoot) { el("page-body").replaceChildren(); settingsRoot = createRoot(el("page-body")); }
-    if (state.page === "menubar") {
-      const props = { isMacOS: state.info?.machine.platform === "darwin", refreshSeconds: state.info?.refreshSeconds ?? 2 };
-      if (props.isMacOS !== renderedMenuProps?.isMacOS || props.refreshSeconds !== renderedMenuProps?.refreshSeconds) {
-        settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(MenuBarView, props)));
-        renderedMenuProps = props;
-      }
+    if (reactPages) {
+      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); });
     } else {
-      renderedMenuProps = null;
-      settingsRoot.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, version: state.info?.version ?? "", isMacOS: state.info?.machine.platform === "darwin", onLanguage: (language: Language) => { state.languageDraft = language; render(); void saveSettings(); } })));
+      el("page-body").textContent = reactPageError ? `${t("页面加载失败，请重试。")} ${reactPageError}` : t("正在加载页面…");
+      void loadReactPages();
     }
   } else {
-    renderedMenuProps = null;
-    settingsRoot?.unmount(); settingsRoot = null;
+    reactPages?.unmountReactPage();
     const body = renderBody(state);
     const unchangedScan = state.scanning && state.page === "cleanup" && renderedScan === body;
     const unchangedReview = state.page === "apps" && !!state.appReview && renderedAppReview === body;
@@ -108,11 +139,17 @@ function render(filters = false) {
           if (value.innerHTML !== nextValues[index]!.innerHTML) value.innerHTML = nextValues[index]!.innerHTML;
         });
       } else el("page-body").innerHTML = body;
-    } else if (!unchangedScan && !unchangedReview) el("page-body").innerHTML = body;
+    } else if (!unchangedScan && !unchangedReview && body !== renderedBody) {
+      const live = metricPages.includes(state.page) || ["processes", "connections"].includes(state.page) || (state.page === "apps" && !state.appMode);
+      if (live && renderedPage === state.page) updateLiveContent(el("page-body"), body);
+      else el("page-body").innerHTML = body;
+    }
+    renderedPage = state.page;
     renderedAboutLanguage = state.page === "about" ? i18n.language : "";
     renderedAboutInfo = state.page === "about" ? state.info : null;
     renderedScan = state.scanning && state.page === "cleanup" ? body : "";
     renderedAppReview = state.page === "apps" && state.appReview ? body : "";
+    renderedBody = body;
     const progress = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
     if (progress) progress.textContent = scanProgressText || t("正在统计扫描项目…");
     const selectAll = el("page-body").querySelector<HTMLInputElement>("[data-app-select-all]");
@@ -124,12 +161,8 @@ function render(filters = false) {
   }
   const bodyBusy = String(state.busy || state.scanning);
   if (el("page-body").getAttribute("aria-busy") !== bodyBusy) el("page-body").setAttribute("aria-busy", bodyBusy);
-  if (focusKey) for (const button of focusArea!.querySelectorAll<HTMLElement>("button, input")) {
+  if (focusKey && document.activeElement !== focused) for (const button of focusArea!.querySelectorAll<HTMLElement>("button, input")) {
     if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.selectProcess, button.dataset.metric, button.dataset.connectionSort, button.dataset.processSort, button.dataset.processScope].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
-  }
-  for (const button of el("navigation").querySelectorAll<HTMLButtonElement>("button")) {
-    if (button.dataset.page === state.page) button.setAttribute("aria-current", "page");
-    else button.removeAttribute("aria-current");
   }
   const s = state.snapshot;
   if (s) {
@@ -146,6 +179,12 @@ function render(filters = false) {
     el("nav-energy").title = batteryAvailable ? t("电池电量") : s.battery.error || t("未检测到内置电池");
   }
 }
+function renderNavigation(selected: Page) {
+  for (const button of el("navigation").querySelectorAll<HTMLButtonElement>("button")) {
+    if (button.dataset.page === selected) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
+}
 function recordProcessSample() {
   const process = state.processes?.items.find(item => item.pid === state.selectedProcess);
   if (!process || !state.processes) return;
@@ -154,35 +193,63 @@ function recordProcessSample() {
   if (history.at(-1)?.at !== at) history.push({ at, cpu: process.cpuReady ? process.cpu : null, memory: process.memory, gpu: null, diskRead: null, diskWrite: null, download: null, upload: null, battery: null, power: null });
   state.processHistory = history;
 }
-async function loadProcesses() {
-  try { state.processes = await System.processes(); state.processError = state.processes.error; recordProcessSample(); }
+async function loadProcesses(live = false) {
+  if (state.processes && !state.processError && state.processes.updatedAt === state.snapshot?.processUpdatedAt) return;
+  try {
+    const result = await readProcesses();
+    if (live && state.paused) return;
+    state.processes = result; state.processError = state.processes.error; recordProcessSample();
+  }
   catch (reason) { state.processError = String(reason); }
-  processTime = state.processes?.updatedAt || "";
+}
+const refreshProcessView = singleFlight(async () => {
+  await loadProcesses(true);
+  if (!state.paused && !document.hidden && ["processes", "apps", "connections"].includes(state.page)) render();
+});
+const refreshConnectionView = singleFlight(async () => {
+  await connections(true);
+  if (state.page === "connections" && !state.paused && !document.hidden) render();
+});
+async function readHistory(snapshot: Snapshot, live = false) {
+  const historySeconds = state.info!.historySeconds;
+  const last = state.history.at(-1);
+  const incoming = last ? await System.historySince(last.at) : await System.history();
+  if (live && state.paused) return;
+  if (!state.snapshot || Date.parse(snapshot.updatedAt) >= Date.parse(state.snapshot.updatedAt)) {
+    state.snapshot = snapshot;
+    state.history = mergeHistory(state.history, incoming, Date.parse(snapshot.updatedAt), historySeconds);
+  }
 }
 async function receive(snapshot: Snapshot) {
-  if (stopped || state.paused || !state.info || updating) return;
+  if (stopped || !state.info) return;
   if (state.snapshot && Date.parse(snapshot.updatedAt) < Date.parse(state.snapshot.updatedAt)) return;
+  if (updating || state.paused || document.hidden) {
+    if (!queuedSnapshot || Date.parse(snapshot.updatedAt) >= Date.parse(queuedSnapshot.updatedAt)) queuedSnapshot = snapshot;
+    return;
+  }
   updating = true;
+  queuedSnapshot = null;
+  const epoch = navigationEpoch;
   try {
-    const history = await System.history();
+    await readHistory(snapshot, true);
     if (state.paused || stopped) return;
-    if (!state.snapshot || Date.parse(snapshot.updatedAt) >= Date.parse(state.snapshot.updatedAt)) {
-      state.snapshot = snapshot;
-      state.history = history.filter(p => Date.parse(p.at) <= Date.parse(snapshot.updatedAt));
-    }
-    if (["processes", "apps", "connections"].includes(state.page) && Date.parse(snapshot.updatedAt) - Date.parse(processTime || "1970-01-01") >= state.info.processRefreshSeconds * 1000) await loadProcesses();
-    if (state.page === "connections" && !state.paused && Date.parse(snapshot.updatedAt) - connectionTime >= state.info.processRefreshSeconds * 1000) await connections(true);
+    if (document.hidden) { queuedSnapshot ||= snapshot; return; }
     if (errorKind === "data") error("");
-    render();
+    if (epoch === navigationEpoch) render();
+    if (["processes", "apps", "connections"].includes(state.page)) void refreshProcessView();
+    if (state.page === "connections") void refreshConnectionView();
     if (state.page === "settings" && state.preferences) void refreshTrayPreview();
   } catch (reason) { error(`${t("读取历史失败：")}${String(reason)}${t("。当前显示上次成功的数据。")}`); render(); }
-  finally { updating = false; }
+  finally {
+    updating = false;
+    if (queuedSnapshot && !state.paused && !document.hidden && !stopped) void receive(queuedSnapshot);
+  }
 }
 async function initialize() {
   const result = await System.initialize();
   state.info = result.info;
   state.snapshot = result.snapshot;
-  state.history = result.history;
+  state.history = mergeHistory([], result.history, Date.parse(result.snapshot.updatedAt), result.info.historySeconds);
   el("machine-name").textContent = t("本机");
   el("machine-name").title = result.info.machine.hostname;
   el("machine-detail").textContent = result.info.machine.chip || result.info.machine.architecture;
@@ -278,60 +345,88 @@ async function removeAppFiles() {
   catch (reason) { state.appMessage += ` ${String(reason)}`; state.installedApps = null; }
   state.appBusy = false; render();
 }
-async function connections(live = false) {
-  if (connectionsLoading) return;
-  connectionsLoading = true;
+async function connections(live = false, force = false) {
+  if (!force && state.connections && !state.connectionError && Date.now() - connectionTime < state.info!.processRefreshSeconds * 1000) return;
   connectionTime = Date.now();
   try {
-    const result = await System.connections();
-    if (live && (state.paused || state.page !== "connections")) return;
+    const result = await readConnections();
+    if (live && state.paused && state.page === "connections") return;
     state.connections = result; state.connectionError = "";
+    connectionTime = Date.now();
   } catch (reason) {
-    if (!live || (!state.paused && state.page === "connections")) state.connectionError = String(reason);
-  } finally { connectionsLoading = false; }
+    if (!live || !state.paused || state.page !== "connections") state.connectionError = String(reason);
+  }
+}
+function preloadInspection() {
+  if (inspectionPreloadScheduled || !state.info || !isMyGo()) return;
+  inspectionPreloadScheduled = true;
+  const preload = () => {
+    if (stopped) return;
+    void loadReactPages();
+    void loadProcesses().then(() => {
+      if (!state.paused && ["processes", "apps", "connections"].includes(state.page)) render();
+    });
+    void connections(true).then(() => {
+      if (!state.paused && state.page === "connections") render();
+    });
+  };
+  if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(preload);
+  else requestAnimationFrame(() => { setTimeout(preload, 0); });
 }
 async function refresh() {
   if (state.busy) return;
   if (!isMyGo()) { error(t("实时数据仅在 RockshinOps 桌面应用中可用。请运行 bun run dev 启动应用。")); return; }
+  reactPageError = "";
   state.busy = true; error(""); render();
   try {
     if (!state.info) await initialize();
     else {
       const snapshot = await System.refresh();
-      const history = await System.history();
-      if (!state.snapshot || Date.parse(snapshot.updatedAt) >= Date.parse(state.snapshot.updatedAt)) {
-        state.snapshot = snapshot; state.history = history.filter(p => Date.parse(p.at) <= Date.parse(snapshot.updatedAt));
-      }
+      await readHistory(snapshot);
     }
     if (["processes", "apps", "connections"].includes(state.page)) await loadProcesses();
-    if (state.page === "connections") await connections();
+    if (state.page === "connections") await connections(false, true);
     if (state.page === "cleanup") await scan();
   } catch (reason) { error(`${t("连接采集服务失败：")}${String(reason)}${t("。可再次点击刷新重试。")}`); }
-  finally { state.busy = false; render(); }
+  finally { state.busy = false; render(); preloadInspection(); }
 }
 async function navigate(page: Page, query = "") {
+  const current = navigationTarget || state;
+  if (page === current.page && query === current.query) return;
+  const epoch = ++navigationEpoch;
+  navigationTarget = { page, query };
+  renderNavigation(page);
+  // Paint the selected item before constructing a potentially large table.
+  await new Promise<void>(resolve => requestAnimationFrame(() => { setTimeout(resolve, 0); }));
+  if (epoch !== navigationEpoch) return;
+  navigationTarget = null;
   state.page = page; state.query = query; state.selectedProcess = null;
   if (!metricPages.includes(page)) state.paused = false;
   if (page === "apps" && !["cpu", "memory", "name"].includes(state.sort)) state.sort = "cpu";
   el("content-scroll").scrollTop = 0; render(true);
   if (page === "settings" && !state.preferences) await loadSettings();
   if (!isMyGo() || !state.info) return;
-  if (["processes", "apps", "connections"].includes(page)) { await loadProcesses(); render(); }
-  if (page === "connections") { await connections(true); render(); }
+  if (page === "connections") {
+    await Promise.all([loadProcesses(), connections(true)]);
+    if (epoch === navigationEpoch) render();
+  } else if (["processes", "apps"].includes(page)) {
+    await loadProcesses();
+    if (epoch !== navigationEpoch) return;
+    render();
+  }
 }
 async function loadSettings() {
   try {
     state.preferences = await System.preferences();
     resetSettingsDrafts(state.preferences); state.preferencesError = "";
   } catch (reason) { state.preferencesError = `${t("无法读取设置：")}${String(reason)}`; }
-  render();
-  void refreshTrayPreview();
+  if (state.page === "settings") { render(); void refreshTrayPreview(); }
 }
 let trayPreviewRequest = 0;
 async function refreshTrayPreview() {
   const request = ++trayPreviewRequest;
   const preview = await System.menuBarPreview([...state.menuBarDraft]).catch(() => null);
-  if (request === trayPreviewRequest) { state.trayPreview = preview; render(); }
+  if (request === trayPreviewRequest) { state.trayPreview = preview; if (state.page === "settings") render(); }
 }
 function resetSettingsDrafts(saved: Preferences) {
   state.hideDockDraft = saved.hideDockOnClose;
@@ -428,6 +523,15 @@ el("page-filters").addEventListener("change", event => {
   render();
 });
 installSortControl(value => { state.sort = value; render(true); });
+el("page-body").addEventListener("scroll", event => {
+  const scroll = event.target as HTMLElement;
+  if (!scroll.classList.contains("activity-scroll")) return;
+  const next = tableWindow(scroll.scrollTop, scroll.clientHeight);
+  if (next.start !== state.tableWindow?.start || next.count !== state.tableWindow?.count) render();
+}, { capture: true, passive: true });
+new ResizeObserver(() => {
+  if (state.page === "processes" || state.page === "connections") render();
+}).observe(el("page-body"));
 document.addEventListener("keydown", event => {
   if ((event.metaKey || event.ctrlKey) && event.key === ",") { event.preventDefault(); void navigate("settings"); }
 });
@@ -454,12 +558,17 @@ if (isMyGo()) {
     void i18n.changeLanguage(language);
     document.documentElement.lang = language;
     el("navigation").innerHTML = navigation();
+    renderNavigation(navigationTarget?.page ?? state.page);
     el("machine-name").textContent = t("本机");
     document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
     el("navigation").setAttribute("aria-label", t("监控页面"));
     state.info = null; state.processes = null; state.connections = null; state.scan = null;
+    inspectionPreloadScheduled = false;
     state.processError = ""; state.connectionError = ""; state.scanError = "";
     error(""); render(true); void refresh();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && queuedSnapshot && !state.paused) void receive(queuedSnapshot);
   });
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"localops/internal/storage"
+	"rockshinops/internal/storage"
 )
 
 type Options struct {
@@ -19,7 +19,8 @@ type Options struct {
 }
 
 type Monitor struct {
-	mu              sync.Mutex
+	mu              sync.RWMutex
+	sampleMu        sync.Mutex
 	options         Options
 	read            func() rawSample
 	readProcesses   func() ([]rawProcess, int, error)
@@ -28,7 +29,7 @@ type Monitor struct {
 	previousAt      time.Time
 	capacityAt      time.Time
 	processAt       time.Time
-	processPrevious map[int]rawProcess
+	processPrevious map[int]processCounters
 	processes       ProcessList
 	snapshot        Snapshot
 	history         []Trend
@@ -36,21 +37,37 @@ type Monitor struct {
 
 func NewMonitor(options Options) *Monitor {
 	return &Monitor{options: options, read: func() rawSample { return readNative(options.Interval) }, readProcesses: readProcesses, readVolume: storage.Read,
-		processPrevious: make(map[int]rawProcess), history: []Trend{}, processes: ProcessList{Items: []Process{}},
+		processPrevious: make(map[int]processCounters), history: []Trend{}, processes: ProcessList{Items: []Process{}},
 		snapshot: Snapshot{CPU: CPU{Cores: []float64{}}, TopCPU: []Process{}, TopMemory: []AppUsage{}}}
 }
 
-func (m *Monitor) Current() Snapshot      { m.mu.Lock(); defer m.mu.Unlock(); return m.snapshot }
-func (m *Monitor) History() []Trend       { m.mu.Lock(); defer m.mu.Unlock(); return slices.Clone(m.history) }
-func (m *Monitor) Processes() ProcessList { m.mu.Lock(); defer m.mu.Unlock(); return m.processes }
+func (m *Monitor) Current() Snapshot { m.mu.RLock(); defer m.mu.RUnlock(); return m.snapshot }
+func (m *Monitor) History() []Trend {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return slices.Clone(m.history)
+}
+func (m *Monitor) Processes() ProcessList { m.mu.RLock(); defer m.mu.RUnlock(); return m.processes }
+
+// HistorySince returns only samples newer than the caller's last accepted point.
+func (m *Monitor) HistorySince(after time.Time) []Trend {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	first := len(m.history)
+	for first > 0 && m.history[first-1].At.After(after) {
+		first--
+	}
+	return slices.Clone(m.history[first:])
+}
 
 func ptr(value float64) *float64 { return &value }
 
 func (m *Monitor) Refresh(force bool) Snapshot { return m.refreshAt(time.Now(), force) }
 
 func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Native I/O is serialized separately from reads of the last published data.
+	m.sampleMu.Lock()
+	defer m.sampleMu.Unlock()
 	raw := m.read()
 	seconds := now.Sub(m.previousAt).Seconds()
 	continuous := !m.previousAt.IsZero() && seconds > 0 && now.Sub(m.previousAt) <= m.options.Interval*3
@@ -127,26 +144,32 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 			s.Network.Ready = s.Network.Ready || n.Ready
 		}
 	}
-	if force || m.processAt.IsZero() || now.Sub(m.processAt) >= m.options.ProcessInterval {
-		m.refreshProcesses(now)
+	processes := m.processes
+	processChanged := force || m.processAt.IsZero() || now.Sub(m.processAt) >= m.options.ProcessInterval
+	if processChanged {
+		processes = m.refreshProcesses(now)
 	}
-	s.ProcessCount = m.processes.Total
-	s.ProcessSkipped = m.processes.Skipped
-	s.ProcessError = m.processes.Error
-	s.TopCPU = slices.Clone(m.processes.Items)
-	slices.SortFunc(s.TopCPU, func(a, b Process) int {
-		if a.CPU > b.CPU {
-			return -1
-		}
-		if a.CPU < b.CPU {
-			return 1
-		}
-		return a.PID - b.PID
-	})
-	s.TopCPU = s.TopCPU[:min(6, len(s.TopCPU))]
-	s.TopMemory = GroupApps(m.processes.Items)
-	s.TopMemory = s.TopMemory[:min(6, len(s.TopMemory))]
-	m.previous, m.previousAt, m.snapshot = raw, now, s
+	s.ProcessUpdatedAt = processes.UpdatedAt
+	s.ProcessCount = processes.Total
+	s.ProcessSkipped = processes.Skipped
+	s.ProcessError = processes.Error
+	s.TopCPU, s.TopMemory = m.snapshot.TopCPU, m.snapshot.TopMemory
+	if processChanged {
+		s.TopCPU = slices.Clone(processes.Items)
+		slices.SortFunc(s.TopCPU, func(a, b Process) int {
+			if a.CPU > b.CPU {
+				return -1
+			}
+			if a.CPU < b.CPU {
+				return 1
+			}
+			return a.PID - b.PID
+		})
+		s.TopCPU = s.TopCPU[:min(6, len(s.TopCPU))]
+		s.TopMemory = GroupApps(processes.Items)
+		s.TopMemory = s.TopMemory[:min(6, len(s.TopMemory))]
+	}
+	m.previous, m.previousAt = raw, now
 	t := Trend{At: s.UpdatedAt}
 	if s.CPU.Ready {
 		t.CPU = ptr(s.CPU.Usage)
@@ -167,6 +190,9 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 		t.Battery = ptr(s.Battery.Percent)
 		t.Power = s.Battery.SystemWatts
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.snapshot, m.processes = s, processes
 	m.history = append(m.history, t)
 	cutoff := now.Add(-time.Duration(m.options.HistorySeconds) * time.Second)
 	first := 0
@@ -195,12 +221,17 @@ func rate(current ioCounter, previous map[string]ioCounter, seconds float64) (fl
 	return float64(current.read-old.read) / seconds, float64(current.write-old.write) / seconds, true
 }
 
-func (m *Monitor) refreshProcesses(now time.Time) {
+type processCounters struct {
+	start, cpuTime, read, write uint64
+	ioValid                     bool
+}
+
+func (m *Monitor) refreshProcesses(now time.Time) ProcessList {
 	items, total, err := m.readProcesses()
-	result := ProcessList{Items: []Process{}, Total: total, UpdatedAt: now.UTC()}
+	result := ProcessList{Items: make([]Process, 0, len(items)), Total: total, UpdatedAt: now.UTC()}
 	seconds := now.Sub(m.processAt).Seconds()
 	continuous := !m.processAt.IsZero() && seconds > 0 && now.Sub(m.processAt) <= m.options.ProcessInterval*3
-	previous := make(map[int]rawProcess, len(items))
+	previous := make(map[int]processCounters, len(items))
 	if err != nil {
 		result.Error = err.Error()
 	}
@@ -210,17 +241,18 @@ func (m *Monitor) refreshProcesses(now time.Time) {
 		if old, exists := m.processPrevious[p.PID]; exists && old.start == raw.start && continuous && raw.cpuTime >= old.cpuTime {
 			p.CPU = float64(raw.cpuTime-old.cpuTime) / 1e9 / seconds * 100
 			p.CPUReady = true
-			if raw.IOError == "" && old.IOError == "" && raw.ReadBytes >= old.ReadBytes && raw.WriteBytes >= old.WriteBytes {
-				p.ReadRate = float64(raw.ReadBytes-old.ReadBytes) / seconds
-				p.WriteRate = float64(raw.WriteBytes-old.WriteBytes) / seconds
+			if raw.IOError == "" && old.ioValid && raw.ReadBytes >= old.read && raw.WriteBytes >= old.write {
+				p.ReadRate = float64(raw.ReadBytes-old.read) / seconds
+				p.WriteRate = float64(raw.WriteBytes-old.write) / seconds
 				p.IOReady = true
 			}
 		}
 		result.Items = append(result.Items, p)
-		previous[p.PID] = raw
+		previous[p.PID] = processCounters{raw.start, raw.cpuTime, raw.ReadBytes, raw.WriteBytes, raw.IOError == ""}
 	}
 	result.Skipped = total - len(items)
-	m.processAt, m.processPrevious, m.processes = now, previous, result
+	m.processAt, m.processPrevious = now, previous
+	return result
 }
 
 func GroupApps(processes []Process) []AppUsage {

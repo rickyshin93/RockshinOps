@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.5
+
+- Unify app, executable, installer and configuration names as RockshinOps; preserve existing settings during the transition. Older LocalOps installations require one manual installation.
+- Improve page switching, idle preloading, retained tables, incremental history, native collection concurrency and cached rendering.
+- Add macOS per-connection transfer rates, byte counters and TCP RTT, including long-latency parsing fixes.
+- Refine menu-bar selection and pointer dragging with live reordering, settling animations and failure rollback; retain successful icon previews.
+- Remove reload and developer-tool actions from the production View menu; improve macOS resize pacing and About-page refreshes.
+- Publish bilingual website metadata, structured data, sitemap and Agent-readable Markdown/llms.txt.
+- macOS builds remain ad-hoc signed: installing an updated build can require removing and re-adding stale Accessibility or Screen Recording permissions.
+
+### 中文
+
+- App、可执行文件、安装包和配置统一为 RockshinOps，保留旧设置；旧 LocalOps 安装需要手动安装一次。
+- 优化切页、空闲预加载、列表复用、增量历史、原生并行采集和渲染缓存。
+- 新增 macOS 连接流量、速率及 TCP RTT，并修复大延迟数值解析。
+- 优化菜单栏选中态和拖动动画，支持实时让位与失败回退，保留已捕获的图标。
+- 正式版本移除刷新和开发者工具入口，优化窗口缩放与关于本机刷新。
+- 发布双语官网 SEO、结构化数据、站点地图和 Agent 可读内容。
+- macOS 仍采用临时签名；覆盖安装后可能需要移除并重新添加辅助功能或屏幕录制授权。
+
 ## 0.2.4
 
 - Refresh RockshinOps branding, navigation, settings and hardware views, with smoother macOS resizing.

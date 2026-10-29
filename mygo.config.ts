@@ -2,12 +2,11 @@ import { defineConfig } from "mygo-cli";
 import pkg from "./package.json";
 
 export default defineConfig({
-  // The updater relaunches the original executable path; keep its installed identity.
-  name: "LocalOps",
-  identifier: "dev.localops.desktop",
+  name: "RockshinOps",
+  identifier: "dev.rockshinops.desktop",
   version: pkg.version,
   updates: {
-    github: "rickyshin93/local-ops",
+    github: "rickyshin93/RockshinOps",
     publicKey: "kOxLJUSMhx/BmI9BovPOHCPvC0nOV7JXgQ03IsLA/Ik=",
     deltas: 0,
   },

@@ -8,18 +8,27 @@ import (
 	"strings"
 	"time"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
+type ConnectionMetrics struct {
+	Received *uint64  `json:"received"`
+	Sent     *uint64  `json:"sent"`
+	Download *float64 `json:"download"`
+	Upload   *float64 `json:"upload"`
+	RTT      *float64 `json:"rtt"`
+}
+
 type Connection struct {
-	PID      int    `json:"pid"`
-	Process  string `json:"process"`
-	UserID   string `json:"userId"`
-	Protocol string `json:"protocol"`
-	Family   string `json:"family"`
-	Local    string `json:"local"`
-	Remote   string `json:"remote"`
-	State    string `json:"state"`
+	Metrics  *ConnectionMetrics `json:"metrics,omitempty"`
+	PID      int                `json:"pid"`
+	Process  string             `json:"process"`
+	UserID   string             `json:"userId"`
+	Protocol string             `json:"protocol"`
+	Family   string             `json:"family"`
+	Local    string             `json:"local"`
+	Remote   string             `json:"remote"`
+	State    string             `json:"state"`
 }
 
 type Connections struct {
@@ -28,8 +37,8 @@ type Connections struct {
 	Warning   string       `json:"warning"`
 }
 
-func ReadConnections(ctx context.Context, timeout time.Duration) (Connections, error) {
-	return readConnections(ctx, timeout)
+func ReadConnections(ctx context.Context, timeout, interval time.Duration) (Connections, error) {
+	return readConnections(ctx, timeout, interval)
 }
 
 func parseConnections(data []byte) ([]Connection, error) {
@@ -42,7 +51,7 @@ func parseConnections(data []byte) ([]Connection, error) {
 		}
 		hasFile = false
 	}
-	for _, field := range bytes.Split(data, []byte{0}) {
+	for field := range bytes.SplitSeq(data, []byte{0}) {
 		field = bytes.TrimLeft(field, "\n")
 		if len(field) < 1 {
 			continue

@@ -33,9 +33,16 @@ const icons: Record<string, IconNode> = {
   folder: Folder,
 };
 
+const markup = new Map<IconNode, string>();
+
 export function icon(name: string): string {
-  return createElement(icons[name] || Laptop, {
+  const node = icons[name] || Laptop;
+  const cached = markup.get(node);
+  if (cached) return cached;
+  const svg = createElement(node, {
     "stroke-width": 1.75,
     "aria-hidden": "true",
   }).outerHTML;
+  markup.set(node, svg);
+  return svg;
 }

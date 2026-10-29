@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 // Volume reports the filesystem containing the user's home directory.

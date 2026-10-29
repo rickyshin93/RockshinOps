@@ -7,3 +7,5 @@ work/
 .DS_Store
 .impeccable/
 release-files/
+
+.logs/

@@ -60,7 +60,7 @@ func TestNativeCollectorSmoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	connections, err := ReadConnections(context.Background(), 10*time.Second)
+	connections, err := ReadConnections(context.Background(), 10*time.Second, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

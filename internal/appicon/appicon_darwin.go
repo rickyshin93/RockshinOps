@@ -4,7 +4,7 @@ package appicon
 #cgo CFLAGS: -fobjc-arc
 #cgo LDFLAGS: -framework Cocoa
 #include <stdlib.h>
-void *localops_app_icon_png(const char *path, int pixels, size_t *length);
+void *rockshinops_app_icon_png(const char *path, int pixels, size_t *length);
 */
 import "C"
 
@@ -27,7 +27,7 @@ func renderComputer() ([]byte, error) { return renderPNG(nil, 256) }
 
 func renderPNG(path *C.char, pixels int) ([]byte, error) {
 	var length C.size_t
-	data := C.localops_app_icon_png(path, C.int(pixels), &length)
+	data := C.rockshinops_app_icon_png(path, C.int(pixels), &length)
 	if data == nil {
 		return nil, errors.New("icon unavailable")
 	}

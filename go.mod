@@ -1,4 +1,4 @@
-module localops
+module rockshinops
 
 go 1.27.3
 

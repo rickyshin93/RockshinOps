@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 func readNative(timeout time.Duration) rawSample {
@@ -22,6 +22,6 @@ func ReadMachine(timeout time.Duration) Machine {
 	return Machine{Platform: runtime.GOOS, Architecture: runtime.GOARCH, Error: localization.T("当前平台尚未实现本机信息采集")}
 }
 
-func readConnections(ctx context.Context, timeout time.Duration) (Connections, error) {
+func readConnections(ctx context.Context, timeout, interval time.Duration) (Connections, error) {
 	return Connections{Items: []Connection{}, UpdatedAt: time.Now().UTC()}, errors.New(localization.T("当前平台尚未实现连接采集"))
 }

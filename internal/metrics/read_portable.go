@@ -4,7 +4,7 @@ package metrics
 
 import (
 	"fmt"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 	"os/user"
 	"runtime"
 	"slices"

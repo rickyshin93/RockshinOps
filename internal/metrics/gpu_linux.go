@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 	"os"
 	"os/exec"
 	"path/filepath"

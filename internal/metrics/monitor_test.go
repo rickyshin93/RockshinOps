@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"localops/internal/storage"
+	"rockshinops/internal/storage"
 )
 
 func TestCounterDeltasBaselineResetAndSleep(t *testing.T) {

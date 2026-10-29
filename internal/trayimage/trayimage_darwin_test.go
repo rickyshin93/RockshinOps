@@ -22,3 +22,12 @@ func TestRenderDrawsRetinaStatusItemHeight(t *testing.T) {
 		t.Fatal("unknown symbol rendered")
 	}
 }
+
+func BenchmarkRepeatedTrayImage(b *testing.B) {
+	items := []Item{{"internaldrive", "412.3 GB"}, {"cpu", "23%"}}
+	for i := 0; i < b.N; i++ {
+		if _, err := Render(items); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

@@ -4,5 +4,5 @@ package trayimage
 
 import "errors"
 
-// Render is only available on macOS; other platforms keep the text title.
-func Render([]Item) ([]byte, error) { return nil, errors.ErrUnsupported }
+// renderNative is only available on macOS; other platforms keep the text title.
+func renderNative([]Item) ([]byte, error) { return nil, errors.ErrUnsupported }

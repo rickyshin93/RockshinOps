@@ -2,7 +2,7 @@ package storage
 
 import (
 	"golang.org/x/sys/windows"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 	"os"
 	"strings"
 	"unsafe"

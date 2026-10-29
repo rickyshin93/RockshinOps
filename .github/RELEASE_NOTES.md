@@ -1,16 +1,24 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.4
+### New in v0.2.5
 
-- RockshinOps branding, refreshed navigation, settings and hardware pages, and smoother macOS window resizing.
-- Rebuilt Processes and Connections tables with search, sorting, pause/resume and process detail charts from real samples.
-- Confirmed process Quit (SIGTERM on macOS/Linux) and Force Quit, with process identity checks and visible permission errors. Windows supports Force Quit only.
-- macOS menu-bar management with visible/hidden sections, icon previews, reordering, temporary reveal and appearance settings. Moving other apps' icons requires Accessibility access; previews require Screen Recording access.
-- Automatically saved settings and an optional “Hide Dock icon when closing” preference.
+- Faster navigation with idle preloading, cached tables, incremental history and concurrent native collection.
+- macOS connection download/upload rates, received/sent bytes and TCP RTT, including long-latency parsing fixes.
+- Refined menu-bar selection, pointer dragging, live reordering, settling animations, rollback and retained icon previews.
+- Production builds no longer expose reload or developer-tool menu actions; smoother macOS resizing and incremental About-page updates.
+- RockshinOps app/executable/installer naming and bilingual website SEO with Agent-readable product documentation.
 
-**中文：**更新 RockshinOps 品牌与整体界面，重做进程、连接列表和进程详情；新增确认后退出/强制退出进程、macOS 菜单栏图标分区与整理、自动保存设置及关闭窗口时隐藏 Dock 图标选项。
+**中文：**优化全 App 切页与采集性能，补齐 macOS 连接流量和延迟，优化菜单栏拖动与选中动画，关闭生产版刷新入口，统一 RockshinOps 命名并发布双语官网与 Agent 可读内容。
 
-Installer filenames, executable paths and the preferences directory retain the **LocalOps** name so older versions can continue to update and relaunch. The app identifier and update signing key are unchanged. Versions 0.2.1–0.2.3 use the signed updater; 0.2.0 requires a manual install first. Linux system packages should be updated through the package manager.
+### Upgrade notice / 升级说明
+
+**Install v0.2.5 manually when upgrading from the old LocalOps app.** Older updaters relaunch the old executable path; this version renames the app, executable and installers to RockshinOps. Existing preferences are copied only when the new configuration is absent. The application identifier is now `dev.rockshinops.desktop`; the update signing key is unchanged. Linux system packages should be updated through the package manager.
+
+**旧 LocalOps 用户请手动下载安装 v0.2.5。** 本版更改 App、可执行文件和安装包名称，旧更新器的重启路径不兼容。已有设置会在新配置不存在时迁移，原文件保留。
+
+macOS builds remain ad-hoc signed and not notarized. If Accessibility or Screen Recording appears enabled in System Settings but denied in the app after installation, remove only the stale RockshinOps entry, add `/Applications/RockshinOps.app` again, and quit/reopen the app. This is a known local signing limitation, not a guarantee that upgrades retain permissions.
+
+macOS 覆盖安装后，如系统开关已开但 App 提示未授权，请在相应权限列表移除旧 RockshinOps 条目，重新添加安装版并退出重开。本版仍采用临时签名，无法保证跨构建保留授权。
 
 ### Downloads
 

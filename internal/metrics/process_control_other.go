@@ -4,7 +4,7 @@ package metrics
 
 import (
 	"errors"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 func signalProcess(pid int, force bool) error {

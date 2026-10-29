@@ -1,6 +1,6 @@
 {
   "name": "rockshinops",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,8 @@
     "build:web": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test:go": "sh scripts/go.sh test ./...",
-    "test:web": "bun test tests"
+    "test:web": "bun test tests",
+    "build:website": "bun scripts/build-website.ts"
   },
   "dependencies": {
     "i18next": "26.5.11",
@@ -30,12 +31,12 @@
     "typescript": "7.0.2",
     "vite": "8.3.5"
   },
-  "description": "A local desktop system monitor with persistent menu bar metrics",
+  "description": "Free, open-source desktop system monitor for macOS, Windows and Linux",
   "license": "MIT",
   "author": "RockshinOps contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rickyshin93/local-ops.git"
+    "url": "https://github.com/rickyshin93/RockshinOps.git"
   },
   "packageManager": "bun@1.4.2"
 }

@@ -3,7 +3,7 @@ package metrics
 import (
 	"time"
 
-	"localops/internal/storage"
+	"rockshinops/internal/storage"
 )
 
 type CPU struct {
@@ -122,19 +122,20 @@ type AppUsage struct {
 }
 
 type Snapshot struct {
-	UpdatedAt      time.Time  `json:"updatedAt"`
-	CPU            CPU        `json:"cpu"`
-	Memory         Memory     `json:"memory"`
-	GPU            GPU        `json:"gpu"`
-	Disk           Disk       `json:"disk"`
-	Network        Network    `json:"network"`
-	Battery        Battery    `json:"battery"`
-	ProcessCount   int        `json:"processCount"`
-	ProcessSkipped int        `json:"processSkipped"`
-	ProcessError   string     `json:"processError"`
-	TopCPU         []Process  `json:"topCPU"`
-	TopMemory      []AppUsage `json:"topMemory"`
-	UptimeSeconds  float64    `json:"uptimeSeconds"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
+	CPU              CPU        `json:"cpu"`
+	Memory           Memory     `json:"memory"`
+	GPU              GPU        `json:"gpu"`
+	Disk             Disk       `json:"disk"`
+	Network          Network    `json:"network"`
+	Battery          Battery    `json:"battery"`
+	ProcessUpdatedAt time.Time  `json:"processUpdatedAt"`
+	ProcessCount     int        `json:"processCount"`
+	ProcessSkipped   int        `json:"processSkipped"`
+	ProcessError     string     `json:"processError"`
+	TopCPU           []Process  `json:"topCPU"`
+	TopMemory        []AppUsage `json:"topMemory"`
+	UptimeSeconds    float64    `json:"uptimeSeconds"`
 }
 
 type Trend struct {

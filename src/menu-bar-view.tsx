@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent, type ButtonHTMLAttributes } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent, type ButtonHTMLAttributes, type PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { System, type MenuBarConfiguration, type Settings as MenuBarSettings, type State as MenuBarState, type Item as MenuBarItem, type Appearance } from "./mygo";
 import { icon } from "./icons";
@@ -46,18 +46,20 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<MenuBarItem | null>(null);
   const [drag, setDrag] = useState<MenuBarItem | null>(null);
-  const drop = useRef<{ section: string; before: number; target: HTMLElement | null } | null>(null);
+  const [dragPreview, setDragPreview] = useState<MenuBarItem[] | null>(null);
+  const pointer = useRef<{ id: number; item: MenuBarItem; x: number; y: number; dx: number; dy: number; ghost: HTMLElement | null; section: string; before: number; valid: boolean; frame?: () => void } | null>(null);
+  const dragFrame = useRef(0);
   const dragging = useRef(false);
   const [moving, setMoving] = useState<number | null>(null);
   const layout = useRef<HTMLDivElement>(null);
-  const positions = useRef<Map<number, { x: number; y: number; section: string }> | null>(null);
+  const positions = useRef<Map<number, { x: number; y: number }> | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [message, setMessage] = useState("");
   useEffect(() => {
     if (tab !== "layout") return;
-    const cancelSelection = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setSelected(null); };
+    const cancelSelection = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { cancelDrag(); setSelected(null); } };
     window.addEventListener("keydown", cancelSelection);
-    return () => window.removeEventListener("keydown", cancelSelection);
+    return () => { window.removeEventListener("keydown", cancelSelection); cancelDrag(); };
   }, [tab]);
   useEffect(() => {
     if (!isMacOS) return;
@@ -101,24 +103,35 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
   }
   const settings = config?.settings;
   const state = config?.state;
+  const displayedItems = dragPreview || state?.items;
   const itemGroups = useMemo(() => {
     const search = query.toLocaleLowerCase();
-    return sections.map(([id, title]) => ({ id, title, items: state?.items.filter(item => item.section === id && `${item.name} ${item.owner}`.toLocaleLowerCase().includes(search)) || [] }));
-  }, [state?.items, query]);
+    return sections.map(([id, title]) => ({ id, title, items: displayedItems?.filter(item => item.section === id && `${item.name} ${item.owner}`.toLocaleLowerCase().includes(search)) || [] }));
+  }, [displayedItems, query]);
+  function capturePositions() {
+    positions.current = new Map(Array.from(layout.current?.querySelectorAll<HTMLElement>("[data-menu-id]") || []).map(button => {
+      const rect = button.getBoundingClientRect();
+      return [Number(button.dataset.menuId), { x: rect.x, y: rect.y }];
+    }));
+  }
   useLayoutEffect(() => {
     const previous = positions.current;
     positions.current = null;
+    const buttons = Array.from(layout.current?.querySelectorAll<HTMLElement>("[data-menu-id]") || []);
+    // Capture visual positions before cancelling an interrupted transition.
+    buttons.forEach(button => button.getAnimations().forEach(animation => animation.cancel()));
     if (!previous || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // Read all positions before starting animations; only the requested move animates.
-    const changes = Array.from(layout.current?.querySelectorAll<HTMLButtonElement>("[data-menu-id]") || []).map(button => ({
-      button, x: button.offsetLeft, y: button.offsetTop, old: previous.get(Number(button.dataset.menuId)),
-    }));
-    for (const { button, x, y, old } of changes) {
-      if (old && old.section === button.dataset.section && (old.x !== x || old.y !== y)) {
-        button.animate([{ transform: `translate(${old.x - x}px, ${old.y - y}px)` }, { transform: "translate(0, 0)" }], { duration: 160, easing: "cubic-bezier(.2,.8,.2,1)" });
+    const changes = buttons.map(button => ({ button, rect: button.getBoundingClientRect(), old: previous.get(Number(button.dataset.menuId)) }));
+    for (const { button, rect, old } of changes) {
+      if (old && Number(button.dataset.menuId) !== drag?.id && (Math.abs(old.x - rect.x) > .5 || Math.abs(old.y - rect.y) > .5)) {
+        button.animate([{ transform: `translate(${old.x - rect.x}px, ${old.y - rect.y}px)` }, { transform: "translate(0, 0)" }], { duration: 240, easing: "cubic-bezier(.16,1,.3,1)" });
       }
     }
-  }, [state?.items]);
+  }, [displayedItems, drag, moving]);
+  useEffect(() => () => {
+    cancelAnimationFrame(dragFrame.current);
+    pointer.current?.ghost?.remove();
+  }, []);
   async function run(action: () => Promise<MenuBarState>) {
     if (!beginOperation()) return;
     setBusy(true); setError(""); setMessage("");
@@ -145,39 +158,104 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
   }
   async function move(item: MenuBarItem, section: string, before = 0) {
     if (operation.current || item.id === before) return;
+    capturePositions();
+    const ghost = pointer.current?.ghost?.getBoundingClientRect();
+    if (ghost) positions.current?.set(item.id, { x: ghost.x, y: ghost.y });
     finishDrag(); beginOperation(); setMoving(item.id); setError("");
     const previous = state!;
-    positions.current = new Map(Array.from(layout.current?.querySelectorAll<HTMLButtonElement>("[data-menu-id]") || []).map(button => [Number(button.dataset.menuId), { x: button.offsetLeft, y: button.offsetTop, section: button.dataset.section! }]));
     const preview = moveMenuBarItem(previous.items, item.id, section, before);
     setConfig(old => old ? { ...old, state: { ...old.state, items: preview } } : old);
     setSelected(old => old ? preview.find(i => i.id === old.id) || null : null);
     try {
       const next = await System.moveMenuBarItem(item.id, item.pid, section, before);
-      setConfig(old => old ? { ...old, state: next } : old);
+      capturePositions();
+      setConfig(old => old ? { ...old, state: reconcileMenuBarState(old.state, next) } : old);
       setSelected(old => old ? next.items.find(i => i.id === old.id) || null : null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
+      capturePositions();
       setConfig(old => old ? { ...old, state: previous } : old);
       setSelected(old => old ? previous.items.find(i => i.id === old.id) || null : null);
       try {
         const actual = await System.menuBarAction("refresh");
+        capturePositions();
         setConfig(old => old ? { ...old, state: actual } : old);
         setSelected(old => old ? actual.items.find(i => i.id === old.id) || null : null);
       } catch (refreshError) { setError(`${reason instanceof Error ? reason.message : String(reason)} · ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`); }
     } finally { operation.current = false; setMoving(null); }
   }
-  function dropTarget(section: string, before: number, target: HTMLElement | null = null) {
-    if (drop.current?.target !== target) {
-      drop.current?.target?.removeAttribute("data-drop-target");
-      target?.setAttribute("data-drop-target", "true");
+  function startPointer(e: ReactPointerEvent<HTMLButtonElement>, item: MenuBarItem) {
+    if (!editable || !item.movable || operation.current || e.button !== 0 || !e.isPrimary) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const same = state!.items.filter(i => i.section === item.section);
+    pointer.current = { id: e.pointerId, item, x: e.clientX, y: e.clientY, dx: e.clientX - rect.x, dy: e.clientY - rect.y, ghost: null, section: item.section, before: same[same.findIndex(i => i.id === item.id) + 1]?.id || 0, valid: false };
+    layout.current?.setPointerCapture(e.pointerId);
+  }
+  function trackPointer(e: ReactPointerEvent<HTMLDivElement>) {
+    const p = pointer.current;
+    if (!p || p.id !== e.pointerId) return;
+    const x = e.clientX, y = e.clientY;
+    if (!p.ghost && Math.hypot(x - p.x, y - p.y) < 6) return;
+    if (!p.ghost) {
+      const source = layout.current!.querySelector<HTMLElement>(`[data-menu-id="${p.item.id}"]`)!;
+      const rect = source.getBoundingClientRect();
+      p.ghost = source.cloneNode(true) as HTMLElement;
+      p.ghost.className = "menu-item menu-drag-preview";
+      p.ghost.removeAttribute("data-menu-id");
+      p.ghost.removeAttribute("title");
+      p.ghost.setAttribute("aria-hidden", "true");
+      p.ghost.tabIndex = -1;
+      Object.assign(p.ghost.style, { width: `${rect.width}px`, height: `${rect.height}px`, transform: `translate3d(${x - p.dx}px, ${y - p.dy}px, 0)` });
+      document.body.append(p.ghost);
+      revision.current++; dragging.current = true; setDrag(p.item); setSelected(p.item);
     }
-    drop.current = { section, before, target };
+    e.preventDefault();
+    cancelAnimationFrame(dragFrame.current);
+    p.frame = () => {
+      p.ghost!.style.transform = `translate3d(${x - p.dx}px, ${y - p.dy}px, 0)`;
+      const strip = document.elementFromPoint(x, y)?.closest<HTMLElement>(".menu-strip");
+      p.valid = Boolean(strip && layout.current?.contains(strip));
+      if (!p.valid || !strip) return;
+      const section = strip.dataset.section!;
+      const origin = strip.getBoundingClientRect();
+      // Hit-test resting slots, not their animated transforms, to avoid oscillation.
+      const slots = Array.from(strip.querySelectorAll<HTMLElement>("[data-menu-id]"));
+      const own = slots.find(button => Number(button.dataset.menuId) === p.item.id);
+      if (own && x >= origin.x + own.offsetLeft && x <= origin.x + own.offsetLeft + own.offsetWidth && y >= origin.y + own.offsetTop && y <= origin.y + own.offsetTop + own.offsetHeight) return;
+      const target = slots.find(button => Number(button.dataset.menuId) !== p.item.id && (y < origin.y + button.offsetTop || (y <= origin.y + button.offsetTop + button.offsetHeight && x < origin.x + button.offsetLeft + button.offsetWidth / 2)));
+      const before = Number(target?.dataset.menuId) || 0;
+      if (section === p.section && before === p.before) return;
+      p.section = section; p.before = before;
+      capturePositions();
+      setDragPreview(moveMenuBarItem(state!.items, p.item.id, section, before));
+    };
+    dragFrame.current = requestAnimationFrame(p.frame);
   }
   function finishDrag() {
+    cancelAnimationFrame(dragFrame.current);
+    const p = pointer.current;
+    pointer.current = null;
+    if (p && layout.current?.hasPointerCapture(p.id)) layout.current.releasePointerCapture(p.id);
+    p?.ghost?.remove();
     dragging.current = false;
-    drop.current?.target?.removeAttribute("data-drop-target");
-    drop.current = null;
-    setDrag(null);
+    setDrag(null); setDragPreview(null);
+  }
+  function cancelDrag() {
+    if (!pointer.current?.ghost) { finishDrag(); return; }
+    capturePositions();
+    const p = pointer.current, rect = p?.ghost?.getBoundingClientRect();
+    if (p && rect) positions.current?.set(p.item.id, { x: rect.x, y: rect.y });
+    finishDrag();
+  }
+  function endPointer(e: ReactPointerEvent<HTMLDivElement>) {
+    const p = pointer.current;
+    if (!p || p.id !== e.pointerId) return;
+    cancelAnimationFrame(dragFrame.current);
+    p.frame?.();
+    const preview = moveMenuBarItem(state!.items, p.item.id, p.section, p.before);
+    const changed = preview.some((item, index) => item.id !== state!.items[index]?.id || item.section !== state!.items[index]?.section);
+    if (p.ghost && p.valid && changed) void move(p.item, p.section, p.before);
+    else cancelDrag();
   }
   function appearance(a: Appearance) {
     const update = (patch: Partial<Appearance>) => void save({ [settings?.dynamic ? theme : "light"]: { ...a, ...patch } });
@@ -201,19 +279,19 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
       <ActionButton blocked={busy || moving !== null} type="button" className="secondary-button" onClick={() => void reload()}><span dangerouslySetInnerHTML={{ __html: icon("refresh") }} />{t("刷新")}</ActionButton>
     </div>
     <div id="menu-tab-panel" role="tabpanel" aria-labelledby={`menu-tab-${tab}`}>
-      {tab === "layout" && <div className="menu-layout" ref={layout} onPointerDown={e => { if (!(e.target as Element).closest("button, input, label")) setSelected(null); }}>
+      {tab === "layout" && <div className="menu-layout" ref={layout} onPointerMove={trackPointer} onPointerUp={endPointer} onPointerCancel={cancelDrag} onLostPointerCapture={() => { if (pointer.current) cancelDrag(); }} onPointerDown={e => { if (!(e.target as Element).closest("button, input, label")) setSelected(null); }}>
         <div className="menu-layout-actions"><label className="menu-search"><span dangerouslySetInnerHTML={{ __html: icon("search") }} /><input aria-label={t("搜索菜单栏图标")} placeholder={t("搜索菜单栏图标")} value={query} onChange={e => setQuery(e.target.value)} /></label>
           <ActionButton blocked={busy || moving !== null} className="secondary-button" disabled={!settings?.enabled} onClick={() => void run(() => System.menuBarAction("all"))}>{t("显示全部分区")}</ActionButton>
           <ActionButton blocked={busy || moving !== null} className="secondary-button" disabled={!settings?.enabled} onClick={() => void run(() => System.menuBarAction(state?.expanded ? "collapse" : "expand"))}>{state?.expanded ? t("收起") : t("展开")}</ActionButton>
           <ActionButton blocked={busy || moving !== null} className="secondary-button" disabled={!settings?.enabled || !state?.screenRecording} onClick={() => void run(() => System.menuBarAction("panel"))}>{t("打开展开栏")}</ActionButton>
           <ActionButton blocked={busy || moving !== null} className="secondary-button" aria-label={t("搜索菜单栏图标")} title={t("搜索菜单栏图标")} disabled={!settings?.enabled || !state?.screenRecording} onClick={() => void run(() => System.menuBarAction("search"))}><span dangerouslySetInnerHTML={{ __html: icon("search") }} /></ActionButton>
         </div>
-        {!state?.accessibility && <p className="menu-help">{t("需要辅助功能权限以操作菜单栏图标。")}</p>}
+        {!state?.accessibility && <div className="menu-help"><p>{t("需要辅助功能权限以操作菜单栏图标。")}</p><ActionButton blocked={busy || moving !== null} className="secondary-button" onClick={() => void run(() => System.menuBarPermission("accessibility"))}>{t("打开辅助功能设置")}</ActionButton><p>{t("如果系统开关已开启但仍无法拖动，请退出 RockshinOps，在辅助功能列表中移除旧条目，重新添加当前安装的 RockshinOps 并开启权限，再打开应用。本地临时签名版本更新后可能需要重新授权。")}</p></div>}
         {!state?.screenRecording && <p className="menu-help">{t("授权屏幕录制后可显示真实图标；当前显示应用名称。")}</p>}
         {itemGroups.filter(({ id }) => id !== "alwaysHidden" || settings?.alwaysHidden).map(({ id, title, items }) => {
           return <section className="menu-section" key={id} aria-labelledby={`section-${id}`}><div className="menu-section-heading"><h2 id={`section-${id}`}>{t(title)}<span>{items.length}</span></h2>{selected && <ActionButton blocked={busy || moving !== null} className="secondary-button" disabled={!editable || !selected.movable || selected.section === id} onClick={() => move(selected, id)}>{t("移到此分区")}</ActionButton>}</div>
-            <div className="menu-strip" onDragOver={e => { if (editable) { e.preventDefault(); dropTarget(id, 0); } }} onDrop={e => { e.preventDefault(); if (drag && editable) void move(drag, id); }}>
-              {items.length ? items.map(item => <button key={item.id} type="button" data-menu-id={item.id} data-section={id} className={`menu-item${selected?.id === item.id ? " selected" : ""}${drag?.id === item.id ? " dragging" : ""}${moving === item.id ? " moving" : ""}`} draggable={editable && item.movable} aria-pressed={selected?.id === item.id} aria-label={item.name} title={item.owner === item.name ? item.name : `${item.owner} · ${item.name}`} onPointerDown={e => { if (e.button === 0) { e.currentTarget.focus({ preventScroll: true }); setSelected(old => old?.id === item.id ? null : item); } }} onClick={e => { if (e.detail === 0) setSelected(old => old?.id === item.id ? null : item); }} onDragStart={e => { if (operation.current) { e.preventDefault(); return; } revision.current++; dragging.current = true; setSelected(item); layout.current?.querySelectorAll("[data-menu-id]").forEach(button => button.getAnimations().forEach(animation => animation.cancel())); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(item.id)); setDrag(item); }} onDragEnd={finishDrag} onDragOver={e => { if (!editable) return; e.preventDefault(); e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(); const next = items[items.findIndex(i => i.id === item.id) + 1]; dropTarget(id, e.clientX < rect.x + rect.width / 2 ? item.id : next?.id || 0, e.currentTarget); }} onDrop={e => { e.preventDefault(); e.stopPropagation(); if (drag && editable) void move(drag, id, drop.current?.section === id ? drop.current.before : item.id); }}><MenuBarIcon image={item.image} name={item.name} /></button>) : <span className="menu-empty">{query ? t("没有匹配图标") : t("此分区没有图标")}</span>}
+            <div className="menu-strip" data-section={id}>
+              {items.length ? items.map(item => <button key={item.id} type="button" data-menu-id={item.id} data-section={id} data-movable={editable && item.movable || undefined} className={`menu-item${selected?.id === item.id ? " selected" : ""}${drag?.id === item.id ? " dragging" : ""}${moving === item.id ? " moving" : ""}`} aria-pressed={selected?.id === item.id} aria-label={item.name} title={item.owner === item.name ? item.name : `${item.owner} · ${item.name}`} onKeyDown={e => { delete e.currentTarget.dataset.pointerSelected; }} onBlur={e => { delete e.currentTarget.dataset.pointerSelected; }} onPointerDown={e => { if (e.button === 0) { e.currentTarget.dataset.pointerSelected = "true"; e.currentTarget.focus({ preventScroll: true }); setSelected(old => old?.id === item.id ? null : item); startPointer(e, item); } }} onClick={e => { if (e.detail === 0) setSelected(old => old?.id === item.id ? null : item); }}><MenuBarIcon image={item.image} name={item.name} /></button>) : <span className="menu-empty">{query ? t("没有匹配图标") : t("此分区没有图标")}</span>}
             </div>
           </section>;
         })}

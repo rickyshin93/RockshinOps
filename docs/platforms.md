@@ -7,6 +7,7 @@ Implementation scope:
 - CPU, memory, swap, disk capacity/I/O, interfaces/traffic, uptime and machine details.
 - Accessible processes, CPU/RSS/I/O and grouping by executable on Windows/Linux; macOS retains bundle grouping and phys_footprint.
 - TCP/UDP sockets and ownership visible with current permissions.
+- macOS per-socket `nettop` receive/send counters, two-sample rates and positive TCP RTT, joined to `lsof` by unique PID/protocol/endpoints. Process aggregates are never assigned to sockets. Missing/ambiguous matches remain unavailable; UDP and listening sockets have no TCP RTT. Windows/Linux per-socket traffic metrics are not implemented.
 - Native battery status and supported GPU counters; missing hardware or unsupported driver interfaces stay unavailable.
 - Platform-specific default scan directories, with the existing read-only analysis and resource limits.
 
@@ -32,4 +33,4 @@ Hardware adapters:
 
 Primary references: [MIB_IF_ROW2](https://learn.microsoft.com/en-us/windows/win32/api/netioapi/ns-netioapi-mib_if_row2), [SYSTEM_POWER_STATUS](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-system_power_status), [DISK_PERFORMANCE](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntdddisk/ns-ntdddisk-_disk_performance), [Linux power supply class](https://cdn.kernel.org/doc/html/latest/power/power_supply_class.html), [AMDGPU counters](https://kernel.org/doc/html/latest/gpu/amdgpu/thermal.html), [NVIDIA SMI](https://docs.nvidia.com/deploy/nvidia-smi/index.html).
 
-Verification evidence: [four native CI jobs and the v0.2.0 release](https://github.com/rickyshin93/local-ops/actions/runs/40373814709) passed on 2026-10-27. The smoke test read real CPU/memory/disk/network counters, found its own process, and matched its own TCP listening socket on every runner. Hosted runners had no battery or usable GPU counters; those adapters have parser/unit coverage, not physical Windows/Linux GPU or battery acceptance. macOS Apple Silicon desktop checks covered language switching, persistence, native App icons and hidden-window history.
+Verification evidence: [four native CI jobs and the v0.2.0 release](https://github.com/rickyshin93/RockshinOps/actions/runs/40373814709) passed on 2026-10-27. The smoke test read real CPU/memory/disk/network counters, found its own process, and matched its own TCP listening socket on every runner. Hosted runners had no battery or usable GPU counters; those adapters have parser/unit coverage, not physical Windows/Linux GPU or battery acceptance. macOS Apple Silicon desktop checks covered language switching, persistence, native App icons and hidden-window history.

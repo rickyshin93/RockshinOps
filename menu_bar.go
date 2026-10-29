@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/egoist/mygo"
-	"localops/internal/localization"
-	"localops/internal/menubar"
+	"rockshinops/internal/localization"
+	"rockshinops/internal/menubar"
 )
 
 type MenuBarConfiguration struct {

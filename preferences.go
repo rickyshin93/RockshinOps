@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo"
-	"localops/internal/localization"
-	"localops/internal/metrics"
-	"localops/internal/storage"
-	"localops/internal/trayimage"
+	"rockshinops/internal/localization"
+	"rockshinops/internal/metrics"
+	"rockshinops/internal/storage"
+	"rockshinops/internal/trayimage"
 )
 
 type Preferences struct {
@@ -22,6 +22,40 @@ type Preferences struct {
 	UpdateUseSystemProxy bool     `json:"updateUseSystemProxy"`
 	Language             string   `json:"language"`
 	MenuBarItems         []string `json:"menuBarItems"`
+}
+
+// Copy only the two settings files from the former app directory. Keep the
+// originals for older installations and never replace newer saved settings.
+func migrateConfigDirectory(root string) (string, error) {
+	directory := filepath.Join(root, "RockshinOps")
+	for _, name := range []string{"preferences.json", "menu-bar.json"} {
+		target := filepath.Join(directory, name)
+		if _, err := os.Stat(target); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("inspect settings %s: %w", name, err)
+		}
+		data, err := os.ReadFile(filepath.Join(root, "LocalOps", name))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("read legacy settings %s: %w", name, err)
+		}
+		if !json.Valid(data) {
+			return "", fmt.Errorf("migrate settings %s: invalid JSON", name)
+		}
+		if err := os.MkdirAll(directory, 0700); err != nil {
+			return "", fmt.Errorf("create settings directory: %w", err)
+		}
+		if err := os.WriteFile(target+".tmp", data, 0600); err != nil {
+			return "", fmt.Errorf("copy settings %s: %w", name, err)
+		}
+		if err := os.Rename(target+".tmp", target); err != nil {
+			return "", fmt.Errorf("install settings %s: %w", name, err)
+		}
+	}
+	return directory, nil
 }
 
 func validatePreferences(p Preferences) error {

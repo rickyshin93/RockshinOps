@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/disk"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 func Read() (Volume, error) {

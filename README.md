@@ -1,13 +1,13 @@
 # RockshinOps
 
-Previously LocalOps. Installer filenames, executables and saved settings retain the LocalOps name for update compatibility; the application identifier and signed update feed are unchanged.
-
-[![Build and release](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml/badge.svg)](https://github.com/rickyshin93/local-ops/actions/workflows/build.yml)
+[![Build and release](https://github.com/rickyshin93/RockshinOps/actions/workflows/build.yml/badge.svg)](https://github.com/rickyshin93/RockshinOps/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A local desktop system monitor built with **Go, MyGo and TypeScript**. Keep useful metrics in the menu bar, inspect live activity, and see what takes up disk space.
+**RockshinOps is a free, open-source desktop system monitor for macOS, Windows and Linux**, built with Go, MyGo and TypeScript. Monitor CPU, memory, disk, network, processes and connections. Keep useful metrics in the menu bar, inspect live activity, and see what takes up disk space.
 
-[Website](https://rickyshin93.github.io/local-ops/) · [简体中文](README.zh-CN.md) · [Download](https://github.com/rickyshin93/local-ops/releases) · [Project status](STATUS.md)
+[Website](https://rickyshin93.github.io/RockshinOps/) · [简体中文](README.zh-CN.md) · [Download](https://github.com/rickyshin93/RockshinOps/releases) · [Project status](STATUS.md)
+
+Live pages reuse DOM nodes, large process/connection tables render visible rows, history updates transfer only new samples, and slow inspection reads stay independent of live metrics. Native collection remains independent of rendering. See [performance design and measurements](docs/performance.md).
 
 ## Platform status
 
@@ -25,8 +25,8 @@ All four targets run real collector smoke tests in CI. Interactive desktop accep
 - Process details support confirmed Quit (SIGTERM on macOS/Linux) and Force Quit (SIGKILL; Windows uses process termination), with process-identity checks and normal OS permissions. A sent request does not guarantee a process has exited.
 - CPU usage by core, memory composition/pressure/swap, GPU counters, disk capacity and I/O, physical network traffic, battery and available hardware power telemetry.
 - Actual history for the last minute, 5 minutes, 15 minutes or hour. Pausing freezes the view while native sampling continues. History lives only in memory for the current session.
-- Searchable process and running-app lists with CPU and physical-memory usage; on-demand TCP/UDP connection snapshots.
-- Space analysis of configured caches, logs, downloads and trash. Move selected scanned items to the system trash, or confirm permanent emptying of the configured trash directory. Incomplete directories cannot be cleaned; process termination is unavailable.
+- Searchable process and running-app lists with CPU and physical-memory usage; on-demand TCP/UDP connection snapshots. On macOS, matched sockets include received/sent bytes, sampled download/upload rates and available TCP RTT, with sortable columns. Missing measurements remain unavailable.
+- Space analysis of configured caches, logs, downloads and trash. Move selected scanned items to the system trash, or confirm permanent emptying of the configured trash directory. Incomplete directories cannot be cleaned; process termination requires separate confirmation.
 - Explore the system disk from its root by logical size and navigate its directories. Disk exploration counts items before showing item-based progress and has no time or entry limit; inaccessible paths are reported, symbolic links are not followed, and mounted paths may be counted more than once. On macOS, review installed app bundles and possible associated files found by identifier across home, Library and system temporary/cache directories, and by app name or declared bundle name at filename boundaries at any depth throughout those locations and application directories, then move selected items to the system trash. Common locations appear first while the remaining search runs independently of disk exploration. Apps without a bundle identifier can still be searched by name; canonically equivalent Unicode names match while original paths are preserved. Search has no time or item limit but can be incomplete due to permissions, skipped symbolic links, application bundles, and files whose names do not identify the app; matches may be shared and must be reviewed. Inaccessible locations and OS errors appear in expandable coverage details, separately from app candidates. Running apps must be quit first. System components, other users, arbitrary names and privileged locations may be missed.
 - macOS app-uninstall scans show a visible permission guide when access is denied. **Open Full Disk Access** goes directly to the system authorization page and is also available in the installed-app list. Enable RockshinOps there (use **+** to add it if missing), then quit and reopen RockshinOps before searching again. Some system directories may remain restricted.
 - Persistent menu bar metrics: disk space, CPU, memory, GPU, network speed and battery. Close the window to keep sampling; use **Quit** to stop. On macOS, **Settings → General → Hide Dock icon when closing** optionally removes the Dock icon while the window is closed; reopening restores it.
@@ -38,11 +38,11 @@ CPU temperature and per-app watt measurements are not implemented. GPU and syste
 
 ## Install
 
-Download the package for your architecture from [Releases](https://github.com/rickyshin93/local-ops/releases).
+Download the package for your architecture from [Releases](https://github.com/rickyshin93/RockshinOps/releases).
 
 - **macOS:** open the `.dmg` and drag the app to Applications. Packages are ad-hoc signed, not notarized. If macOS blocks the downloaded app, follow Apple's [instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
-- **Windows:** run the `LocalOps Setup … amd64.exe` installer. It installs for the current user and requires WebView2. Packages are unsigned, so Windows may display a publisher warning.
-- **Debian/Ubuntu:** install the `.deb` with `sudo apt install ./localops_…_amd64.deb`; the package declares its GTK/WebKitGTK dependencies. A desktop tray implementation is needed to expose the tray menu.
+- **Windows:** run the `RockshinOps Setup … amd64.exe` installer. It installs for the current user and requires WebView2. Packages are unsigned, so Windows may display a publisher warning.
+- **Debian/Ubuntu:** install the `.deb` with `sudo apt install ./rockshinops_…_amd64.deb`; the package declares its GTK/WebKitGTK dependencies. A desktop tray implementation is needed to expose the tray menu.
 - **Other Linux desktops:** extract the `.tar.gz` and use its included `install.sh`. Install GTK 3, WebKitGTK 4.1 and an AppIndicator-compatible tray through your distribution. The archive's installer reports missing WebKitGTK dependencies.
 
 Each release includes `SHA256SUMS.txt`. Starting with v0.2.1, RockshinOps checks GitHub Releases after launch and daily while running. Use **Settings → Check for Updates…**, the app menu or the tray menu to check manually. The update window shows release notes, downloads with progress, verifies the signature and lets you choose when to relaunch. Installation requires confirmation unless you explicitly opt into automatic installation.
@@ -90,9 +90,9 @@ The public key and release repository are in `mygo.config.ts`. Keep the original
 
 ## Configuration and data
 
-`localops.json` is the single file for the update check interval (`updateIntervalSeconds`, default 86400 seconds), sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems`, `defaultLanguage`, and `defaultUpdateUseSystemProxy` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
+`rockshinops.json` is the single file for the update check interval (`updateIntervalSeconds`, default 86400 seconds), sampling intervals, history retention, connection/scan timeouts, scan scope and resource limits. It is embedded in the app, so changes require a rebuild. `defaultMenuBarItems`, `defaultLanguage`, and `defaultUpdateUseSystemProxy` define first-run preferences. `scanTargets` has separate `darwin`, `windows` and `linux` lists; `~/` paths resolve against the current user home.
 
-User settings are stored at `os.UserConfigDir()/LocalOps/preferences.json` (on macOS: `~/Library/Application Support/LocalOps/preferences.json`). Existing settings without a language field follow the system. Invalid settings or failed saves report errors; saved preferences are not silently reset.
+User settings are stored at `os.UserConfigDir()/RockshinOps/preferences.json` (on macOS: `~/Library/Application Support/RockshinOps/preferences.json`). Existing settings without a language field follow the system. Invalid settings or failed saves report errors; saved preferences are not silently reset.
 
 Data is read locally. No analytics, remote upload, privileged helper or HTTP IPC server is included. Permission restrictions can result in partial data.
 
@@ -103,12 +103,12 @@ Data is read locally. No analytics, remote upload, privileged helper or HTTP IPC
 | Disk capacity | Space writable by the current user on the home directory's volume, decimal MB/GB/TB. Reclaimable space is excluded; APFS shared volumes are not summed. |
 | Disk I/O | macOS block-driver counters, Windows fixed-volume counters, Linux hardware block devices excluding partitions and virtual layers. Disabled or inaccessible counters are unavailable; RockshinOps does not enable them in the registry. |
 | Network | 64-bit interface counter deltas. macOS sums `en*`; Windows uses the hardware-interface flag; Linux uses sysfs hardware device identity. Virtual interfaces remain separate to avoid duplicate traffic. |
-| Connections | macOS `lsof`, Windows connection tables or Linux procfs, limited to current permissions; no remote DNS lookup or outgoing connection to displayed addresses. |
+| Connections | Processes and connections preload once after the initial view is idle; page entry shows cached connections while refreshing stale data. Failed refreshes retain the previous list with an error. macOS `lsof` plus two `nettop` samples (`connectionSampleIntervalSeconds`, default 1 second); metrics match unique PID/protocol/local/remote tuples. TCP RTT is the OS-reported round-trip time, not a ping probe. New/reset counters have no rate baseline. Windows connection tables and Linux procfs currently provide socket metadata only. No elevation, remote DNS lookup or outgoing probe. |
 | Space analysis | Logical file sizes, without following symlinks. Hard links/APFS clones may count more than once; results are not guaranteed reclaimable space. |
 
 ## Source layout
 
-- `website/`: bilingual static promotional site, deployed to GitHub Pages by `pages.yml`. English is the default; `?lang=zh` selects Chinese. Preview with `python3 -m http.server 4177 --directory website` and open `http://localhost:4177/`. No build step, CDN or runtime dependencies are required.
+- `website/`: bilingual static promotional site, deployed to GitHub Pages by `pages.yml`. English is the default; `/zh/` serves static Chinese HTML. Preview with `python3 -m http.server 4177 --directory website` and open `http://localhost:4177/`. Run `bun run build:website` after editing the website; deployed pages have no CDN or server runtime dependencies.
 - `internal/metrics/`, `internal/storage/`: native collection, rates, history and read-only inspection.
 - `internal/localization/`: shared English/Chinese catalogs and native translations.
 - `main.go`, `preferences.go`: lifecycle, native menus, preferences and typed IPC.
@@ -117,3 +117,13 @@ Data is read locally. No analytics, remote upload, privileged helper or HTTP IPC
 - [DESIGN.md](DESIGN.md): interface conventions; [STATUS.md](STATUS.md): current progress and verification limits.
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under [MIT](LICENSE); dependency licenses are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Website and machine-readable documentation
+
+The [English website](https://rickyshin93.github.io/RockshinOps/) and [Chinese website](https://rickyshin93.github.io/RockshinOps/zh/) are static HTML and work without JavaScript. [Product facts in Markdown](https://rickyshin93.github.io/RockshinOps/index.md) and [llms.txt](https://rickyshin93.github.io/RockshinOps/llms.txt) provide concise entry points for AI search and agents. They describe the same features and platform limits shown to people.
+
+Run `bun run build:website` after editing `website/index.html` or `scripts/website-copy.ts`; it regenerates metadata, Chinese HTML, Markdown and `sitemap.xml`. Preview with `python3 -m http.server 4177 --directory website`. GitHub Pages serves this project below `/RockshinOps/`; a project-level `robots.txt` cannot control the host root. The sitemap can be submitted in Google Search Console after ownership verification. These files do not guarantee indexing or AI citations.
+
+## Naming transition (unreleased)
+
+New builds use RockshinOps for the app, executable and installer, with application ID `dev.rockshinops.desktop`. Install the first renamed release manually: older updaters relaunch the former executable path. Existing `LocalOps/preferences.json` and `LocalOps/menu-bar.json` are copied to the RockshinOps settings directory only when their destination is absent; originals are retained. macOS permissions may need to be granted to the renamed app again. Published 0.2.4 artifacts retain their original filenames; use the files actually listed on the release page. The update signing key is unchanged.

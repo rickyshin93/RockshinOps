@@ -46,6 +46,12 @@ test("uses exact PID metadata for name and icon, and filters complete names and 
   expect(connectionRows([connection], [], "")[0]).toMatchObject({ process: "Chrome He", path: "" });
 });
 
+test.each(["rtt", "download", "upload", "received", "sent"] as const)("sorts measured %s numerically with unavailable values last", key => {
+  const items = [100, 9, 0, null].map((value, pid) => ({ ...connection, pid, metrics: { rtt: value, download: value, upload: value, received: value, sent: value } }));
+  expect(connectionRows(items, [], "", { key, direction: "ascending" }).map(row => row.pid)).toEqual([2, 1, 0, 3]);
+  expect(connectionRows(items, [], "", { key, direction: "descending" }).map(row => row.pid)).toEqual([0, 1, 2, 3]);
+});
+
 test("connection view keeps unavailable telemetry explicit and exposes pause without metric ranges", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {}, outerHTML: "<svg></svg>" }) } as unknown as Document;
@@ -53,10 +59,25 @@ test("connection view keeps unavailable telemetry explicit and exposes pause wit
     const state = { page: "connections", connections: { items: [connection], updatedAt: "2026-10-29T01:00:00Z", warning: "" }, processes: { items: [process] }, info: { machine: { platform: "darwin" } }, snapshot: {}, connectionError: "", query: "", paused: false } as ViewState;
     const html = renderBody(state);
     expect(html.match(/<th scope=/g)).toHaveLength(10);
-    expect(html.match(/data-connection-sort=/g)).toHaveLength(5);
+    expect(html.match(/data-connection-sort=/g)).toHaveLength(10);
     expect(renderBody({ ...state, connectionSort: { key: "port", direction: "descending" } })).toContain('aria-sort="descending"');
     expect(html.match(/class="connection-unavailable"/g)).toHaveLength(5);
     expect(html).not.toContain("0 B/s");
+    const stale = renderBody({ ...state, connectionError: "collection failed" });
+    expect(stale).toContain("connection-table");
+    expect(stale).toContain("collection failed");
+    expect(stale).toContain(t("更新中断 · 上次数据"));
+    const measured = renderBody({ ...state, connections: { ...state.connections!, items: [{ ...connection, metrics: { rtt: 12.3, download: 0, upload: 1500, received: 1200000, sent: null } }] } });
+    expect(measured).toContain("12.3 ms");
+    expect(measured).toContain("0 B/s");
+    expect(measured).toContain("1.5 KB/s");
+    expect(measured).toContain("1.2 MB");
+    expect(measured.match(/class="connection-unavailable"/g)).toHaveLength(1);
+    expect(measured).toContain(t("TCP 平均往返时间，不是 ping 延迟。"));
+    for (const [received, label] of [[0, "0 B"], [531, "531 B"], [12300, "12.3 KB"]] as const) {
+      const small = renderBody({ ...state, connections: { ...state.connections!, items: [{ ...connection, metrics: { rtt: null, download: null, upload: null, received, sent: null } }] } });
+      expect(small).toContain(`>${label}</td>`);
+    }
     expect(html).toContain("2001:db8::1");
     expect(html).toContain("appicon://localhost/?path=%2FApplications%2FChrome.app");
     expect(html).toContain("PID 42");

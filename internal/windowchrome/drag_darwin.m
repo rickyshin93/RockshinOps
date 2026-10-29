@@ -11,12 +11,12 @@ static IMP originalSetFrame;
 static IMP originalPerformZoom;
 static IMP originalZoom;
 
-@interface LocalOpsResizeTick : NSObject
+@interface RockshinOpsResizeTick : NSObject
 @property(copy) void (^advance)(CFTimeInterval);
 - (void)step:(CADisplayLink *)link API_AVAILABLE(macos(14.0));
 @end
 
-@implementation LocalOpsResizeTick
+@implementation RockshinOpsResizeTick
 - (void)step:(CADisplayLink *)link {
     void (^advance)(CFTimeInterval) = [self.advance copy];
     advance(link.targetTimestamp);
@@ -77,7 +77,7 @@ static void setAnimatedFrame(NSWindow *window, SEL selector, NSRect frame, BOOL 
     };
     id driver;
     if (@available(macOS 14.0, *)) {
-        LocalOpsResizeTick *tick = [LocalOpsResizeTick new];
+        RockshinOpsResizeTick *tick = [RockshinOpsResizeTick new];
         tick.advance = advance;
         driver = [window displayLinkWithTarget:tick selector:@selector(step:)];
         [tick release];
@@ -135,10 +135,10 @@ static void enableResponsiveResize(NSWindow *window) {
     objc_setAssociatedObject(window, &responsiveResizeKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-@interface LocalOpsDragStrip : NSView
+@interface RockshinOpsDragStrip : NSView
 @end
 
-@implementation LocalOpsDragStrip
+@implementation RockshinOpsDragStrip
 - (void)mouseDown:(NSEvent *)event {
     NSWindow *window = self.window;
     if (event.clickCount == 2) {
@@ -152,7 +152,7 @@ static void enableResponsiveResize(NSWindow *window) {
 - (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
 @end
 
-void localops_install_top_drag(uintptr_t handle) {
+void rockshinops_install_top_drag(uintptr_t handle) {
     NSWindow *window = (NSWindow *)handle;
     // AppKit's default zoom animation blocks WebKit's resize updates until it ends.
     // Advance the frame on the run loop so WebKit can lay out each intermediate size.
@@ -161,7 +161,7 @@ void localops_install_top_drag(uintptr_t handle) {
     // Native traffic lights start at y=20; the blank strip sits above them.
     NSRect frame = NSMakeRect(0, content.bounds.size.height - 20,
                              content.bounds.size.width, 20);
-    LocalOpsDragStrip *strip = [[LocalOpsDragStrip alloc] initWithFrame:frame];
+    RockshinOpsDragStrip *strip = [[RockshinOpsDragStrip alloc] initWithFrame:frame];
     strip.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
     [content addSubview:strip positioned:NSWindowAbove relativeTo:nil];
     [strip release];

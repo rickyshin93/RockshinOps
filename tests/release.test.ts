@@ -14,9 +14,9 @@ test("release preflight rejects absent or empty update notes", () => {
   expect(() => checkRelease("v0.2.3", "0.2.4", "## 0.2.4\nNew notes")).toThrow("must match");
 });
 
-test("branding preserves the installed executable path used by existing updaters", () => {
-  expect(config.name).toBe("LocalOps");
-  expect(config.identifier).toBe("dev.localops.desktop");
+test("app and package use the RockshinOps identity", () => {
+  expect(config.name).toBe("RockshinOps");
+  expect(config.identifier).toBe("dev.rockshinops.desktop");
   expect(config.macos?.infoPlist?.CFBundleDisplayName).toBe("RockshinOps");
 });
 
@@ -47,6 +47,6 @@ test("rejects corrupted bytes, another signing key, size and release mismatches"
 test("a signed release cannot silently omit a platform manifest", () => {
   mkdirSync("work", { recursive: true });
   const directory = mkdtempSync(join("work", "release-test-"));
-  writeFileSync(join(directory, "LocalOps 0.2.1 arm64.dmg"), "installer");
+  writeFileSync(join(directory, "RockshinOps 0.2.1 arm64.dmg"), "installer");
   expect(() => collectRelease("darwin/arm64", true, directory, join(directory, "out"))).toThrow("update-darwin-arm64.json");
 });

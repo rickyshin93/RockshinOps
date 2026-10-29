@@ -196,8 +196,8 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
         _images=[NSMutableDictionary new]; _imageURLs=[NSMutableDictionary new]; _strings=@{}; _lastError=@"";
         NSUserDefaults *defaults=NSUserDefaults.standardUserDefaults;
         // Seed first-run positions; AppKit owns subsequent user ordering.
-        if(![defaults objectForKey:@"NSStatusItem Preferred Position localops.storage"])
-            [defaults setInteger:1 forKey:@"NSStatusItem Preferred Position localops.storage"];
+        if(![defaults objectForKey:@"NSStatusItem Preferred Position rockshinops.storage"])
+            [defaults setInteger:1 forKey:@"NSStatusItem Preferred Position rockshinops.storage"];
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(screenChanged:) name:NSApplicationDidChangeScreenParametersNotification object:nil];
         [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(screenChanged:) name:NSWorkspaceActiveSpaceDidChangeNotification object:nil];
         [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(screenChanged:) name:@"AppleInterfaceThemeChangedNotification" object:nil];
@@ -662,7 +662,12 @@ static NSDictionary *MBRequest(NSDictionary *request) {
     if([action isEqual:@"apply"])manager.lastError=[manager apply:payload] ?: @"";
     else if([action isEqual:@"stop"])[manager stop];
     else if([action isEqual:@"permission"]){
-        if([payload isEqual:@"accessibility"]){AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)@{(__bridge NSString *)kAXTrustedCheckOptionPrompt:@YES});}
+        if([payload isEqual:@"accessibility"]){
+            AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)@{(__bridge NSString *)kAXTrustedCheckOptionPrompt:@YES});
+            // macOS can retain an enabled entry for an older ad-hoc signature without prompting again.
+            NSURL *url=[NSURL URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+            if(![NSWorkspace.sharedWorkspace openURL:url])manager.lastError=MBText(manager.strings,@"无法打开辅助功能设置，请在系统设置的隐私与安全性中打开。");
+        }
         else if([payload isEqual:@"screenRecording"]){CGRequestScreenCaptureAccess();}
     }
     else if([action isEqual:@"refresh"])[manager captureImages:NO];

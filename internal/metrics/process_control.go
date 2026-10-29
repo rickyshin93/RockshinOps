@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 // TerminateProcess addresses one sampled process, never a process group.

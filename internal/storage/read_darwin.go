@@ -7,7 +7,7 @@ import (
 	"strings"
 	"syscall"
 
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 )
 
 func Read() (Volume, error) {

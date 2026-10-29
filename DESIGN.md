@@ -2,7 +2,7 @@
 
 ## Public website
 
-The standalone promotional site in `website/` uses an instrument-inspired dark presentation: near-black #080b12, cool white #f1f4fc and blue #659dff. Large editorial headings, an 8px spacing rhythm, thin grid rules and restrained signal motion frame the actual light desktop UI. This does not change the app's design system below. Use the existing `resources/icon.png` brand icon (copied under `website/assets/localops-brand/`). Product screenshots render the real app components with synthetic demonstration data, labeled in the page; no local device identity or private process information is published. Motion respects reduced-motion preferences. Typography uses locally served Space Grotesk for English display text, system Chinese fallbacks, and the app's existing system body stack.
+The standalone promotional site in `website/` uses an instrument-inspired dark presentation: near-black #080b12, cool white #f1f4fc and blue #659dff. Large editorial headings, an 8px spacing rhythm, thin grid rules and restrained signal motion frame the actual light desktop UI. This does not change the app's design system below. Use the existing `resources/icon.png` brand icon (copied under `website/assets/rockshinops-brand/`). Product screenshots render the real app components with synthetic demonstration data, labeled in the page; no local device identity or private process information is published. Motion respects reduced-motion preferences. Typography uses locally served Space Grotesk for English display text, system Chinese fallbacks, and the app's existing system body stack.
 
 方向：**macOS 原生**。参照 Finder / 系统设置（侧栏）、健康 App（指标卡片）、活动监视器（表格）。2026-10-27 起取代「活泼橙色」与「中性克制」两版。
 
@@ -110,7 +110,7 @@ RockshinOps 品牌标识采用系统蓝圆角方形、粗白色几何 R 和右�
 
 ### 页面头
 
-26/700 大标题 + 12px `--color-muted` 副标题。右侧工具栏：分段控件 + 无边框图标按钮（悬停 `--color-fill`），同 macOS 工具栏。
+26/700 大标题 + 12px `--color-muted` 副标题。搜索、筛选、排序与页面操作统一放在标题右侧，搜索在前，暂停或刷新在末尾；工具区右对齐。空间不足时工具区整体换至标题下方并保持右对齐，内部按需换行，避免压缩标题或溢出。
 
 ### 卡片（健康 App 式）
 
@@ -148,12 +148,12 @@ RockshinOps 品牌标识采用系统蓝圆角方形、粗白色几何 R 和右�
 
 ### 连接与进程页（参考图复刻）
 
-- 保留已确认的页面标题字样与标题字号；内容区按用户提供的两张截图复刻，不再使用外层卡片、卡片圆角或大留白。白色平铺背景，搜索、进程范围和暂停位于标题同一行；底部状态条在正常 Flex 流中。
+- 保留已确认的页面标题字样与标题字号；内容区按用户提供的两张截图复刻，不再使用外层卡片、卡片圆角或大留白。页面背景、标题副标题字号、顶部间距与概览共用样式；搜索、进程范围和暂停位于标题右侧的共用工具区；底部状态条在正常 Flex 流中。
 - 列表为 26px 行高、13px 正常字重、14px 图标、浅灰交替行与 7px 行端圆角；选中为 #007aff。表头 12px 灰字与细竖分隔。进程列顺序为名称、CPU、GPU、内存、功率、线程、CPU 时间、PID、用户；连接为进程、主机、服务、协议、状态、延迟、下载、上传、已接收、已发送。
 - 主列表是唯一主滚动容器，标题与底栏不滚动；无 sticky。窄窗口表格横向滚动，进程详情保持右侧，不再移到表格上方；短窗口下详情栏可独立滚动，和主列表互为兄弟容器，不嵌套。
 - 详情栏宽 300px，浅灰整高背景、1px 左分隔，内边距 16px；包含身份、操作行、蓝绿 CPU/内存真实采样点阵、无大分隔线的键值详情及单行命令区域。宽度不足时收至 260px。
 - 仅使用已有 Go 数据；图表只记录选中后的真实进程样本，不用系统历史冒充。没有来源的值显示 —。进程退出经用户明确授权：退出发送 SIGTERM，强制退出发送 SIGKILL；Windows 仅支持强制退出。操作前显示名称、PID 与风险确认，后端重新核对采集身份并拒绝 PID 0/1/自身；不提权。成功只表示请求已发送，是否退出由后续快照确认。打开路径仍禁用。
-- 可用列支持升降排序；全部、App、我的进程、系统范围只筛选当前权限可见进程。连接端口不冒充已确认的应用层服务；未采集到的延迟与流量显示 —。来源与限制放入底栏和悬停说明。
+- 可用列支持升降排序；全部、App、我的进程、系统范围只筛选当前权限可见进程。连接端口不冒充已确认的应用层服务；macOS 单连接流量来自 nettop 原生计数，两次采样计算速率；延迟为 TCP RTT，不进行 ping。监听/无 RTT 样本或无法唯一匹配的连接显示 —，累计值不得用进程汇总代替。来源与限制放入底栏和悬停说明。
 
 ### 关于本机
 
@@ -191,6 +191,6 @@ RockshinOps 品牌标识采用系统蓝圆角方形、粗白色几何 R 和右�
 - 入口右键菜单分组提供打开应用、菜单栏设置、应用设置，展开栏、分区展开/收起、搜索、显示全部及刷新图标，末尾提供退出。
 - 布局图标按下即选中，再次点击、点击空白、Esc 或「取消选择」退出；拖动无需长按，拖动起点保持选中。打开系统菜单只通过明确按钮，不占用双击。底部操作行保持高度，名称与应用名相同只显示一次；仅在未选择时显示一句操作提示，删除重复长说明。分区标题与按钮采用 13px/500，计数 12px/500，说明 13px/500。
 - 操作等待保留控件原有对比度与图标可拖动属性，不通过全页变灰表达忙碌；操作互斥，重复请求被阻止。状态读取串行且旧请求不能覆盖新操作，页面不可见时暂停轮询；相同快照不更新布局，展开状态变化不重建图标列表。
-- 布局拖动只柔和标记当前落点图标，不绘制分区竖线或整栏描边，不增加占位元素；图标预览高 38px、交互区至少 48px。拖动期间冻结布局轮询，经过目标不重新渲染整页；放下立即反馈，只动画同分区的相邻图标，失败恢复真实布局。移动不改变工具栏透明度或移除当前选择，避免页面高度跳动。
+- 布局拖动只柔和标记当前落点图标，不绘制分区竖线或整栏描边，不增加占位元素；图标预览高 38px、交互区至少 48px。拖动期间冻结布局轮询，经过目标不重新渲染整页；使用 Pointer Events 与逐帧跟手预览，经过有效槽位时相邻图标平滑让位；同分区与跨分区落位保持位置连续，失败平滑恢复真实布局。选中使用中性半透明底和柔影，不使用粗蓝框；键盘焦点单独显示。拖动跟手不加缓动，落位使用短减速动画；减少动态效果时直接落位。移动不改变工具栏透明度或移除当前选择，避免页面高度跳动。
 - 原生展开栏使用 NSVisualEffectView 的材质遮罩裁剪圆角；图标按捕获窗口的实际 point 尺寸居中绘制，不经过 NSButton 的内容缩放。
 - 菜单栏入口首次位于最右侧；自身箭头和监控读数也可在布局中调整位置，重启及重新启用沿用 macOS 保存的位置。展开与收起避免重复截图和无关窗口重建。原生面板仅使用短淡入淡出，不逐帧改变系统状态栏宽度。

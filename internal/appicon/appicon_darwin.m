@@ -3,7 +3,7 @@
 #include <string.h>
 
 // Returns malloc'ed PNG bytes of the Finder icon for path, or NULL.
-void *localops_app_icon_png(const char *path, int pixels, size_t *length) {
+void *rockshinops_app_icon_png(const char *path, int pixels, size_t *length) {
 	@autoreleasepool {
 		NSImage *icon = path ? [[NSWorkspace sharedWorkspace] iconForFile:[NSString stringWithUTF8String:path]] : [NSImage imageNamed:NSImageNameComputer];
 		NSBitmapImageRep *rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:pixels pixelsHigh:pixels

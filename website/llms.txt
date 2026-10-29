@@ -1,0 +1,17 @@
+# RockshinOps
+
+> Free, MIT-licensed desktop system monitor for macOS, Windows and Linux.
+
+RockshinOps reads native CPU, memory, disk, network, process and connection data. It provides persistent menu bar metrics, disk-space analysis and reviewed cleanup. History stays in memory for the current session; no cloud account is required. Menu-bar icon management and app-uninstall review are macOS features. Hardware telemetry and desktop acceptance vary by platform; see the product pages for limits.
+
+## Product
+
+- [English product facts and downloads](https://rickyshin93.github.io/RockshinOps/index.md): Features, installation notes, platform limits and FAQs, generated from the visible website.
+- [中文产品说明与下载](https://rickyshin93.github.io/RockshinOps/zh/index.md): 功能、安装要求、平台边界与常见问题。
+
+## Source and releases
+
+- [GitHub repository](https://github.com/rickyshin93/RockshinOps): Source, README and MIT license.
+- [Latest release](https://github.com/rickyshin93/RockshinOps/releases/latest): Published installers and release notes; repository main can contain unreleased changes.
+- [Platform support](https://github.com/rickyshin93/RockshinOps/blob/main/docs/platforms.md): Collector sources and availability.
+- [Project status](https://github.com/rickyshin93/RockshinOps/blob/main/STATUS.md): Verification boundaries and known issues.

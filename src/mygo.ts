@@ -82,6 +82,7 @@ export interface CPU {
 }
 
 export interface Connection {
+  metrics?: ConnectionMetrics;
   pid: number;
   process: string;
   userId: string;
@@ -90,6 +91,14 @@ export interface Connection {
   local: string;
   remote: string;
   state: string;
+}
+
+export interface ConnectionMetrics {
+  received: number | null;
+  sent: number | null;
+  download: number | null;
+  upload: number | null;
+  rtt: number | null;
 }
 
 export interface Connections {
@@ -303,6 +312,7 @@ export interface Snapshot {
   disk: Disk;
   network: Network;
   battery: Battery;
+  processUpdatedAt: string;
   processCount: number;
   processSkipped: number;
   processError: string;
@@ -376,6 +386,9 @@ export const System = {
   },
   history(): Promise<Trend[]> {
     return call("System.History");
+  },
+  historySince(after: string): Promise<Trend[]> {
+    return call("System.HistorySince", after);
   },
   initialize(): Promise<Bootstrap> {
     return call("System.Initialize");

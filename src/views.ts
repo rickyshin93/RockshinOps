@@ -1,6 +1,8 @@
+import { windowRows, type TableWindow } from "./table-window";
+import { trendTime } from "./history";
 import { t, i18n } from "./i18n";
 import type { AppInfo, Snapshot, Trend, ProcessList, Connections, ScanResult, AppUsage, Process, InstalledApp, AppReview } from "./mygo";
-import { capacityParts, duration, escapeHTML as e, formatCapacity, formatMemory, formatRate, memoryParts, percent, rateParts, timeLabel } from "./format";
+import { capacityParts, duration, escapeHTML as e, formatBytes, formatCapacity, formatMemory, formatRate, memoryParts, percent, rateParts, timeLabel } from "./format";
 import { dots, lineChart, type TrendKey } from "./charts";
 import { icon } from "./icons";
 import { sortControl } from "./dropdown";
@@ -28,6 +30,7 @@ export const metricPages: Page[] = ["overview", "cpu", "memory", "gpu", "disk", 
 
 export interface ViewState extends SettingsState {
   page: Page;
+  tableWindow?: TableWindow;
   info: AppInfo | null;
   snapshot: Snapshot | null;
   history: Trend[];
@@ -125,7 +128,7 @@ function overview(state: ViewState): string {
 
 function trendNumbers(state: ViewState, key: TrendKey): number[] {
   const cutoff = new Date(state.snapshot!.updatedAt).getTime() - state.range * 1000;
-  return state.history.filter(p => new Date(p.at).getTime() >= cutoff && p[key] != null).map(p => p[key]!);
+  return state.history.filter(p => trendTime(p) >= cutoff && p[key] != null).map(p => p[key]!);
 }
 function trendAverage(state: ViewState, key: TrendKey): string { const v = trendNumbers(state, key); return v.length ? percent(v.reduce((a, b) => a + b, 0) / v.length) : "—"; }
 function trendPeak(state: ViewState, key: TrendKey): string { const v = trendNumbers(state, key); return v.length ? percent(Math.max(...v)) : "—"; }
@@ -191,10 +194,23 @@ function energyView(state: ViewState): string {
   return details;
 }
 
+// Each section retains only its latest immutable IPC inputs and markup.
+// Snapshot-only footer updates do not rebuild an unchanged inspection table.
+function cachedMarkup(render: (state: ViewState) => string, inputs: (state: ViewState) => unknown[]) {
+  let previous: unknown[] = [], html = "";
+  return (state: ViewState): string => {
+    const next = inputs(state);
+    if (next.length !== previous.length || next.some((value, i) => value !== previous[i])) {
+      html = render(state); previous = next;
+    }
+    return html;
+  };
+}
+
 function orderedProcesses(state: ViewState): Process[] {
   const query = state.query.toLowerCase();
-  const result = (state.processes?.items || []).filter(p => (state.processScope === "apps" ? !!p.app : state.processScope === "mine" ? p.own : state.processScope === "system" ? !p.own : !state.onlyMine || p.own) && `${p.name} ${p.pid} ${p.path}`.toLowerCase().includes(query));
-  result.sort((a, b) => state.sort === "name" ? a.name.localeCompare(b.name) : (state.sort === "memory" ? b.memory - a.memory : state.sort === "readRate" ? b.readRate - a.readRate : state.sort === "writeRate" ? b.writeRate - a.writeRate : b.cpu - a.cpu) || a.pid - b.pid);
+  const result = (state.processes?.items || []).filter(p => (state.processScope === "apps" ? !!p.app : state.processScope === "mine" ? p.own : state.processScope === "system" ? !p.own : !state.onlyMine || p.own) && (!query || `${p.name} ${p.pid} ${p.path}`.toLowerCase().includes(query)));
+  if (!state.processOrder) result.sort((a, b) => state.sort === "name" ? a.name.localeCompare(b.name) : (state.sort === "memory" ? b.memory - a.memory : state.sort === "readRate" ? b.readRate - a.readRate : state.sort === "writeRate" ? b.writeRate - a.writeRate : b.cpu - a.cpu) || a.pid - b.pid);
   if (state.processOrder) {
     const { key, descending } = state.processOrder;
     result.sort((a, b) => (key === "name" ? a.name.localeCompare(b.name) : Number(a[key]) - Number(b[key])) * (descending ? -1 : 1) || a.pid - b.pid);
@@ -216,10 +232,22 @@ function activityFooter(state: ViewState, message: string, explanation: string):
   return `<footer class="activity-footer"><span class="activity-source" title="${e(explanation)}">${e(message)}</span>${state.page === "processes" ? `<div class="activity-totals"><span class="total-cpu">CPU <b>${snapshot?.cpu?.ready ? percent(snapshot.cpu.usage) : "—"}</b></span><span class="total-memory">${t("内存")} <b>${snapshot?.memory?.total ? formatMemory(snapshot.memory.used) : "—"}</b></span><span class="total-power">${t("功率")} <b>${snapshot?.battery?.systemWatts != null ? snapshot.battery.systemWatts.toFixed(1) + " W" : "—"}</b></span></div>` : ""}</footer>`;
 }
 
+function tableSpacer(height: number, columns: number, key: string): string {
+  return `<tr class="virtual-spacer" data-row-key="${key}" aria-hidden="true"><td colspan="${columns}" style="height:${height}px"></td></tr>`;
+}
+
+const processTable = cachedMarkup(state => {
+  const allRows = orderedProcesses(state);
+  const window = windowRows(allRows, state.tableWindow), rows = window.rows;
+  const columns: [string, string][] = [["名称", "name"], ["% CPU", "cpu"], ["% GPU", ""], ["内存", "memory"], ["功率", ""], ["线程", "threads"], ["CPU 时间", ""], ["PID", "pid"], ["用户", "userId"]];
+  const processHeaders = columns.map(([label, key]) => `<th scope="col"${key ? ` aria-sort="${state.processOrder?.key === key ? state.processOrder.descending ? "descending" : "ascending" : "none"}"` : ""}>${key ? `<button class="activity-sort" data-process-sort="${key}">${t(label)}${state.processOrder?.key === key ? `<span class="sort-direction ${state.processOrder.descending ? "descending" : "ascending"}">${icon("chevron")}</span>` : ""}</button>` : t(label)}</th>`).join("");
+  return rows.length ? `<table class="process-table activity-table${state.tableWindow ? " is-windowed" : ""}" aria-rowcount="${allRows.length + 1}" data-window-start="${window.start}"><thead><tr>${processHeaders}</tr></thead><tbody>${state.tableWindow ? tableSpacer(window.before, 9, "before") : ""}${rows.map((p, index) => `<tr aria-rowindex="${window.start + index + 2}" data-row-key="${p.pid}:${e(p.identity)}" class="${state.selectedProcess === p.pid ? "selected" : ""} ${(window.start + index) % 2 ? "striped" : ""}" data-select-process="${p.pid}"><td><button class="connection-process" data-select-process="${p.pid}" aria-pressed="${state.selectedProcess === p.pid}" title="${e(p.path)}">${processIcon(p, state)}<span>${e(p.name)}</span></button></td><td>${p.cpuReady ? p.cpu.toFixed(1) : "—"}</td><td class="connection-unavailable">—</td><td>${formatMemory(p.memory)}</td><td class="connection-unavailable">—</td><td>${p.threads}</td><td class="connection-unavailable">—</td><td>${p.pid}</td><td>${p.userId}</td></tr>`).join("")}${state.tableWindow ? tableSpacer(window.after, 9, "after") : ""}</tbody></table>` : empty(t("没有匹配的进程"), t("试试其他名称，或查看完整进程列表。"));
+}, state => [state.processes, state.query, state.processScope, state.onlyMine, state.sort,
+  state.processOrder?.key, state.processOrder?.descending, state.selectedProcess, isMac(state), i18n.language, state.tableWindow?.start, state.tableWindow?.count]);
+
 function processView(state: ViewState): string {
   if (state.processError) return empty(t("无法读取进程"), state.processError, `<button data-action="refresh">${t("重试")}</button>`);
   if (!state.processes) return empty(t("正在读取进程"), t("进程采集独立于窗口绘制运行。"));
-  const rows = orderedProcesses(state);
   const selected = state.processes.items.find(p => p.pid === state.selectedProcess);
   const missing = t("当前采集源未提供单进程 GPU、功率或 CPU 时间；用户列显示 UID。");
   const history = state.processHistory || [];
@@ -233,9 +261,7 @@ function processView(state: ViewState): string {
     <h2>${t("父进程")}</h2><div class="process-parent"><span class="process-system-icon">${icon("settings")}</span><span>—</span></div>
     <h2>${t("命令")}</h2><p class="process-path" title="${e(selected.path)}">${e(selected.path || "—")}</p>` : `<p class="muted">${t("进程可能已退出或不再可见。")}</p>`}
   </aside>`;
-  const columns: [string, string][] = [["名称", "name"], ["% CPU", "cpu"], ["% GPU", ""], ["内存", "memory"], ["功率", ""], ["线程", "threads"], ["CPU 时间", ""], ["PID", "pid"], ["用户", "userId"]];
-  const processHeaders = columns.map(([label, key]) => `<th scope="col"${key ? ` aria-sort="${state.processOrder?.key === key ? state.processOrder.descending ? "descending" : "ascending" : "none"}"` : ""}>${key ? `<button class="activity-sort" data-process-sort="${key}">${t(label)}${state.processOrder?.key === key ? `<span class="sort-direction ${state.processOrder.descending ? "descending" : "ascending"}">${icon("chevron")}</span>` : ""}</button>` : t(label)}</th>`).join("");
-  const table = rows.length ? `<table class="process-table activity-table"><thead><tr>${processHeaders}</tr></thead><tbody>${rows.map(p => `<tr class="${state.selectedProcess === p.pid ? "selected" : ""}" data-select-process="${p.pid}"><td><button class="connection-process" data-select-process="${p.pid}" aria-pressed="${state.selectedProcess === p.pid}" title="${e(p.path)}">${processIcon(p, state)}<span>${e(p.name)}</span></button></td><td>${p.cpuReady ? p.cpu.toFixed(1) : "—"}</td><td class="connection-unavailable">—</td><td>${formatMemory(p.memory)}</td><td class="connection-unavailable">—</td><td>${p.threads}</td><td class="connection-unavailable">—</td><td>${p.pid}</td><td>${p.userId}</td></tr>`).join("")}</tbody></table>` : empty(t("没有匹配的进程"), t("试试其他名称，或查看完整进程列表。"));
+  const table = processTable(state);
   return `<div class="activity-workspace process-layout ${state.selectedProcess == null ? "" : "has-detail"}"><div class="activity-scroll process-list">${table}</div>${detail}</div>${activityFooter(state, `${state.processes.skipped} ${t("个因权限或已退出未读取")}`, missing)}`;
 }
 
@@ -257,25 +283,39 @@ function connectionStatus(status: string): string {
   }
 }
 
-function connectionView(state: ViewState): string {
-  if (state.connectionError) return empty(t("无法读取连接"), state.connectionError, `<button data-action="refresh">${t("重试")}</button>`);
+const connectionView = cachedMarkup(state => {
+  if (state.connectionError && !state.connections) return empty(t("无法读取连接"), state.connectionError, `<button data-action="refresh">${t("重试")}</button>`);
   if (!state.connections) return empty(t("正在读取网络连接"), t("读取当前权限可见的 TCP / UDP 套接字。"));
-  const rows = connectionRows(state.connections.items, state.processes?.items || [], state.query, state.connectionSort);
-  const missing = t("当前采集源未提供单连接延迟、速率及累计流量。");
+  const allRows = connectionRows(state.connections.items, state.processes?.items || [], state.query, state.connectionSort);
+  const window = windowRows(allRows, state.tableWindow), rows = window.rows;
+  const missing = isMac(state) ? t("延迟为 TCP RTT；速率取两次采样差值。— 表示无样本或无法匹配。") : t("当前采集源未提供单连接延迟、速率及累计流量。");
   const headers = [t("进程"), t("主机"), t("服务"), t("协议"), t("状态"), t("延迟"), t("下载"), t("上传"), t("已接收"), t("已发送")];
-  const keys: ConnectionSortKey[] = ["process", "host", "port", "protocol", "state"];
+  const keys: ConnectionSortKey[] = ["process", "host", "port", "protocol", "state", "rtt", "download", "upload", "received", "sent"];
   const headerCells = headers.map((header, i) => {
     const key = keys[i];
-    if (!key) return `<th scope="col" title="${e(missing)}">${header}</th>`;
-    const direction = state.connectionSort?.key === key ? state.connectionSort.direction : "none";
+    const direction = state.connectionSort && state.connectionSort.key === key ? state.connectionSort.direction : "none";
     return `<th scope="col" aria-sort="${direction}"><button class="connection-sort" data-connection-sort="${key}">${header}${direction === "none" ? "" : `<span class="sort-direction ${direction}" aria-hidden="true">${icon("chevron")}</span>`}</button></th>`;
   }).join("");
-  return `${state.connections.warning ? notice(state.connections.warning) : ""}${rows.length ? `<div class="activity-workspace"><div class="activity-scroll"><table class="connection-table activity-table" aria-label="${t("连接")}"><thead><tr>${headerCells}</tr></thead><tbody>${rows.map(c => {
+  const localLabel = t("本地地址"), remoteLabel = t("远端地址"), unavailableLabel = t("暂不可用");
+  const hints = [t("TCP 平均往返时间，不是 ping 延迟。"), t("本次采样窗口内的平均接收速率。"), t("本次采样窗口内的平均发送速率。"), t("系统报告的该套接字累计接收字节数。"), t("系统报告的该套接字累计发送字节数。")];
+  const statusLabels = new Map(rows.map(row => [row.state, ""]));
+  for (const status of statusLabels.keys()) statusLabels.set(status, connectionStatus(status));
+  const unavailableCell = `<td class="connection-unavailable" title="${e(missing)}" aria-label="${unavailableLabel}">—</td>`;
+  const metricCell = (value: number | null | undefined, format: (n: number) => string, hint: string) => value == null
+    ? unavailableCell : `<td class="connection-metric" title="${e(hint)}">${format(value)}</td>`;
+  return `${state.connectionError ? notice(`${t("更新中断 · 上次数据")} · ${state.connectionError}`) : ""}${state.connections.warning ? notice(state.connections.warning) : ""}${rows.length ? `<div class="activity-workspace"><div class="activity-scroll"><table class="connection-table activity-table${state.tableWindow ? " is-windowed" : ""}" aria-rowcount="${allRows.length + 1}" data-window-start="${window.start}" aria-label="${t("连接")}"><thead><tr>${headerCells}</tr></thead><tbody>${state.tableWindow ? tableSpacer(window.before, 10, "before") : ""}${rows.map((c, index) => {
     const endpoint = splitEndpoint(c.remote || c.local);
-    const addresses = `${t("本地地址")}: ${c.local} · ${t("远端地址")}: ${c.remote || "—"} · ${c.family}`;
-    return `<tr><td><button class="connection-process" data-process="${c.pid}" title="${e(c.process)} · PID ${c.pid}${c.path ? ` · ${e(c.path)}` : ""}">${c.path ? appIcon(c.path, isMac(state)) : `<span class="app-icon process-system-icon">${icon("settings")}</span>`}<span>${e(c.process || String(c.pid))}</span></button></td><td title="${e(addresses)}">${e(endpoint.host || "—")}</td><td class="connection-secondary" title="${e(c.remote || c.local)}">${e(endpoint.port || "—")}</td><td>${e(c.protocol)}</td><td class="connection-secondary" title="${e(c.state)}">${e(connectionStatus(c.state))}</td>${Array.from({length: 5}, () => `<td class="connection-unavailable" title="${e(missing)}" aria-label="${t("暂不可用")}">—</td>`).join("")}</tr>`;
-  }).join("")}</tbody></table></div></div>` : empty(t("没有匹配的连接"), t("当前权限下没有匹配的 TCP / UDP 记录，可调整搜索或刷新。"))}${activityFooter(state, missing, isMac(state) ? t("来源：本机 lsof。只包含当前权限可见的套接字，不提权、不解析远端域名，不向这些地址发起请求。") : t("来源：Windows 系统连接表或 Linux procfs。只包含当前权限可见的套接字；进程归属可能不可见。不提权、不解析远端域名、不发起请求。"))}`;
-}
+    const addresses = `${localLabel}: ${c.local} · ${remoteLabel}: ${c.remote || "—"} · ${c.family}`;
+    const metrics = c.metrics;
+    const cells = metricCell(metrics?.rtt, n => `${n.toFixed(1)} ms`, hints[0]!)
+      + metricCell(metrics?.download, formatRate, hints[1]!)
+      + metricCell(metrics?.upload, formatRate, hints[2]!)
+      + metricCell(metrics?.received, formatBytes, hints[3]!)
+      + metricCell(metrics?.sent, formatBytes, hints[4]!);
+    return `<tr data-row-key="connection-${window.start + index}" aria-rowindex="${window.start + index + 2}" class="${(window.start + index) % 2 ? "striped" : ""}"><td><button class="connection-process" data-process="${c.pid}" title="${e(c.process)} · PID ${c.pid}${c.path ? ` · ${e(c.path)}` : ""}">${c.path ? appIcon(c.path, isMac(state)) : `<span class="app-icon process-system-icon">${icon("settings")}</span>`}<span>${e(c.process || String(c.pid))}</span></button></td><td title="${e(addresses)}">${e(endpoint.host || "—")}</td><td class="connection-secondary" title="${e(c.remote || c.local)}">${e(endpoint.port || "—")}</td><td>${e(c.protocol)}</td><td class="connection-secondary" title="${e(c.state)}">${e(statusLabels.get(c.state)!)}</td>${cells}</tr>`;
+  }).join("")}${state.tableWindow ? tableSpacer(window.after, 10, "after") : ""}</tbody></table></div></div>` : empty(t("没有匹配的连接"), t("当前权限下没有匹配的 TCP / UDP 记录，可调整搜索或刷新。"))}${activityFooter(state, missing, isMac(state) ? t("来源：本机 lsof 与 nettop。仅匹配 PID、协议和两端地址唯一对应的套接字，不提权、不解析远端域名、不主动探测。") : t("来源：Windows 系统连接表或 Linux procfs。只包含当前权限可见的套接字；进程归属可能不可见。不提权、不解析远端域名、不发起请求。"))}`;
+}, state => [state.connections, state.processes, state.query, state.connectionSort?.key,
+  state.connectionSort?.direction, state.connectionError, isMac(state), i18n.language, state.tableWindow?.start, state.tableWindow?.count]);
 
 function groupApps(processes: Process[]): AppUsage[] {
   const groups = new Map<string, AppUsage>();

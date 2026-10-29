@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"localops/internal/localization"
+	"rockshinops/internal/localization"
 	"math"
 	"os/exec"
 	"strconv"

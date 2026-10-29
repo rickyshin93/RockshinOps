@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"localops/internal/localization"
-	"localops/internal/metrics"
+	"rockshinops/internal/localization"
+	"rockshinops/internal/metrics"
 )
 
 func TestPreferencesPersistAndKeepExplicitEmpty(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "LocalOps", "preferences.json")
+	path := filepath.Join(t.TempDir(), "RockshinOps", "preferences.json")
 	defaults := []string{"disk"}
 	got, err := readPreferences(path, defaults, "system", false, false)
 	if err != nil || !reflect.DeepEqual(got.MenuBarItems, defaults) {
@@ -33,6 +33,62 @@ func TestPreferencesPersistAndKeepExplicitEmpty(t *testing.T) {
 	}
 	if _, err := readPreferences(path, defaults, "system", false, false); err == nil {
 		t.Fatal("invalid persisted value silently accepted")
+	}
+}
+
+func TestConfigDirectoryMigration(t *testing.T) {
+	root := t.TempDir()
+	legacy := filepath.Join(root, "LocalOps")
+	if err := os.MkdirAll(legacy, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"preferences.json", "menu-bar.json"} {
+		if err := os.WriteFile(filepath.Join(legacy, name), []byte(`{"saved":true}`), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directory, err := migrateConfigDirectory(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"preferences.json", "menu-bar.json"} {
+		data, err := os.ReadFile(filepath.Join(directory, name))
+		if err != nil || string(data) != `{"saved":true}` {
+			t.Fatalf("migration %s: %s, %v", name, data, err)
+		}
+		if _, err := os.Stat(filepath.Join(legacy, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(directory, "preferences.json"), []byte(`{"newer":true}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrateConfigDirectory(root); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(directory, "preferences.json"))
+	if err != nil || string(data) != `{"newer":true}` {
+		t.Fatalf("existing settings overwritten: %s, %v", data, err)
+	}
+}
+
+func TestConfigDirectoryMigrationAbsentOrInvalidLegacy(t *testing.T) {
+	root := t.TempDir()
+	if got, err := migrateConfigDirectory(root); err != nil || got != filepath.Join(root, "RockshinOps") {
+		t.Fatalf("fresh installation: %q, %v", got, err)
+	}
+	legacy := filepath.Join(root, "LocalOps")
+	if err := os.MkdirAll(legacy, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(legacy, "preferences.json"), []byte("invalid"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := migrateConfigDirectory(root); err == nil || !strings.Contains(err.Error(), "invalid JSON") {
+		t.Fatalf("invalid legacy settings: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "RockshinOps", "preferences.json")); !os.IsNotExist(err) {
+		t.Fatalf("invalid settings copied: %v", err)
 	}
 }
 

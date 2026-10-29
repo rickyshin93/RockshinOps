@@ -32,7 +32,7 @@ export function collectRelease(target: string, signed: boolean, directory = join
   if (signed) {
     const platform = target.replace("/", "-");
     const manifestName = `update-${platform}.json`;
-    const archiveName = `localops-${config.version}-${platform}.tar.gz`;
+    const archiveName = `rockshinops-${config.version}-${platform}.tar.gz`;
     const manifest: UpdateManifest = JSON.parse(readFileSync(join(directory, manifestName), "utf8"));
     verifyUpdate(manifest, readFileSync(join(directory, archiveName)), config.updates!.publicKey, config.version!,
       `https://github.com/${config.updates!.github}/releases/download/v${config.version}/${archiveName}`);

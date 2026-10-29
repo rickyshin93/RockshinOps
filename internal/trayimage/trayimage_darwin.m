@@ -4,7 +4,7 @@
 
 // Draws "symbol text  symbol text" at 2x into a bitmap 18pt tall and returns malloc'ed PNG bytes, or NULL.
 // Only alpha matters: the status item shows it as a template image tinted by the system.
-void *localops_tray_png(const char **symbols, const char **texts, int count, size_t *length) {
+void *rockshinops_tray_png(const char **symbols, const char **texts, int count, size_t *length) {
 	@autoreleasepool {
 		const CGFloat scale = 2, height = 18 * scale, iconGap = 3 * scale, itemGap = 8 * scale;
 		CGFloat size = [NSFont menuBarFontOfSize:0].pointSize * scale;
