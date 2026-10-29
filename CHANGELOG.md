@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.4
+
+- Refresh RockshinOps branding, navigation, settings and hardware views, with smoother macOS resizing.
+- Rebuild Processes and Connections with compact tables, sorting, search, pause/resume and real process history charts.
+- Add confirmed Quit and Force Quit with process identity and OS permission checks. Windows supports Force Quit only.
+- Add macOS menu-bar icon sections, previews, reordering, temporary reveal and appearance controls.
+- Save settings automatically and optionally hide the Dock icon when closing the main window.
+- Keep LocalOps installer and executable names for compatibility with existing signed updates and relaunch paths.
+
+### 中文
+
+- 更新 RockshinOps 品牌、导航、设置和硬件页面，优化 macOS 窗口缩放。
+- 重做进程与连接列表，支持排序、搜索、暂停和真实进程历史图表。
+- 新增确认后退出与强制退出，核对进程身份并遵循系统权限；Windows 仅支持强制退出。
+- 新增 macOS 菜单栏图标分区、预览、排序、临时显示和外观设置。
+- 设置自动保存，可选择关闭窗口时隐藏 Dock 图标。
+- 安装包和可执行文件保留 LocalOps 名称，兼容旧版签名更新与重启路径。
+
 ## 0.2.3
 
 - On macOS, optionally use the system proxy for update checks and downloads. PAC scripts and authenticated proxies are not supported.

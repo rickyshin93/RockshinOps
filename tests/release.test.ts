@@ -4,6 +4,14 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectRelease, verifyUpdate } from "../scripts/collect-release";
 import config from "../mygo.config";
+import { checkRelease } from "../scripts/check-release";
+
+test("release preflight rejects absent or empty update notes", () => {
+  expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\n\n## 0.2.3\n\nOld notes")).toThrow("no notes");
+  expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\n\n## 0.2.4\n\n## 0.2.3\nOld notes")).toThrow("no notes");
+  expect(() => checkRelease("v0.2.4", "0.2.4", "# Changelog\n\n## 0.2.4\n\nNew notes")).not.toThrow();
+  expect(() => checkRelease("v0.2.3", "0.2.4", "## 0.2.4\nNew notes")).toThrow("must match");
+});
 
 test("branding preserves the installed executable path used by existing updaters", () => {
   expect(config.name).toBe("LocalOps");
