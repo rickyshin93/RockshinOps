@@ -25,7 +25,7 @@ macOS 覆盖安装后，如系统开关已开但 App 提示未授权，请在相
 - **macOS Apple Silicon:** the `arm64.dmg` file.
 - **macOS Intel:** the `amd64.dmg` file.
 - **Windows x86_64:** the `Setup … amd64.exe` installer.
-- **Linux x86_64:** the `.deb` package or `.tar.gz` archive (includes a local install script).
+- **Linux x86_64:** the `.deb` package or `.tar.gz` archive (extract and run `./rockshinops`; no install script is included).
 - `SHA256SUMS.txt` contains checksums for all packages. `update-*.json` and the macOS/Windows `.tar.gz` files are consumed by the updater; choose the installers above for manual installation.
 
 ### Platform status

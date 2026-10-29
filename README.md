@@ -43,7 +43,7 @@ Download the package for your architecture from [Releases](https://github.com/ri
 - **macOS:** open the `.dmg` and drag the app to Applications. Packages are ad-hoc signed, not notarized. If macOS blocks the downloaded app, follow Apple's [instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
 - **Windows:** run the `RockshinOps Setup … amd64.exe` installer. It installs for the current user and requires WebView2. Packages are unsigned, so Windows may display a publisher warning.
 - **Debian/Ubuntu:** install the `.deb` with `sudo apt install ./rockshinops_…_amd64.deb`; the package declares its GTK/WebKitGTK dependencies. A desktop tray implementation is needed to expose the tray menu.
-- **Other Linux desktops:** extract the `.tar.gz` and use its included `install.sh`. Install GTK 3, WebKitGTK 4.1 and an AppIndicator-compatible tray through your distribution. The archive's installer reports missing WebKitGTK dependencies.
+- **Other Linux desktops:** extract the `.tar.gz` and run `./rockshinops` from the extracted directory. Install GTK 3, WebKitGTK 4.1 and an AppIndicator-compatible tray through your distribution. The archive does not include an installation script.
 
 Each release includes `SHA256SUMS.txt`. Starting with v0.2.1, RockshinOps checks GitHub Releases after launch and daily while running. Use **Settings → Check for Updates…**, the app menu or the tray menu to check manually. The update window shows release notes, downloads with progress, verifies the signature and lets you choose when to relaunch. Installation requires confirmation unless you explicitly opt into automatic installation.
 

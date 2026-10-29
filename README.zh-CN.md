@@ -40,7 +40,7 @@ CPU 温度和 App 级瓦特计量尚未实现；GPU 与系统功率取决于硬�
 - macOS：打开 `.dmg`，拖入 Applications。当前为 ad-hoc 签名，未做 Apple 公证；如被系统拦截，参照 [Apple 官方说明](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)操作。
 - Windows：运行 `RockshinOps Setup … amd64.exe`，按当前用户安装，需要 WebView2。安装包未签名，Windows 可能显示发布者提示。
 - Debian/Ubuntu：`sudo apt install ./rockshinops_…_amd64.deb`，由包管理器处理声明的 GTK/WebKitGTK 依赖。
-- 其他 Linux 桌面：解压 `.tar.gz`，使用其中的 `install.sh`；系统需提供 GTK 3、WebKitGTK 4.1 和兼容 AppIndicator 的托盘。安装脚本会报告缺失的 WebKitGTK 依赖。
+- 其他 Linux 桌面：解压 `.tar.gz`，在解压目录运行 `./rockshinops`；系统需提供 GTK 3、WebKitGTK 4.1 和兼容 AppIndicator 的托盘。压缩包不包含安装脚本。
 
 每次发布附带 `SHA256SUMS.txt`。从 v0.2.1 开始，应用启动后及持续运行期间每天检查 GitHub Releases；也可通过**设置 → 检查更新…**、应用菜单或托盘菜单手动检查。更新窗口提供说明、下载进度、签名验证和重启选择；默认确认后安装，主动勾选后才启用自动安装。
 
