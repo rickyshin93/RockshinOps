@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.6
+## 0.2.7
 
 - Rebuild space analysis around a single allocated-size scan with folder browsing, largest files, cleanup suggestions and reviewed trash actions.
 - Add a developer ports panel with listener search, favorites, address copying and process details.

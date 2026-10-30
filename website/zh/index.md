@@ -28,13 +28,13 @@
 
 macOS、Windows 和 Linux 均免费。无需账户，无需订阅。
 
-版本 0.2.6
+版本 0.2.7
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.amd64.dmg)
-- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.Setup.0.2.6.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops_0.2.6_amd64.deb)
-- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops-0.2.6-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/RockshinOps.0.2.7.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/RockshinOps.0.2.7.amd64.dmg)
+- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/RockshinOps.Setup.0.2.7.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/rockshinops_0.2.7_amd64.deb)
+- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/rockshinops-0.2.7-linux-amd64.tar.gz)
 
 采用临时签名，尚未公证。
 

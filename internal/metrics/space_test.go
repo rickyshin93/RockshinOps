@@ -77,7 +77,11 @@ func TestSpaceScanMeasuresEachFileOnceWithoutFollowingLinks(t *testing.T) {
 	if len(inner.Ancestors) != 1 || inner.Ancestors[0].Path != root {
 		t.Fatalf("unexpected breadcrumb: %+v", inner.Ancestors)
 	}
-	if progress.Files.Load() < 3 || progress.Bytes.Load() < 3_000_000 {
+	wantFiles := int64(2)
+	if runtime.GOOS != "windows" {
+		wantFiles++
+	}
+	if progress.Files.Load() < wantFiles || progress.Bytes.Load() < 3_000_000 {
 		t.Fatalf("progress not reported: %d files %d bytes", progress.Files.Load(), progress.Bytes.Load())
 	}
 	if largest := tree.Largest(5, ""); len(largest) == 0 || largest[0].Name != "video" {

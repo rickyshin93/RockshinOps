@@ -28,13 +28,13 @@ Reads native system counters locally. No account, no cloud. History is kept in m
 
 Free for macOS, Windows and Linux. No account or subscription required.
 
-Version 0.2.6
+Version 0.2.7
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.amd64.dmg)
-- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.Setup.0.2.6.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops_0.2.6_amd64.deb)
-- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops-0.2.6-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/RockshinOps.0.2.7.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/RockshinOps.0.2.7.amd64.dmg)
+- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/RockshinOps.Setup.0.2.7.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/rockshinops_0.2.7_amd64.deb)
+- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.7/rockshinops-0.2.7-linux-amd64.tar.gz)
 
 Ad-hoc signed. Not notarized.
 

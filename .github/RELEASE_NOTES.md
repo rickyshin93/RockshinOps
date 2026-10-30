@@ -1,6 +1,6 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.6
+### New in v0.2.7
 
 - Rebuilt space analysis with a single scan, folder browsing, largest files, cleanup suggestions and reviewed trash actions.
 - Developer ports panel with listener search, favorites, address copying and process details.
