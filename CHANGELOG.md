@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.6
+
+- Rebuild space analysis around a single allocated-size scan with folder browsing, largest files, cleanup suggestions and reviewed trash actions.
+- Add a developer ports panel with listener search, favorites, address copying and process details.
+- Add an OS-backed Open at login setting for packaged builds.
+- Redesign the bilingual website and select downloads for the visitor's platform.
+
+### 中文
+
+- 重做空间分析，通过一次扫描查看文件夹占用、大文件及清理建议，并在核对后移入废纸篓。
+- 新增开发者端口面板，支持搜索监听端口、收藏、复制地址和查看进程详情。
+- 正式版新增系统开机启动设置。
+- 改版双语官网，按访问平台选择下载包。
+
 ## 0.2.5
 
 - Unify app, executable, installer and configuration names as RockshinOps; preserve existing settings during the transition. Older LocalOps installations require one manual installation.

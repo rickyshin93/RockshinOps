@@ -2,7 +2,7 @@
 
 ## Public website
 
-The standalone promotional site in `website/` uses an instrument-inspired dark presentation: near-black #080b12, cool white #f1f4fc and blue #659dff. Large editorial headings, an 8px spacing rhythm, thin grid rules and restrained signal motion frame the actual light desktop UI. This does not change the app's design system below. Use the existing `resources/icon.png` brand icon (copied under `website/assets/rockshinops-brand/`). Product screenshots render the real app components with synthetic demonstration data, labeled in the page; no local device identity or private process information is published. Motion respects reduced-motion preferences. Typography uses locally served Space Grotesk for English display text, system Chinese fallbacks, and the app's existing system body stack.
+The standalone promotional site in `website/` follows a light, Apple-like product-page style: white page, #f5f5f7 rounded tiles and bands, ink #1d1d1f, secondary #6e6e73 and blue #0071e3 (the app accent deepened for text contrast) for pill buttons and links. The system font stack (SF Pro, PingFang SC, Segoe UI) carries large centered headings with tight tracking; no webfonts. The real product screenshot is the hero; supporting visuals are simple CSS illustrations of real behavior (menu-bar values, storage bar). No decorative arrows, glyph icons, eyebrow labels, numbered section markers, grid textures or looping animation; copy states facts plainly. This does not change the app's design system below. Use the existing `resources/icon.png` brand icon (copied under `website/assets/rockshinops-brand/`). Product screenshots render the real app components with synthetic demonstration data, labeled in the page; no local device identity or private process information is published.
 
 方向：**macOS 原生**。参照 Finder / 系统设置（侧栏）、健康 App（指标卡片）、活动监视器（表格）。2026-10-27 起取代「活泼橙色」与「中性克制」两版。
 
@@ -45,6 +45,7 @@ The standalone promotional site in `website/` uses an instrument-inspired dark p
 
 - 标题文字、对应图标底色和图形共用 `--tone` 原色，不混入黑色；普通信息文字仍用中性色。
 - 同一指标的第二序列 / 分段：同色相 45% → 25% 浅化，不混色相。
+- 非指标页侧栏图标：概览 `--color-indigo` `#5e5ce6` 靛蓝、菜单栏管理 `--color-teal` `#2fb3c3` 青、关于本机 `--color-violet` `#9a62d8` 紫（紫色同时用作清理页容量条第四段），避免与内存/能耗的翠绿重复。
 
 ### 字体
 
@@ -86,8 +87,10 @@ RockshinOps 品牌标识采用系统蓝圆角方形、粗白色几何 R 和右�
 
 - 与指标页共享白色面板、20px 内边距和 16px 栅格；取消居中的大型空状态入口。
 - 首行显示用户主目录所在卷的当前用户可写剩余容量、已占用及保留容量、总容量；进度条表示已占用及保留容量的比例；采集失败保持不可用状态，不编造数值。
-- 两个并列工作区分别提供磁盘探索与配置目录扫描，窗口宽度 ≤1000px 时上下排列。容量指标在 ≤760px 时将可写剩余容量独占首行。目录以图标、名称和完整路径组成分组列表。
-- 风险提示紧邻扫描入口；按钮保留现有扫描及清理契约，空闲页面不执行任何删除。
+- 全页使用清理色（金橙）作为主色：标题图标、扫描进度环、占比条和文件夹图标底色。扫描后容量条按顶层文件夹分段，依次用金橙、蓝、绿、紫区分，「其他文件」为石板灰，「系统数据与未统计」用中性灰，可用空间为浅槽，下方配图例。容量指标在 ≤760px 时将可写剩余容量独占首行。
+- 未扫描时显示一张说明卡片和「开始扫描」；扫描中显示进度环、已读取容量/文件数、当前目录和「停止扫描」。
+- 结果用分段控件切换「空间分布 / 大文件 / 建议清理」。空间分布为分组列表：面包屑 + 返回，行 = 图标 · 名称/文件数 · 占比条 · 百分比 · 容量 · 箭头，点击文件夹下钻；可移入废纸篓的行悬停时显示垃圾桶按钮。≤1000px 隐藏百分比并缩短占比条。
+- 移入废纸篓和清空废纸篓都要求确认并写明名称、容量和路径；空闲页面不执行任何删除。
 
 ## 3. 组件
 
@@ -154,6 +157,7 @@ RockshinOps 品牌标识采用系统蓝圆角方形、粗白色几何 R 和右�
 - 详情栏宽 300px，浅灰整高背景、1px 左分隔，内边距 16px；包含身份、操作行、蓝绿 CPU/内存真实采样点阵、无大分隔线的键值详情及单行命令区域。宽度不足时收至 260px。
 - 仅使用已有 Go 数据；图表只记录选中后的真实进程样本，不用系统历史冒充。没有来源的值显示 —。进程退出经用户明确授权：退出发送 SIGTERM，强制退出发送 SIGKILL；Windows 仅支持强制退出。操作前显示名称、PID 与风险确认，后端重新核对采集身份并拒绝 PID 0/1/自身；不提权。成功只表示请求已发送，是否退出由后续快照确认。打开路径仍禁用。
 - 可用列支持升降排序；全部、App、我的进程、系统范围只筛选当前权限可见进程。连接端口不冒充已确认的应用层服务；macOS 单连接流量来自 nettop 原生计数，两次采样计算速率；延迟为 TCP RTT，不进行 ping。监听/无 RTT 样本或无法唯一匹配的连接显示 —，累计值不得用进程汇总代替。来源与限制放入底栏和悬停说明。
+- 开发端口沿用连接页的紧凑活动列表和底栏，行间以细分隔线区分并保持统一行高；筛选和计数放在同一工具栏。收藏区保持固定高度，收藏项单行排列，超出时横向滚动；应用名和监听范围在地址后的独立列显示。多个地址单行排列并可横向滚动、分别复制，窄窗口允许列表横向滚动。
 
 ### 关于本机
 

@@ -12,8 +12,8 @@ function Row({ id, label, description, lead, children }: { id: string; label: st
   return <div className={lead ? "settings-row with-lead" : "settings-row"}>{lead}<div className="setting-copy"><span id={id} className="setting-label">{label}</span>{description && <p>{description}</p>}</div><div className="setting-control">{children}</div></div>;
 }
 
-function Switch({ on, labelledBy, metric, action }: { on: boolean; labelledBy: string; metric?: string; action?: string }) {
-  return <button type="button" className="switch" role="switch" aria-checked={on} aria-labelledby={labelledBy} data-metric={metric} data-action={action}><span /></button>;
+function Switch({ on, labelledBy, metric, action, disabled = false }: { on: boolean; labelledBy: string; metric?: string; action?: string; disabled?: boolean }) {
+  return <button type="button" className="switch" disabled={disabled} role="switch" aria-checked={on} aria-labelledby={labelledBy} data-metric={metric} data-action={action}><span /></button>;
 }
 
 export function SettingsView({ state, version, onLanguage, isMacOS }: { state: SettingsState; version: string; onLanguage: (language: Language) => void; isMacOS: boolean }) {
@@ -30,6 +30,9 @@ export function SettingsView({ state, version, onLanguage, isMacOS }: { state: S
     </div>
     <div className="settings-column">
     <Group id="general-title" title={t("通用")}>
+      <Row id="startup-label" label={t("开机自启动")} description={t("登录电脑后自动在菜单栏运行 RockshinOps。安装后首次打开时默认开启。")}><Switch on={state.startup?.enabled ?? false} labelledBy="startup-label" action="toggle-startup" disabled={state.startupBusy || !state.startup?.available} /></Row>
+      {(state.startupError || state.startup?.error) && <div className="notice error" role="alert">{state.startupError || state.startup?.error}{state.startupError && <button type="button" className="secondary-button" data-action="load-startup">{t("重试")}</button>}</div>}
+      {!state.startup && !state.startupError && <p className="settings-note" role="status">{t("正在读取本机偏好…")}</p>}
       {isMacOS && <Row id="hide-dock-label" label={t("关闭时隐藏程序坞图标")} description={t("关闭窗口时隐藏 RockshinOps 的程序坞图标，菜单栏仍会保留。重新打开窗口时恢复图标。")}><Switch on={state.hideDockDraft} labelledBy="hide-dock-label" action="toggle-hide-dock" /></Row>}
       <Row id="language-label" label={t("显示语言")} description={t("默认跟随系统语言；不支持的语言使用英文。")}>
         <div className="segmented" role="radiogroup" aria-labelledby="language-label">{languages.map(([id, label]) => <label key={id}><input type="radio" name="language" value={id} checked={state.languageDraft === id} onChange={() => onLanguage(id)} /><span>{label}</span></label>)}</div>

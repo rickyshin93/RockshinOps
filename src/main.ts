@@ -11,24 +11,27 @@ import { tableWindow } from "./table-window";
 import { singleFlight } from "./single-flight";
 import { installSortControl } from "./dropdown";
 import { nextConnectionSort, type ConnectionSortKey } from "./connections";
+import { listeningPorts } from "./ports";
 import { menuBarChoices, preferencesDirty } from "./settings";
 import { actionControls, connectionSubtitle, processSubtitle, filterControls, metricPages, navigation, pages, renderBody, type Page, type ViewState } from "./views";
 
 const el = (id: string) => document.getElementById(id)!;
 const state: ViewState = {
   page: "overview", info: null, snapshot: null, history: [], range: 60, paused: false,
-  processes: null, connections: null, connectionSort: null, selectedProcess: null, processOrder: { key: "cpu", descending: true }, scan: null, query: "", sort: "cpu", onlyMine: false,
-  busy: false, processError: "", connectionError: "", scanError: "", scanning: false, cleanupBusy: false, cleanupMessage: "", spaceMode: false, spaceHistory: [],
+  processes: null, connections: null, connectionSort: null, connectionMode: "all", portScope: "all", favoritePorts: [], portsLoaded: false, selectedProcess: null, processOrder: { key: "cpu", descending: true }, query: "", sort: "cpu", onlyMine: false,
+  busy: false, processError: "", connectionError: "",
   appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
+  startup: null, startupBusy: false, startupError: "",
   preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
+const reactPage = (page: Page) => ["settings", "menubar", "cleanup"].includes(page);
 let reactPages: typeof import("./react-pages") | null = null;
 let reactPageError = "";
 const loadReactPages = singleFlight(async () => {
   if (reactPages || reactPageError) return;
   try { reactPages = await import("./react-pages"); }
   catch (reason) { reactPageError = String(reason); }
-  if (["settings", "menubar"].includes(state.page)) render();
+  if (reactPage(state.page)) render();
 });
 void i18n.changeLanguage(isMyGo() ? locale() : resolveLanguage(navigator.languages));
 document.documentElement.lang = i18n.language;
@@ -41,11 +44,9 @@ const readProcesses = singleFlight(() => System.processes());
 let inspectionPreloadScheduled = false;
 let stopped = false;
 let renderedActions = "";
-let renderedScan = "";
 let renderedAppReview = "";
 let renderedAboutLanguage = "";
 let renderedAboutInfo: ViewState["info"] = null;
-let scanProgressText = "";
 let appReviewEpoch = 0;
 let appSelectAll = false;
 let navigationEpoch = 0;
@@ -88,7 +89,7 @@ function renderNow(filters = false) {
   const activityPosition = activityScroll ? [activityScroll.scrollLeft, activityScroll.scrollTop] : null;
   const focused = document.activeElement as HTMLElement | null;
   const focusArea = focused?.closest("#page-actions, #page-filters, #page-body");
-  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.selectProcess || focused?.dataset.metric || focused?.dataset.connectionSort || focused?.dataset.processSort || focused?.dataset.processScope : undefined;
+  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.selectProcess || focused?.dataset.metric || focused?.dataset.connectionSort || focused?.dataset.processSort || focused?.dataset.processScope || focused?.dataset.connectionMode || focused?.dataset.favoritePort || focused?.dataset.copyPort || focused?.dataset.portProcess || focused?.dataset.closePort || focused?.dataset.portScope || focused?.dataset.portQuery : undefined;
   const title = t(page.title);
   let subtitle = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
   if (state.page === "settings") subtitle = t("更改会自动保存");
@@ -112,13 +113,12 @@ function renderNow(filters = false) {
     el("page-filters").innerHTML = html;
     el("page-filters").hidden = !html;
   }
-  if (state.page === "settings" || state.page === "menubar") {
+  if (reactPage(state.page)) {
     renderedBody = "";
     renderedPage = null;
-    renderedScan = "";
     renderedAppReview = "";
     if (reactPages) {
-      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); });
+      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings());
     } else {
       el("page-body").textContent = reactPageError ? `${t("页面加载失败，请重试。")} ${reactPageError}` : t("正在加载页面…");
       void loadReactPages();
@@ -126,7 +126,6 @@ function renderNow(filters = false) {
   } else {
     reactPages?.unmountReactPage();
     const body = renderBody(state);
-    const unchangedScan = state.scanning && state.page === "cleanup" && renderedScan === body;
     const unchangedReview = state.page === "apps" && !!state.appReview && renderedAppReview === body;
     const about = el("page-body").querySelector(".about-page");
     if (state.page === "about" && about && renderedAboutLanguage === i18n.language && renderedAboutInfo === state.info && body.includes('class="about-page"')) {
@@ -139,7 +138,7 @@ function renderNow(filters = false) {
           if (value.innerHTML !== nextValues[index]!.innerHTML) value.innerHTML = nextValues[index]!.innerHTML;
         });
       } else el("page-body").innerHTML = body;
-    } else if (!unchangedScan && !unchangedReview && body !== renderedBody) {
+    } else if (!unchangedReview && body !== renderedBody) {
       const live = metricPages.includes(state.page) || ["processes", "connections"].includes(state.page) || (state.page === "apps" && !state.appMode);
       if (live && renderedPage === state.page) updateLiveContent(el("page-body"), body);
       else el("page-body").innerHTML = body;
@@ -147,11 +146,8 @@ function renderNow(filters = false) {
     renderedPage = state.page;
     renderedAboutLanguage = state.page === "about" ? i18n.language : "";
     renderedAboutInfo = state.page === "about" ? state.info : null;
-    renderedScan = state.scanning && state.page === "cleanup" ? body : "";
     renderedAppReview = state.page === "apps" && state.appReview ? body : "";
     renderedBody = body;
-    const progress = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
-    if (progress) progress.textContent = scanProgressText || t("正在统计扫描项目…");
     const selectAll = el("page-body").querySelector<HTMLInputElement>("[data-app-select-all]");
     if (selectAll && state.appReview) selectAll.indeterminate = state.appSelection.length > 0 && state.appSelection.length < state.appReview.files.length;
   }
@@ -159,10 +155,10 @@ function renderNow(filters = false) {
     const scroll = el("page-body").querySelector<HTMLElement>(".activity-scroll");
     if (scroll) { scroll.scrollLeft = activityPosition[0]!; scroll.scrollTop = activityPosition[1]!; }
   }
-  const bodyBusy = String(state.busy || state.scanning);
+  const bodyBusy = String(state.busy);
   if (el("page-body").getAttribute("aria-busy") !== bodyBusy) el("page-body").setAttribute("aria-busy", bodyBusy);
   if (focusKey && document.activeElement !== focused) for (const button of focusArea!.querySelectorAll<HTMLElement>("button, input")) {
-    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.selectProcess, button.dataset.metric, button.dataset.connectionSort, button.dataset.processSort, button.dataset.processScope].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
+    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.selectProcess, button.dataset.metric, button.dataset.connectionSort, button.dataset.processSort, button.dataset.processScope, button.dataset.connectionMode, button.dataset.favoritePort, button.dataset.copyPort, button.dataset.portProcess, button.dataset.closePort, button.dataset.portScope, button.dataset.portQuery].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
   }
   const s = state.snapshot;
   if (s) {
@@ -253,45 +249,6 @@ async function initialize() {
   el("machine-name").textContent = t("本机");
   el("machine-name").title = result.info.machine.hostname;
   el("machine-detail").textContent = result.info.machine.chip || result.info.machine.architecture;
-}
-async function scan() {
-  if (state.scanning || state.cleanupBusy) return;
-  state.scanning = true; state.scanError = ""; scanProgressText = ""; render();
-  let polling = false, active = true;
-  const timer = state.spaceMode ? window.setInterval(async () => {
-    if (polling) return;
-    polling = true;
-    try {
-      const progress = await System.scanProgress();
-      if (!active) return;
-      scanProgressText = progress.phase === "scanning" && progress.total > 0
-        ? t("已扫描 {{percent}}%（{{visited}} / {{total}} 项）", { percent: Math.min(99, Math.floor(progress.visited / progress.total * 100)), visited: progress.visited, total: progress.total })
-        : progress.phase === "counting" ? t("正在统计扫描项目：已发现 {{visited}} 项", { visited: progress.visited }) : t("正在统计扫描项目…");
-      const element = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
-      if (element) element.textContent = scanProgressText;
-    } catch {
-      if (!active) return;
-      scanProgressText = t("无法读取扫描进度，扫描仍在进行。");
-      const element = el("page-body").querySelector<HTMLElement>("[data-scan-progress]");
-      if (element) element.textContent = scanProgressText;
-    } finally { polling = false; }
-  }, 500) : undefined;
-  try { state.scan = state.spaceMode ? await System.scanDisk(state.spaceHistory.at(-1) || "") : await System.scanCleanup(); }
-  catch (reason) { state.scanError = String(reason); }
-  finally { active = false; if (timer !== undefined) window.clearInterval(timer); state.scanning = false; render(); }
-}
-async function cleanup(path: string, emptyTrash: boolean) {
-  if (state.cleanupBusy || state.scanning || !state.scan) return;
-  const prompt = emptyTrash
-    ? t("永久删除废纸篓中的所有内容？此操作不可恢复。路径：{{path}}", { path })
-    : t("将此项目移入系统废纸篓？目录内的全部内容都会移动，包括扫描未统计的内容。路径：{{path}}", { path });
-  if (!window.confirm(prompt)) return;
-  state.cleanupBusy = true; state.cleanupMessage = ""; render();
-  try {
-    if (emptyTrash) await System.emptyCleanupTrash(path); else await System.trashCleanupItem(path);
-    state.cleanupMessage = emptyTrash ? t("废纸篓已清空。") : t("项目已移入废纸篓；清空废纸篓后才会释放空间。");
-  } catch (reason) { state.cleanupMessage = `${t("清理未完全完成，请检查后重试：")}${String(reason)}`; }
-  finally { state.cleanupBusy = false; await scan(); }
 }
 async function openFullDiskAccessSettings() {
   try { await System.openFullDiskAccessSettings(); if (errorKind === "action") error("", "action"); }
@@ -386,7 +343,6 @@ async function refresh() {
     }
     if (["processes", "apps", "connections"].includes(state.page)) await loadProcesses();
     if (state.page === "connections") await connections(false, true);
-    if (state.page === "cleanup") await scan();
   } catch (reason) { error(`${t("连接采集服务失败：")}${String(reason)}${t("。可再次点击刷新重试。")}`); }
   finally { state.busy = false; render(); preloadInspection(); }
 }
@@ -404,10 +360,13 @@ async function navigate(page: Page, query = "") {
   if (!metricPages.includes(page)) state.paused = false;
   if (page === "apps" && !["cpu", "memory", "name"].includes(state.sort)) state.sort = "cpu";
   el("content-scroll").scrollTop = 0; render(true);
-  if (page === "settings" && !state.preferences) await loadSettings();
+  if (page === "settings") {
+    if (!state.preferences) await loadSettings();
+    await loadStartupSettings();
+  }
   if (!isMyGo() || !state.info) return;
   if (page === "connections") {
-    await Promise.all([loadProcesses(), connections(true)]);
+    await Promise.all([loadProcesses(), connections(true), state.portsLoaded ? Promise.resolve() : loadPortFavorites()]);
     if (epoch === navigationEpoch) render();
   } else if (["processes", "apps"].includes(page)) {
     await loadProcesses();
@@ -415,12 +374,76 @@ async function navigate(page: Page, query = "") {
     render();
   }
 }
+async function loadPortFavorites() {
+  state.portsError = "";
+  try { state.favoritePorts = await System.favoritePorts(); state.portsLoaded = true; }
+  catch (reason) { state.portsLoaded = false; state.portsError = `${t("读取端口收藏失败：")}${String(reason)}`; }
+  render();
+}
+async function toggleFavoritePort(port: number) {
+  if (state.portsSaving || !state.portsLoaded) return;
+  state.portsSaving = true; state.portsError = ""; render();
+  const favorites = state.favoritePorts || [];
+  try { state.favoritePorts = await System.saveFavoritePorts(favorites.includes(port) ? favorites.filter(value => value !== port) : [...favorites, port]); }
+  catch (reason) { state.portsError = `${t("保存端口收藏失败：")}${String(reason)}`; }
+  finally { state.portsSaving = false; render(); }
+}
+async function copyPortAddress(address: string) {
+  try { await System.copyPortAddress(address); state.portMessage = { text: t("已复制 {{address}}", { address }), error: false }; }
+  catch (reason) { state.portMessage = { text: `${t("复制失败：")}${String(reason)}`, error: true }; }
+  render();
+}
+async function inspectPortProcess(pid: number) {
+  state.processScope = "all"; state.onlyMine = false; state.processHistory = [];
+  await navigate("processes", String(pid));
+  if (state.page !== "processes" || state.query !== String(pid)) return;
+  state.selectedProcess = pid; recordProcessSample(); render();
+}
+async function closePortProcess(pid: number) {
+  if (state.portAction?.busy || pid <= 1) return;
+  const rows = listeningPorts(state.connections?.items || [], state.processes?.items || []);
+  const row = rows.find(item => item.pid === pid && item.identity && item.process);
+  if (!row) { state.portMessage = { text: t("进程信息不可用，无法结束。"), error: true }; render(); return; }
+  const prompt = t("强制退出 {{name}}（PID {{pid}}）以关闭端口 {{port}}？未保存的数据可能丢失。", { name: row.process, pid: row.pid, port: row.port });
+  if (!window.confirm(prompt)) return;
+  state.portAction = { pid, busy: true }; render();
+  try {
+    await System.terminateProcess(row.pid, row.identity, true);
+    state.portMessage = { text: t("已结束 {{name}}，端口 {{port}} 即将释放。", { name: row.process, port: row.port }), error: false };
+    try { await System.refresh(); await loadProcesses(); await connections(true, true); }
+    catch (reason) { state.portMessage = { text: `${state.portMessage.text} ${t("刷新失败：")}${String(reason)}`, error: true }; }
+  } catch (reason) {
+    state.portMessage = { text: `${t("关闭端口失败：")}${String(reason)}`, error: true };
+  } finally { state.portAction = undefined; render(); }
+}
 async function loadSettings() {
   try {
     state.preferences = await System.preferences();
     resetSettingsDrafts(state.preferences); state.preferencesError = "";
   } catch (reason) { state.preferencesError = `${t("无法读取设置：")}${String(reason)}`; }
   if (state.page === "settings") { render(); void refreshTrayPreview(); }
+}
+let startupRequest = 0;
+async function loadStartupSettings() {
+  if (state.startupBusy) return;
+  const request = ++startupRequest;
+  try {
+    const startup = await System.startupSettings();
+    if (request !== startupRequest) return;
+    state.startup = startup; state.startupError = "";
+  } catch (reason) {
+    if (request !== startupRequest) return;
+    state.startupError = `${t("无法读取设置：")}${String(reason)}`;
+  }
+  if (state.page === "settings") render();
+}
+async function toggleStartup() {
+  if (state.startupBusy || !state.startup?.available) return;
+  startupRequest++;
+  state.startupBusy = true; state.startupError = ""; render();
+  try { state.startup = await System.setOpenAtLogin(!state.startup.enabled); }
+  catch (reason) { state.startupError = `${t("无法设置开机自启动：")}${String(reason)}`; }
+  finally { state.startupBusy = false; render(); }
 }
 let trayPreviewRequest = 0;
 async function refreshTrayPreview() {
@@ -472,10 +495,9 @@ document.addEventListener("click", event => {
   }
   const button = (event.target as Element).closest<HTMLButtonElement>("button");
   if (!button || button.disabled) return;
-  if (button.dataset.cleanupPath) { void cleanup(button.dataset.cleanupPath, false); return; }
-  if (button.dataset.emptyTrash) { void cleanup(button.dataset.emptyTrash, true); return; }
-  if (button.dataset.spacePath) { state.spaceHistory.push(button.dataset.spacePath); void scan(); return; }
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
+  if (button.dataset.action === "toggle-startup") { void toggleStartup(); return; }
+  if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
   if (button.dataset.action === "toggle-hide-dock") { state.hideDockDraft = !state.hideDockDraft; render(); void saveSettings(); return; }
   if (button.dataset.action === "toggle-update-proxy") { state.updateProxyDraft = !state.updateProxyDraft; render(); void saveSettings(); return; }
   if (button.dataset.metric) {
@@ -488,18 +510,23 @@ document.addEventListener("click", event => {
   if (button.dataset.process) { void navigate("processes", button.dataset.process); return; }
   if (button.dataset.processScope) { state.processScope = button.dataset.processScope as ViewState["processScope"]; state.onlyMine = false; render(true); return; }
   if (button.dataset.processSort) { const key = button.dataset.processSort as NonNullable<ViewState["processOrder"]>["key"]; state.processOrder = { key, descending: state.processOrder?.key === key ? !state.processOrder.descending : key !== "name" }; render(); return; }
+  if (button.dataset.connectionMode) { state.connectionMode = button.dataset.connectionMode as "all" | "ports"; state.query = ""; state.portMessage = undefined; state.portAction = undefined; render(true); return; }
+  if (button.dataset.favoritePort) { void toggleFavoritePort(Number(button.dataset.favoritePort)); return; }
+  if (button.dataset.copyPort) { void copyPortAddress(button.dataset.copyPort); return; }
+  if (button.dataset.portProcess) { void inspectPortProcess(Number(button.dataset.portProcess)); return; }
+  if (button.dataset.closePort) { void closePortProcess(Number(button.dataset.closePort)); return; }
+  if (button.dataset.portScope) { state.portScope = button.dataset.portScope as ViewState["portScope"]; render(); return; }
+  if (button.dataset.portQuery) { state.query = `:${button.dataset.portQuery}`; state.portScope = "all"; render(true); return; }
   if (button.dataset.connectionSort) { state.connectionSort = nextConnectionSort(state.connectionSort, button.dataset.connectionSort as ConnectionSortKey); render(); return; }
   if (button.dataset.range) { state.range = Number(button.dataset.range); render(); return; }
   switch (button.dataset.action) {
+    case "load-port-favorites": void loadPortFavorites(); break;
+    case "clear-port-filters": state.query = ""; state.portScope = "all"; render(true); break;
     case "quit-process": void terminateSelectedProcess(false); break;
     case "force-quit-process": void terminateSelectedProcess(true); break;
     case "close-process": state.selectedProcess = null; render(); break;
     case "pause": state.paused = !state.paused; render(); if (!state.paused) void refresh(); break;
     case "refresh": void refresh(); break;
-    case "scan": void scan(); break;
-    case "space-start": state.spaceMode = true; state.spaceHistory = []; state.scan = null; void scan(); break;
-    case "space-back": state.spaceHistory.pop(); void scan(); break;
-    case "cleanup-targets": state.spaceMode = false; state.spaceHistory = []; state.scan = null; void scan(); break;
     case "installed-apps": void installedApps(); break;
     case "open-full-disk-access": void openFullDiskAccessSettings(); break;
     case "running-apps":
@@ -562,13 +589,17 @@ if (isMyGo()) {
     el("machine-name").textContent = t("本机");
     document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
     el("navigation").setAttribute("aria-label", t("监控页面"));
-    state.info = null; state.processes = null; state.connections = null; state.scan = null;
+    state.info = null; state.processes = null; state.connections = null;
     inspectionPreloadScheduled = false;
-    state.processError = ""; state.connectionError = ""; state.scanError = "";
+    state.processError = ""; state.connectionError = "";
     error(""); render(true); void refresh();
   });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && queuedSnapshot && !state.paused) void receive(queuedSnapshot);
+    if (!document.hidden && state.page === "settings") void loadStartupSettings();
+  });
+  window.addEventListener("focus", () => {
+    if (state.page === "settings") void loadStartupSettings();
   });
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });

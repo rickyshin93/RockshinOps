@@ -15,6 +15,7 @@ import (
 var configJSON []byte
 
 type Config struct {
+	DefaultOpenAtLogin              bool                            `json:"defaultOpenAtLogin"`
 	ConnectionSampleIntervalSeconds int                             `json:"connectionSampleIntervalSeconds"`
 	MenuBarManager                  menubar.Settings                `json:"menuBarManager"`
 	DefaultHideDockOnClose          bool                            `json:"defaultHideDockOnClose"`
@@ -28,9 +29,6 @@ type Config struct {
 	HistorySeconds                  int                             `json:"historySeconds"`
 	ConnectionTimeoutSeconds        int                             `json:"connectionTimeoutSeconds"`
 	MachineInfoTimeoutSeconds       int                             `json:"machineInfoTimeoutSeconds"`
-	ScanTimeoutSeconds              int                             `json:"scanTimeoutSeconds"`
-	ScanMaxEntries                  int                             `json:"scanMaxEntries"`
-	ScanMaxItems                    int                             `json:"scanMaxItems"`
 	ScanTargets                     map[string][]metrics.ScanTarget `json:"scanTargets"`
 }
 
@@ -54,8 +52,8 @@ func parseConfig(data []byte) (Config, error) {
 	if c.MachineInfoTimeoutSeconds <= 0 {
 		return c, fmt.Errorf("rockshinops.json: machineInfoTimeoutSeconds must be positive")
 	}
-	if c.MetricsIntervalSeconds <= 0 || c.ProcessIntervalSeconds <= 0 || c.HistorySeconds < 3600 || c.ConnectionTimeoutSeconds <= 0 || c.ScanTimeoutSeconds <= 0 || c.ScanMaxEntries <= 0 || c.ScanMaxItems <= 0 {
-		return c, fmt.Errorf("rockshinops.json: monitoring and scan parameters must be positive; historySeconds must be at least 3600")
+	if c.MetricsIntervalSeconds <= 0 || c.ProcessIntervalSeconds <= 0 || c.HistorySeconds < 3600 || c.ConnectionTimeoutSeconds <= 0 {
+		return c, fmt.Errorf("rockshinops.json: monitoring parameters must be positive; historySeconds must be at least 3600")
 	}
 	if len(c.ScanTargets) == 0 {
 		return c, fmt.Errorf("rockshinops.json: scanTargets is required")

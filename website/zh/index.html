@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080b12">
+  <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="../assets/rockshinops-brand/icon.png">
-  <link rel="preload" href="../assets/space-grotesk.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="../styles.css">
   <script type="module" src="../main.js"></script>
 
@@ -38,73 +37,129 @@
 </head>
 <body>
   <a class="skip" href="#main" data-i18n="skip">跳到正文</a>
-  <header class="header wrap">
-    <a class="brand" href="./" aria-label="RockshinOps 首页"><img src="../assets/rockshinops-brand/icon.png" width="38" height="38" alt=""><span>RockshinOps</span></a>
-    <nav aria-label="主导航">
-      <a href="#features" data-i18n="navFeatures">功能</a>
-      <a href="#download" data-i18n="navDownload">下载</a>
-      <a class="source-link" href="https://github.com/rickyshin93/RockshinOps">GitHub <span aria-hidden="true">↗</span></a>
-    </nav>
-    <a class="language" id="language" href="../" hreflang="en" aria-label="Switch to English"><span aria-hidden="true">文 / A</span><span id="language-label">English</span></a>
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="./" aria-label="RockshinOps 首页"><img src="../assets/rockshinops-brand/icon.png" width="24" height="24" alt=""><span>RockshinOps</span></a>
+      <nav aria-label="主导航">
+        <a href="#features" data-i18n="navFeatures">功能</a>
+        <a href="#download" data-i18n="navDownload">下载</a>
+        <a href="https://github.com/rickyshin93/RockshinOps">GitHub</a>
+        <a class="language" id="language" href="../" hreflang="en" aria-label="Switch to English"><span id="language-label">English</span></a>
+      </nav>
+    </div>
   </header>
+
   <main id="main">
-    <section class="hero wrap" aria-labelledby="hero-title">
-      <div class="orbital" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
-      <a class="release" href="https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.5"><span class="status-dot"></span><span data-i18n="release">V0.2.5 已发布</span><span class="release-divider"></span><span data-i18n="releaseNote">重新认识你的电脑</span><span aria-hidden="true">↗</span></a>
-      <h1 id="hero-title"><span data-i18n="hero1">系统监控，</span><br><span class="quiet" data-i18n="hero2">一目了然。</span></h1>
-      <p class="hero-copy" data-i18n="heroCopy">RockshinOps 是免费开源的桌面系统监控工具，支持 macOS、Windows 和 Linux。查看 CPU、内存、磁盘、网络、进程与连接，在菜单栏持续掌握系统活动。</p>
-      <div class="hero-actions"><a class="button primary" href="#download"><span data-i18n="getApp">下载 RockshinOps</span><span aria-hidden="true">↓</span></a><a class="button secondary" href="https://github.com/rickyshin93/RockshinOps"><span data-i18n="exploreSource">探索源代码</span><span aria-hidden="true">↗</span></a></div>
-      <p class="availability"><span data-i18n="free">免费 · 开源</span><span aria-hidden="true">/</span><span>macOS · Windows · Linux</span></p>
-      <figure class="product">
-        <div class="product-top"><span><i class="status-dot"></i><span data-i18n="consoleLabel">一眼看懂，心中有数</span></span><span>ROCKSHINOPS / 0.2</span></div>
-        <div class="product-image"><img id="product-image" src="../assets/rockshinops-brand/overview-zh.jpg" width="1200" height="590" fetchpriority="high" alt="RockshinOps 概览，展示 CPU、内存、GPU、磁盘、网络与电池面板，使用演示数据。"></div>
-        <figcaption><span data-i18n="caption">真实 macOS 界面 · 演示数据</span><button id="motion" type="button" aria-pressed="false" data-i18n="pauseMotion">暂停动效</button></figcaption>
+    <section class="hero" aria-labelledby="hero-title">
+      <img class="hero-icon" src="../assets/rockshinops-brand/icon.png" width="88" height="88" alt="">
+      <h1 id="hero-title"><span data-i18n="hero1">电脑在忙什么，</span><br><span data-i18n="hero2">一眼看清。</span></h1>
+      <p class="lede" data-i18n="heroCopy">免费开源的系统监控工具，支持 macOS、Windows 和 Linux。CPU、内存、磁盘、网络、进程与连接尽在掌握，常用指标常驻菜单栏。</p>
+      <div class="actions">
+        <a class="button" id="hero-download" href="#download" data-i18n="getApp">下载</a>
+        <a class="link" href="https://github.com/rickyshin93/RockshinOps" data-i18n="exploreSource">在 GitHub 查看</a>
+      </div>
+      <p class="detected" id="detected" hidden><span id="detected-label"></span> · <a href="#download" data-i18n="otherVersions">选择其他版本</a></p>
+      <p class="meta"><a href="https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.6" data-i18n="release">版本 0.2.6 · 免费开源</a></p>
+      <figure class="shot">
+        <img id="product-image" src="../assets/rockshinops-brand/overview-zh.jpg" width="1200" height="590" fetchpriority="high" alt="RockshinOps 概览，展示 CPU、内存、GPU、磁盘、网络与电池面板，使用演示数据。">
+        <figcaption data-i18n="caption">真实 macOS 界面，演示数据。</figcaption>
       </figure>
     </section>
 
-    <section class="principles wrap" aria-label="产品原则">
-      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle1">原生系统数据</span></div>
-      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle2">无需注册账户</span></div>
-      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle3">清理前先核对</span></div>
-      <div><span class="plus" aria-hidden="true">+</span><span data-i18n="principle4">中文与英文</span></div>
-    </section>
-
-    <section class="features wrap section" id="features" aria-labelledby="features-title">
-      <div class="section-heading"><div><p class="eyebrow" data-i18n="featuresEyebrow">01 / 看见表象之下</p><h2 id="features-title"><span data-i18n="featuresTitle1">少一点猜测，</span><br><span class="quiet" data-i18n="featuresTitle2">多一点了解。</span></h2></div><p class="section-intro" data-i18n="featuresIntro">保留有用的细节，去掉多余的干扰。从一个读数，深入理解它背后的系统活动。</p></div>
-      <div class="feature-grid">
-        <article class="feature feature-signal">
-          <div class="feature-index">01 <span data-i18n="monitorLabel">观察</span></div>
-          <h3 data-i18n="monitorTitle">看清整个系统。</h3><p data-i18n="monitorCopy">CPU、内存、磁盘与网络，一处掌握。查看每个核心的活动，回顾本次运行中最近一小时的变化。</p>
-          <div class="signal-art" aria-hidden="true"><div class="signal-lines"></div><div class="signal-scan"></div><div class="signal-center"><img src="../assets/rockshinops-brand/icon.png" width="72" height="72" alt=""></div><span class="signal-node n1">CPU</span><span class="signal-node n2">MEM</span><span class="signal-node n3">I/O</span><span class="signal-node n4">NET</span></div>
-          <div class="feature-foot"><span data-i18n="monitorFoot">一个概览，六个硬件面板。</span><span aria-hidden="true">↗</span></div>
+    <section class="features" id="features" aria-labelledby="features-title">
+      <header class="section-head">
+        <h2 id="features-title" data-i18n="monitorTitle">一个应用，看清整个系统。</h2>
+        <p data-i18n="monitorCopy">从六个硬件面板的概览开始，再深入到每个核心的活动，回看本次运行最近一小时的变化。</p>
+      </header>
+      <div class="tiles">
+        <article class="tile wide">
+          <h3 data-i18n="quietTitle">常驻菜单栏。</h3>
+          <p data-i18n="quietCopy">把想看的指标放进菜单栏。关闭窗口只是隐藏，原生采样不会中断。</p>
+          <div class="menubar" aria-hidden="true">
+            <span class="mb-item"><svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/><path d="M6 1.5v2M10 1.5v2M6 12.5v2M10 12.5v2M1.5 6h2M1.5 10h2M12.5 6h2M12.5 10h2"/></svg>24%</span>
+            <span class="mb-item"><svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="13" height="7" rx="1"/><path d="M4.5 11.5v2M8 11.5v2M11.5 11.5v2"/></svg>43%</span>
+            <span class="mb-item"><svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="13" height="7" rx="2"/><circle cx="11.5" cy="8" r=".75"/></svg>642 GB</span>
+            <span class="mb-time">10:24</span>
+          </div>
         </article>
-        <div class="feature-stack">
-          <article class="feature compact"><div class="feature-index">02 <span data-i18n="inspectLabel">理解</span></div><h3 data-i18n="inspectTitle">找到忙碌的源头。</h3><p data-i18n="inspectCopy">查看进程，按应用归集资源占用，检查当前连接。顺着资源消耗，找到对应的活动。</p><div class="tag-row"><span data-i18n="processTag">进程</span><span data-i18n="appsTag">应用</span><span>TCP / UDP</span></div></article>
-          <article class="feature compact"><div class="feature-index">03 <span data-i18n="spaceLabel">读懂磁盘空间</span></div><h3 data-i18n="spaceTitle">知道空间去了哪里。</h3><p data-i18n="spaceCopy">查看磁盘空间占用，核对所选项目后可移入系统废纸篓。</p><div class="space-bar" aria-hidden="true"><i></i><i></i><i></i><i></i></div></article>
-        </div>
+        <article class="tile">
+          <h3 data-i18n="privateTitle">数据只在本机。</h3>
+          <p data-i18n="privateCopy">直接读取系统原生计数器。无需账户，不连云端，历史只保存在内存中。</p>
+        </article>
+        <article class="tile half">
+          <h3 data-i18n="inspectTitle">找到谁在占用。</h3>
+          <p data-i18n="inspectCopy">按资源排序进程，按应用汇总占用，查看每一条 TCP 与 UDP 连接。</p>
+          <div class="segmented" aria-hidden="true"><span class="on" data-i18n="processTag">进程</span><span data-i18n="appsTag">应用</span><span data-i18n="connTag">连接</span></div>
+        </article>
+        <article class="tile half">
+          <h3 data-i18n="spaceTitle">看清空间去向。</h3>
+          <p data-i18n="spaceCopy">分析磁盘占用，逐项核对所选内容，再移入废纸篓。</p>
+          <div class="storage" aria-hidden="true">
+            <div class="storage-bar"><i></i><i></i><i></i><i></i></div>
+            <span data-i18n="storageLabel">可用 642 GB，共 1 TB</span>
+          </div>
+        </article>
       </div>
     </section>
 
-    <section class="quiet-section wrap" aria-labelledby="quiet-title"><div class="quiet-mark" aria-hidden="true">[ R / O ]</div><div><p class="eyebrow" data-i18n="quietEyebrow">需要时在场，其余时候安静</p><h2 id="quiet-title" data-i18n="quietTitle">关上窗口，仍然心中有数。</h2><p data-i18n="quietCopy">把关心的指标留在菜单栏。隐藏窗口后，原生采样继续运行；再次打开时，变化尽在眼前。</p></div><a class="text-link" href="https://github.com/rickyshin93/RockshinOps#features"><span data-i18n="allFeatures">查看全部功能</span> <span aria-hidden="true">↗</span></a></section>
-
-    <section class="download section wrap" id="download" aria-labelledby="download-title">
-      <div class="section-heading"><div><p class="eyebrow" data-i18n="downloadEyebrow">02 / 开始看清你的电脑</p><h2 id="download-title" data-i18n="downloadTitle">为你的电脑，准备好了。</h2></div><p class="section-intro" data-i18n="downloadIntro">选择你的平台。无需账户、订阅，也不用配置云端控制台。</p></div>
-      <div class="download-grid">
-        <article class="download-card"><span class="os-symbol" aria-hidden="true">⌘</span><div class="os-title"><h3>macOS</h3><span>.DMG</span></div><p data-i18n="macDesc">支持 Apple Silicon 与 Intel</p><a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.0.2.5.arm64.dmg"><span>Apple Silicon</span><span aria-hidden="true">↓</span></a><a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.0.2.5.amd64.dmg"><span>Intel</span><span aria-hidden="true">↓</span></a><p class="install-note" data-i18n="macNote">采用临时签名，尚未公证。</p></article>
-        <article class="download-card"><span class="os-symbol windows-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></span><div class="os-title"><h3>Windows</h3><span>.EXE</span></div><p data-i18n="winDesc">适用于 x86_64 电脑</p><a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.Setup.0.2.5.amd64.exe"><span data-i18n="winDownload">下载安装程序</span><span aria-hidden="true">↓</span></a><p class="install-note" data-i18n="winNote">安装包未签名，需要 WebView2。</p></article>
-        <article class="download-card"><span class="os-symbol terminal-symbol" aria-hidden="true">&gt;_</span><div class="os-title"><h3>Linux</h3><span>X86_64</span></div><p data-i18n="linuxDesc">适合你习惯的桌面</p><a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/rockshinops_0.2.5_amd64.deb"><span>Debian / Ubuntu <small>.deb</small></span><span aria-hidden="true">↓</span></a><a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/rockshinops-0.2.5-linux-amd64.tar.gz"><span data-i18n="linuxArchive">Linux 压缩包</span><span><small>.tar.gz</small> ↓</span></a><p class="install-note" data-i18n="linuxNote">需要 GTK 3、WebKitGTK 4.1 和桌面托盘支持。</p></article>
+    <section class="download" id="download" aria-labelledby="download-title">
+      <header class="section-head">
+        <h2 id="download-title" data-i18n="downloadTitle">下载 RockshinOps</h2>
+        <p data-i18n="downloadIntro">macOS、Windows 和 Linux 均免费。无需账户，无需订阅。</p>
+      </header>
+      <div class="platforms">
+        <article class="platform">
+          <h3>macOS</h3>
+          <p data-i18n="macDesc">支持 Apple Silicon 与 Intel</p>
+          <div class="platform-links">
+            <a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.arm64.dmg" data-target="mac-arm64">Apple Silicon</a>
+            <a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.amd64.dmg" data-target="mac-x64">Intel</a>
+          </div>
+          <p class="note" data-i18n="macNote">采用临时签名，尚未公证。</p>
+        </article>
+        <article class="platform">
+          <h3>Windows</h3>
+          <p data-i18n="winDesc">适用于 x86_64 电脑</p>
+          <div class="platform-links">
+            <a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.Setup.0.2.6.amd64.exe" data-target="windows-x64"><span data-i18n="winDownload">安装程序</span> <small>.exe</small></a>
+          </div>
+          <p class="note" data-i18n="winNote">安装包未签名，需要 WebView2。</p>
+        </article>
+        <article class="platform">
+          <h3>Linux</h3>
+          <p data-i18n="linuxDesc">适用于 x86_64 桌面</p>
+          <div class="platform-links">
+            <a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops_0.2.6_amd64.deb" data-target="linux-deb">Debian / Ubuntu <small>.deb</small></a>
+            <a class="download-link" href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops-0.2.6-linux-amd64.tar.gz" data-target="linux-tar"><span data-i18n="linuxArchive">压缩包</span> <small>.tar.gz</small></a>
+          </div>
+          <p class="note" data-i18n="linuxNote">需要 GTK 3、WebKitGTK 4.1 和桌面托盘支持。</p>
+        </article>
       </div>
-      <div class="release-links"><span data-i18n="version">当前版本 — V0.2.5</span><div><a href="https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.5" data-i18n="releaseDetails">发行说明与安装指引</a><a href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/SHA256SUMS.txt" data-i18n="checksums">SHA-256 校验清单</a></div></div>
+      <p class="release-links"><span data-i18n="version">版本 0.2.6</span><a href="https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.6" data-i18n="releaseDetails">发行说明</a><a href="https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/SHA256SUMS.txt" data-i18n="checksums">SHA-256 校验值</a></p>
       <p class="platform-note" data-i18n="platformNote">核心采集已在四个构建目标上测试。桌面交互已在 macOS Apple Silicon 验证；Windows/Linux 桌面交互及电池、GPU 实机覆盖仍在进行。GPU 与功耗读数取决于硬件和驱动支持。</p>
     </section>
 
-    <section class="faq wrap" aria-labelledby="faq-title"><div><p class="eyebrow" data-i18n="faqEyebrow">再了解一点</p><h2 id="faq-title" data-i18n="faqTitle">你可能想知道。</h2></div><div class="questions">
-      <details><summary data-i18n="faq1">需要云端账户吗？</summary><p data-i18n="answer1">不需要。RockshinOps 在本机读取系统指标，历史数据仅保留在本次运行的内存中。无需账户，也无需配置托管监控服务。</p></details>
-      <details><summary data-i18n="faq2">RockshinOps 可以移除文件吗？</summary><p data-i18n="answer2">分析是只读的。你可以核对所选项目并将其移入系统废纸篓；清空废纸篓需要确认。macOS 还支持核对应用和可能的关联文件。退出和强制退出进程需要单独确认。</p></details>
-      <details><summary data-i18n="faq3">应用支持中文吗？</summary><p data-i18n="answer3">支持。应用默认跟随系统语言。也可以在设置中选择“跟随系统”“中文”或“English”，选择后自动保存。</p></details>
-      <details><summary data-i18n="faq4">可以查看源代码吗？</summary><p><span data-i18n="answer4">可以。RockshinOps 采用 MIT 许可证，使用 Go、MyGo 和 TypeScript 构建。</span> <a href="https://github.com/rickyshin93/RockshinOps" data-i18n="readCode">在 GitHub 查看代码 ↗</a></p></details>
-    </div></section>
+    <section class="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title" data-i18n="faqTitle">常见问题</h2>
+      <div class="questions">
+        <details><summary data-i18n="faq1">需要云端账户吗？</summary><p data-i18n="answer1">不需要。RockshinOps 在本机读取系统指标，历史数据仅保留在本次运行的内存中。无需账户，也无需配置托管监控服务。</p></details>
+        <details><summary data-i18n="faq2">RockshinOps 可以移除文件吗？</summary><p data-i18n="answer2">分析是只读的。你可以核对所选项目并将其移入系统废纸篓；清空废纸篓需要确认。macOS 还支持核对应用和可能的关联文件。退出和强制退出进程需要单独确认。</p></details>
+        <details><summary data-i18n="faq3">应用支持中文吗？</summary><p data-i18n="answer3">支持。应用默认跟随系统语言。也可以在设置中选择「跟随系统」「中文」或「English」，选择后自动保存。</p></details>
+        <details><summary data-i18n="faq4">可以查看源代码吗？</summary><p><span data-i18n="answer4">可以。RockshinOps 采用 MIT 许可证，使用 Go、MyGo 和 TypeScript 构建。</span> <a href="https://github.com/rickyshin93/RockshinOps" data-i18n="readCode">在 GitHub 阅读源代码</a></p></details>
+      </div>
+    </section>
   </main>
-  <footer class="footer wrap"><a class="brand" href="./"><img src="../assets/rockshinops-brand/icon.png" width="32" height="32" alt=""><span>RockshinOps</span></a><p data-i18n="footerLine">你的电脑，多一分了解。</p><div><a href="https://github.com/rickyshin93/RockshinOps">GitHub ↗</a><a href="https://github.com/rickyshin93/RockshinOps/blob/main/LICENSE" data-i18n="license">MIT 许可证</a></div><a href="index.md">Markdown</a><a href="../llms.txt">llms.txt</a><span class="copyright">© 2026 RockshinOps</span></footer>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>© 2026 RockshinOps</span>
+      <nav>
+        <a href="https://github.com/rickyshin93/RockshinOps">GitHub</a>
+        <a href="https://github.com/rickyshin93/RockshinOps/blob/main/LICENSE" data-i18n="license">MIT 许可证</a>
+        <a href="index.md">Markdown</a>
+        <a href="../llms.txt">llms.txt</a>
+      </nav>
+    </div>
+  </footer>
 </body>
 </html>

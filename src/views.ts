@@ -1,10 +1,12 @@
+import { portsView } from "./ports-view";
+import { listeningPorts, filterPorts, type PortScope } from "./ports";
 import { windowRows, type TableWindow } from "./table-window";
 import { trendTime } from "./history";
 import { t, i18n } from "./i18n";
-import type { AppInfo, Snapshot, Trend, ProcessList, Connections, ScanResult, AppUsage, Process, InstalledApp, AppReview } from "./mygo";
+import type { AppInfo, Snapshot, Trend, ProcessList, Connections, AppUsage, Process, InstalledApp, AppReview } from "./mygo";
 import { capacityParts, duration, escapeHTML as e, formatBytes, formatCapacity, formatMemory, formatRate, memoryParts, percent, rateParts, timeLabel } from "./format";
 import { dots, lineChart, type TrendKey } from "./charts";
-import { icon } from "./icons";
+import { appIcon, icon, processAppIcon } from "./icons";
 import { sortControl } from "./dropdown";
 import { type SettingsState } from "./settings";
 import { connectionRows, splitEndpoint, type ConnectionSort, type ConnectionSortKey } from "./connections";
@@ -39,24 +41,25 @@ export interface ViewState extends SettingsState {
   processes: ProcessList | null;
   connections: Connections | null;
   connectionSort: ConnectionSort | null;
+  connectionMode?: "all" | "ports";
+  portScope?: PortScope;
+  favoritePorts?: number[];
+  portsLoaded?: boolean;
+  portsSaving?: boolean;
+  portsError?: string;
+  portMessage?: { text: string; error: boolean };
+  portAction?: { pid: number; busy: boolean };
   selectedProcess: number | null;
   processHistory?: Trend[];
   processAction?: { pid: number; busy: boolean; error: boolean; message: string };
   processScope?: "all" | "apps" | "mine" | "system";
   processOrder?: { key: "name" | "cpu" | "memory" | "threads" | "pid" | "userId"; descending: boolean };
-  scan: ScanResult | null;
   query: string;
   sort: string;
   onlyMine: boolean;
   busy: boolean;
   processError: string;
   connectionError: string;
-  scanError: string;
-  scanning: boolean;
-  cleanupBusy: boolean;
-  cleanupMessage: string;
-  spaceMode: boolean;
-  spaceHistory: string[];
   appMode: boolean;
   installedApps: InstalledApp[] | null;
   appReview: AppReview | null;
@@ -67,7 +70,6 @@ export interface ViewState extends SettingsState {
 }
 
 function isMac(state: ViewState): boolean { return state.info?.machine.platform === "darwin"; }
-function appIcon(path: string, native: boolean): string { if (!native) return `<span class="app-icon app-letter">${icon("apps")}</span>`; return `<img class="app-icon" src="appicon://localhost/?path=${encodeURIComponent(path)}" alt="">`; }
 function unavailable(message = t("暂不可用")): string { return `<span class="unavailable">${e(message)}</span>`; }
 function stat(label: string, value: string): string { return `<div><dt>${e(label)}</dt><dd>${value}</dd></div>`; }
 function stats(items: [string, string][]): string { return `<dl class="stats-row">${items.map(([k, v]) => stat(k, v)).join("")}</dl>`; }
@@ -91,19 +93,20 @@ export function navigation(): string {
 }
 
 export function actionControls(state: ViewState): string {
-  if (state.page === "menubar") return "";
+  if (state.page === "menubar" || state.page === "cleanup") return "";
   if (state.page === "settings") return `<span class="settings-shortcut">${isMac(state) ? "⌘," : "Ctrl+,"}</span>`;
   const ranges = [[60, t("1 分钟")], [300, t("5 分钟")], [900, t("15 分钟")], [3600, t("1 小时")]] as const;
   const history = metricPages.includes(state.page) ? `<div class="segmented" role="group" aria-label="${t("历史时间范围")}">${ranges.map(([seconds, label]) => `<button data-range="${seconds}" class="${state.range === seconds ? "selected" : ""}" aria-pressed="${state.range === seconds}">${label}</button>`).join("")}</div>` : "";
   const pause = metricPages.includes(state.page) || ["processes", "connections"].includes(state.page) ? `<button class="icon-button pause-button ${state.paused ? "selected" : ""}" data-action="pause" aria-pressed="${state.paused}" aria-label="${state.paused ? t("恢复实时视图") : t("暂停实时视图")}" title="${state.paused ? t("恢复实时视图") : t("暂停视图，菜单栏继续采集")}">${icon(state.paused ? "play" : "pause")}</button>` : "";
-  if (["processes", "connections"].includes(state.page)) return pause;
-  return `${history}${pause}<button class="icon-button" data-action="refresh" ${state.busy ? 'aria-disabled="true" aria-busy="true"' : ""} aria-label="${state.page === "cleanup" ? t("重新扫描") : t("立即刷新")}" title="${state.page === "cleanup" ? t("重新扫描") : t("立即刷新")}">${icon("refresh")}</button>`;
+  if (["processes", "connections"].includes(state.page) && !(state.page === "connections" && state.connectionMode === "ports")) return pause;
+  return `${history}${pause}<button class="icon-button" data-action="refresh" ${state.busy ? 'aria-disabled="true" aria-busy="true"' : ""} aria-label="${t("立即刷新")}" title="${t("立即刷新")}">${icon("refresh")}</button>`;
 }
 
 export function filterControls(state: ViewState): string {
   if (!["processes", "connections", "apps"].includes(state.page) || (state.page === "apps" && !!state.appReview)) return "";
   const sorting = ["processes", "connections"].includes(state.page) || (state.page === "apps" && state.appMode) ? "" : sortControl(state.sort, state.page === "processes");
-  return `<label class="search-field">${icon("search")}<input id="search" type="search" placeholder="${["processes", "connections"].includes(state.page) ? t("搜索") : state.page === "apps" && state.appMode ? t("搜索 App 名称或路径") : t("搜索名称或 PID")}" aria-label="${t("搜索")}${t(pages.find(p => p.id === state.page)!.title)}" value="${e(state.query)}" autocomplete="off" spellcheck="false"/></label>${sorting}${state.page === "processes" ? `<div class="segmented process-scopes" role="group" aria-label="${t("进程范围")}">${([["all", "全部"], ["apps", "App"], ["mine", "我的进程"], ["system", "系统"]] as const).map(([key, label]) => `<button data-process-scope="${key}" aria-pressed="${(state.processScope || "all") === key}" class="${(state.processScope || "all") === key ? "selected" : ""}">${t(label)}</button>`).join("")}</div>` : ""}`;
+  const modes = state.page === "connections" ? `<div class="segmented connection-modes" role="group" aria-label="${t("连接视图")}"><button data-connection-mode="all" aria-pressed="${state.connectionMode !== "ports"}" class="${state.connectionMode !== "ports" ? "selected" : ""}">${t("全部连接")}</button><button data-connection-mode="ports" aria-pressed="${state.connectionMode === "ports"}" class="${state.connectionMode === "ports" ? "selected" : ""}">${t("开发端口")}</button></div>` : "";
+  return `${modes}<label class="search-field">${icon("search")}<input id="search" type="search" placeholder="${state.page === "connections" && state.connectionMode === "ports" ? t("搜索端口、进程或 PID") : ["processes", "connections"].includes(state.page) ? t("搜索") : state.page === "apps" && state.appMode ? t("搜索 App 名称或路径") : t("搜索名称或 PID")}" aria-label="${t("搜索")}${t(pages.find(p => p.id === state.page)!.title)}" value="${e(state.query)}" autocomplete="off" spellcheck="false"/></label>${sorting}${state.page === "processes" ? `<div class="segmented process-scopes" role="group" aria-label="${t("进程范围")}">${([["all", "全部"], ["apps", "App"], ["mine", "我的进程"], ["system", "系统"]] as const).map(([key, label]) => `<button data-process-scope="${key}" aria-pressed="${(state.processScope || "all") === key}" class="${(state.processScope || "all") === key ? "selected" : ""}">${t(label)}</button>`).join("")}</div>` : ""}`;
 }
 
 function card(state: ViewState, page: Page, color: string, title: string, label: string, main: string, items: [string, string][], keys: TrendKey[], max = 100, status = ""): string {
@@ -219,7 +222,7 @@ function orderedProcesses(state: ViewState): Process[] {
 }
 
 function processIcon(process: Process, state: ViewState): string {
-  return process.app ? appIcon(process.app, isMac(state)) : `<span class="app-icon process-system-icon">${icon("settings")}</span>`;
+  return processAppIcon(process.app, isMac(state));
 }
 
 export function processSubtitle(state: ViewState): string {
@@ -267,6 +270,10 @@ function processView(state: ViewState): string {
 
 export function connectionSubtitle(state: ViewState): string {
   if (!state.connections) return t("正在读取网络连接");
+  if (state.connectionMode === "ports") {
+    const rows = filterPorts(listeningPorts(state.connections.items, state.processes?.items || []), state.query, state.portScope || "all");
+    return `${t("{{count}} 条监听记录", { count: rows.length })} · ${state.paused ? t("视图已暂停") : timeLabel(state.connections.updatedAt)}`;
+  }
   const total = state.connections.items.length;
   const count = state.query.trim() ? t("{{shown}} / {{total}} 个连接", { shown: connectionRows(state.connections.items, state.processes?.items || [], state.query).length, total }) : t("{{count}} 个连接", { count: total });
   return `${count} · ${state.paused ? t("视图已暂停") : timeLabel(state.connections.updatedAt)}`;
@@ -358,55 +365,6 @@ function installedAppsView(state: ViewState): string {
   return message + `<div class="installed-hint"><span>${t("选择 App 后可查看应用包和可能的关联文件。")}</span><button class="cleanup-action" data-action="open-full-disk-access">${t("打开完全磁盘访问权限")}</button></div>` + (apps.length ? `<div class="app-list installed-list">${apps.map(app => `<button data-review-app="${e(app.path)}">${appIcon(app.path, true)}<span><strong>${e(app.name)}</strong><small class="path">${e(app.path)}</small></span>${icon("chevron")}</button>`).join("")}</div>` : empty(t("没有匹配的 App"), t("试试其他名称或路径。")));
 }
 
-function cleanupLanding(state: ViewState): string {
-  const disk = state.snapshot!.disk;
-  const volume = disk.volume;
-  const capacity = !disk.capacityError && volume.total > 0;
-  const unavailableRatio = capacity ? 1 - volume.available / volume.total : 0;
-  const targets = state.info!.scanTargets;
-  return `<div class="flex flex-col gap-4">
-    <section class="storage-summary disk" aria-labelledby="storage-title">
-      <div class="flex items-center gap-2 text-text"><span class="content-icon">${icon("disk")}</span><h2 id="storage-title">${t("磁盘空间")}</h2><span class="ml-auto path text-muted">${e(volume.name || volume.mount)}</span></div>
-      ${disk.capacityError ? `<p class="mt-3 text-small text-error" role="status">${e(disk.capacityError)}</p>` : ""}
-      <dl class="storage-values">
-        <div><dt>${t("剩余可写空间")}</dt><dd class="storage-available">${capacity ? formatCapacity(volume.available) : t("不可用")}</dd></div>
-        <div><dt>${t("已占用及保留")}</dt><dd>${capacity ? formatCapacity(volume.total - volume.available) : "—"}</dd></div>
-        <div><dt>${t("容量")}</dt><dd>${capacity ? formatCapacity(volume.total) : "—"}</dd></div>
-      </dl>
-      ${capacity ? `<div class="capacity-track" aria-hidden="true"><i style="transform:scaleX(${unavailableRatio})"></i></div>` : ""}
-      <p class="mt-3 text-caption text-muted">${t("当前用户可写的剩余容量")} · ${t("用户主目录所在卷")}</p>
-    </section>
-    <div class="cleanup-workspaces">
-      <section class="cleanup-workspace" aria-labelledby="explore-title">
-        <div class="flex items-center gap-2"><span class="content-icon">${icon("folder")}</span><h2 id="explore-title">${t("透视磁盘")}</h2></div>
-        <h3 class="mt-5 text-[20px] font-semibold tracking-tight">${t("先了解空间去了哪里")}</h3>
-        <p class="mt-2 text-small leading-relaxed text-muted">${t("从磁盘根目录开始，按文件夹逐层查看空间分布。")}</p>
-        <dl class="fact-list my-5">
-          <div><dt>${t("扫描范围")}</dt><dd>${t("系统磁盘")}</dd></div>
-          <div><dt>${t("分析方式")}</dt><dd>${t("只读取文件大小")}</dd></div>
-          <div><dt>${t("清理方式")}</dt><dd>${t("核对后移入废纸篓")}</dd></div>
-        </dl>
-        <div class="mt-auto pt-2"><button class="primary-button" data-action="space-start">${t("透视磁盘")}${icon("chevron")}</button></div>
-      </section>
-      <section class="cleanup-workspace" aria-labelledby="targets-title">
-        <div class="flex items-center gap-2"><span class="content-icon">${icon("cleanup")}</span><h2 id="targets-title">${t("缓存与废纸篓")}</h2></div>
-        <p class="mt-3 text-small leading-relaxed text-muted">${t("分析下列配置目录的文件大小。文件内容不会被读取。")}</p>
-        <ul class="cleanup-targets">${targets.map(target => `<li><span class="inline-flex shrink-0 text-muted">${icon("folder")}</span><div class="min-w-0"><strong class="block text-small font-medium">${e(t(target.name))}</strong><span class="path block text-muted">${e(target.path)}</span></div></li>`).join("")}</ul>
-        <div class="mt-auto pt-2"><button class="secondary-button" data-action="cleanup-targets">${t("查看缓存与废纸篓")}${icon("chevron")}</button></div>
-      </section>
-    </div>
-    <p class="text-caption leading-relaxed text-muted">${t("分析只读取文件大小。选中的项目会移入系统废纸篓；清空废纸篓将永久删除所有内容。缓存可能仍被 App 使用。")}</p>
-  </div>`;
-}
-
-function cleanupView(state: ViewState): string {
-  const intro = notice(t("分析只读取文件大小。选中的项目会移入系统废纸篓；清空废纸篓将永久删除所有内容。缓存可能仍被 App 使用。"));
-  if (state.scanning) return intro + `<div class="empty-state" role="status" aria-live="polite"><span class="scan-spinner" aria-hidden="true"></span><strong>${t("正在扫描本机空间")}</strong>${state.spaceMode ? `<strong class="scan-progress" data-scan-progress>${t("正在统计扫描项目…")}</strong>` : ""}<p>${t(state.spaceMode ? "进度按项目数量计算，不代表剩余时间。文件较多时统计和扫描可能需要较长时间；无法读取的项目会在结果中标明。" : "逐项读取配置的目录。遇到权限限制会标注，达到时间或数量上限会返回已读部分。")}</p>${state.spaceMode && state.spaceHistory.length ? `<p class="path">${e(state.spaceHistory.at(-1)!)}</p>` : ""}</div>`;
-  if (state.scanError) return intro + empty(t("扫描未完成"), state.scanError, `<button data-action="scan">${t("重新扫描")}</button>`);
-  if (!state.scan) return cleanupLanding(state);
-  return intro + `<div class="space-toolbar">${state.spaceMode ? `<button class="cleanup-action" data-action="space-back" ${state.spaceHistory.length ? "" : "disabled"}>${t("返回上一级")}</button><button class="cleanup-action" data-action="cleanup-targets">${t("查看缓存与废纸篓")}</button>` : `<button class="cleanup-action" data-action="space-start">${t("透视磁盘")}</button>`}</div>` + `${state.cleanupMessage ? notice(state.cleanupMessage) : ""}${!state.scan.complete ? notice(state.scan.warning || t("部分目录无法读取。以下数据仅代表成功读取的文件。")) : ""}<div class="result-summary"><span>${state.scan.complete ? t("扫描完成") : t("扫描结果不完整")}</span><span>${timeLabel(state.scan.finishedAt)} ${t("· 逻辑文件大小，不代表实际可释放空间")}</span></div><div class="scan-groups">${state.scan.groups.map(group => `<section class="scan-group"><div class="scan-group-heading"><div><h2>${e(t(group.name))}</h2><p class="path">${e(group.path)}</p></div><div><strong>${formatCapacity(group.bytes)}</strong><span>${group.files} ${t("个文件")}</span></div></div>${group.error ? notice(group.error) : ""}${group.skipped ? note(`${group.skipped} ${t("项因权限或读取错误跳过。")}`) : ""}${group.error || group.skipped ? note(t("此目录扫描不完整，清理不可用。")) : ""}<div class="space-list">${group.items.map(item => `<div><span title="${e(item.path)}">${icon("folder")}<strong>${e(item.name)}</strong>${state.spaceMode ? `<i class="space-share" style="--share:${group.bytes ? Math.min(100, item.bytes / group.bytes * 100) : 0}%"></i>` : ""}</span>${state.spaceMode && item.directory ? `<button class="cleanup-action" data-space-path="${e(item.path)}">${t("打开")}</button>` : ""}<span>${item.scanned ? `${item.files} ${t("项")}` : t("未扫描")}</span><span>${item.scanned ? formatCapacity(item.bytes) : "—"}</span>${group.name !== "废纸篓" && !(state.info?.scanTargets || []).some(target => target.name === "废纸篓" && (item.path === target.path || item.path.startsWith(target.path + (target.path.includes("\\") ? "\\" : "/")))) ? `<button class="cleanup-action" data-cleanup-path="${e(item.path)}" ${!!group.error || group.skipped > 0 || state.cleanupBusy ? "disabled" : ""}>${t("移入废纸篓")}</button>` : ""}</div>`).join("") || `<p class="muted">${t("未读取到普通文件")}</p>`}</div>${group.name === "废纸篓" ? `<button class="cleanup-action" data-empty-trash="${e(group.path)}" ${!!group.error || group.skipped > 0 || state.cleanupBusy ? "disabled" : ""}>${t("清空废纸篓")}</button>` : ""}</section>`).join("")}</div>${note(t("不跟随符号链接。目录按逻辑大小汇总；硬链接、APFS 克隆和多次挂载的路径可能重复计入。"))}`;
-}
-
 function aboutView(state: ViewState): string {
   const i = state.info!, m = i.machine, s = state.snapshot!, disk = s.disk;
   const name = m.name || m.model || t("本机");
@@ -433,7 +391,7 @@ function aboutView(state: ViewState): string {
 }
 
 export function renderBody(state: ViewState): string {
-  if (state.page === "settings" || state.page === "menubar") return "";
+  if (state.page === "settings" || state.page === "menubar" || state.page === "cleanup") return "";
   if (!state.snapshot || !state.info) return empty(t("等待本机数据"), t("点击右上角刷新重新连接采集服务。"));
   switch (state.page) {
     case "overview": return overview(state);
@@ -444,9 +402,8 @@ export function renderBody(state: ViewState): string {
     case "network": return networkView(state);
     case "energy": return energyView(state);
     case "processes": return processView(state);
-    case "connections": return connectionView(state);
+    case "connections": return state.connectionMode === "ports" ? portsView(state) : connectionView(state);
     case "apps": return appsView(state);
-    case "cleanup": return cleanupView(state);
     case "about": return aboutView(state);
   }
 }

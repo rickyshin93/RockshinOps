@@ -253,30 +253,6 @@ export interface ProcessList {
   error: string;
 }
 
-export interface ScanGroup {
-  name: string;
-  path: string;
-  bytes: number;
-  files: number;
-  skipped: number;
-  error: string;
-  items: SpaceItem[];
-}
-
-export interface ScanProgress {
-  phase: string;
-  total: number;
-  visited: number;
-}
-
-export interface ScanResult {
-  groups: ScanGroup[];
-  startedAt: string;
-  finishedAt: string;
-  complete: boolean;
-  warning: string;
-}
-
 export interface ScanTarget {
   name: string;
   path: string;
@@ -321,13 +297,56 @@ export interface Snapshot {
   uptimeSeconds: number;
 }
 
-export interface SpaceItem {
+export interface SpaceEntry {
   name: string;
   path: string;
   bytes: number;
   files: number;
   directory: boolean;
-  scanned: boolean;
+  other: boolean;
+  partial: boolean;
+  trashable: boolean;
+}
+
+export interface SpaceListing {
+  entry: SpaceEntry;
+  ancestors: SpaceEntry[];
+  children: SpaceEntry[];
+}
+
+export interface SpaceProgress {
+  scanning: boolean;
+  files: number;
+  bytes: number;
+  skipped: number;
+  path: string;
+}
+
+export interface SpaceSuggestion {
+  name: string;
+  path: string;
+  bytes: number;
+  files: number;
+  found: boolean;
+  trash: boolean;
+}
+
+export interface SpaceSummary {
+  root: string;
+  bytes: number;
+  files: number;
+  skipped: number;
+  startedAt: string;
+  finishedAt: string;
+  top: SpaceEntry[];
+  largest: SpaceEntry[];
+  suggestions: SpaceSuggestion[];
+}
+
+export interface StartupSettings {
+  enabled: boolean;
+  available: boolean;
+  error: string;
 }
 
 export interface State {
@@ -372,14 +391,24 @@ export const System = {
   cancelAppReview(id: number): Promise<void> {
     return call("System.CancelAppReview", id);
   },
+  cancelScan(): Promise<void> {
+    return call("System.CancelScan");
+  },
   checkForUpdates(): Promise<void> {
     return call("System.CheckForUpdates");
   },
   connections(): Promise<Connections> {
     return call("System.Connections");
   },
-  emptyCleanupTrash(path: string): Promise<void> {
-    return call("System.EmptyCleanupTrash", path);
+  copyPortAddress(address: string): Promise<void> {
+    return call("System.CopyPortAddress", address);
+  },
+  emptySpaceTrash(): Promise<SpaceSummary> {
+    return call("System.EmptySpaceTrash");
+  },
+  /** An absent file means no favorites, including on upgrades. */
+  favoritePorts(): Promise<number[]> {
+    return call("System.FavoritePorts");
   },
   hideWindow(): Promise<void> {
     return call("System.HideWindow");
@@ -433,26 +462,40 @@ export const System = {
   reviewAppQuick(path: string): Promise<AppReview> {
     return call("System.ReviewAppQuick", path);
   },
+  saveFavoritePorts(ports: number[]): Promise<number[]> {
+    return call("System.SaveFavoritePorts", ports);
+  },
   saveMenuBarSettings(next: Settings): Promise<MenuBarConfiguration> {
     return call("System.SaveMenuBarSettings", next);
   },
   savePreferences(p: Preferences): Promise<Preferences> {
     return call("System.SavePreferences", p);
   },
-  scanCleanup(): Promise<ScanResult> {
-    return call("System.ScanCleanup");
+  /**
+   * ScanSpace measures the volume holding the home directory once; browsing and
+   * cleanup then use the in-memory result until the next scan.
+   */
+  scanSpace(): Promise<SpaceSummary> {
+    return call("System.ScanSpace");
   },
-  scanDisk(path: string): Promise<ScanResult> {
-    return call("System.ScanDisk", path);
+  setOpenAtLogin(enabled: boolean): Promise<StartupSettings> {
+    return call("System.SetOpenAtLogin", enabled);
   },
-  scanProgress(): Promise<ScanProgress> {
-    return call("System.ScanProgress");
+  /** SpaceListing returns a scanned folder; an empty path means the volume root. */
+  spaceListing(path: string): Promise<SpaceListing> {
+    return call("System.SpaceListing", path);
+  },
+  spaceProgress(): Promise<SpaceProgress> {
+    return call("System.SpaceProgress");
+  },
+  startupSettings(): Promise<StartupSettings> {
+    return call("System.StartupSettings");
   },
   terminateProcess(pid: number, identity: string, force: boolean): Promise<void> {
     return call("System.TerminateProcess", pid, identity, force);
   },
-  trashCleanupItem(path: string): Promise<void> {
-    return call("System.TrashCleanupItem", path);
+  trashSpaceItem(path: string): Promise<SpaceSummary> {
+    return call("System.TrashSpaceItem", path);
   },
 } as const;
 

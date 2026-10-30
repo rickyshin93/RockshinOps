@@ -68,13 +68,13 @@ for (const language of ["en", "zh"] as const) {
     });
     html = html.replaceAll('href="assets/', 'href="../assets/').replaceAll('src="assets/', 'src="../assets/').replace('href="styles.css"', 'href="../styles.css"').replace('src="main.js"', 'src="../main.js"');
     html = html.replace('href="zh/" hreflang="zh-CN"', 'href="../" hreflang="en"').replace('id="language-label">中文', 'id="language-label">English').replace('aria-label="切换为中文"', 'aria-label="Switch to English"');
-    html = html.replace('aria-label="Main navigation"', 'aria-label="主导航"').replace('aria-label="Product principles"', 'aria-label="产品原则"').replace('aria-label="RockshinOps home"', 'aria-label="RockshinOps 首页"').replace('overview-en.jpg', 'overview-zh.jpg').replace('RockshinOps overview showing CPU, memory, GPU, disk, network and battery panels with demonstration data.', 'RockshinOps 概览，展示 CPU、内存、GPU、磁盘、网络与电池面板，使用演示数据。');
+    html = html.replace('aria-label="Main navigation"', 'aria-label="主导航"').replace('aria-label="RockshinOps home"', 'aria-label="RockshinOps 首页"').replace('overview-en.jpg', 'overview-zh.jpg').replace('RockshinOps overview showing CPU, memory, GPU, disk, network and battery panels with demonstration data.', 'RockshinOps 概览，展示 CPU、内存、GPU、磁盘、网络与电池面板，使用演示数据。');
     html = html.replace('href="llms.txt"', 'href="../llms.txt"');
   }
   const directory = "website/" + (chinese ? "zh/" : "");
   mkdirSync(directory, { recursive: true });
   writeFileSync(directory + "index.html", html);
-  const sections = [["monitorTitle", "monitorCopy"], ["inspectTitle", "inspectCopy"], ["spaceTitle", "spaceCopy"], ["quietTitle", "quietCopy"], ["downloadTitle", "downloadIntro"]].map(([title, body]) => `## ${copy[title!]}\n\n${copy[body!]}`);
+  const sections = [["monitorTitle", "monitorCopy"], ["inspectTitle", "inspectCopy"], ["spaceTitle", "spaceCopy"], ["quietTitle", "quietCopy"], ["privateTitle", "privateCopy"], ["downloadTitle", "downloadIntro"]].map(([title, body]) => `## ${copy[title!]}\n\n${copy[body!]}`);
   const downloads = [...html.matchAll(/class="download-link" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map(match => `- [${plain(match[2]!).replace(/[↓↗]/g, "").trim()}](${match[1]})`);
   const faq = [1, 2, 3, 4].map(n => `### ${copy["faq" + n]}\n\n${copy["answer" + n]}`);
   writeFileSync(directory + "index.md", `# RockshinOps\n\n${copy.heroCopy}\n\n[${chinese ? "官网" : "Official website"}](${url}) · [GitHub](${repo}) · [MIT](${repo}/blob/main/LICENSE)\n\n${sections.join("\n\n")}\n\n${copy.version}\n\n${downloads.join("\n")}\n\n${copy.macNote}\n\n${copy.winNote}\n\n${copy.linuxNote}\n\n${copy.platformNote}\n\n${faq.join("\n\n")}\n`);

@@ -15,7 +15,7 @@ describe("language selection", () => {
     expect(resolveLanguage(languages)).toBe(expected);
   });
   test("changing only language makes settings saveable", () => {
-    const state: SettingsState = { preferences: { language: "system", menuBarItems: ["disk"], hideDockOnClose: false, updateUseSystemProxy: false }, languageDraft: "system", menuBarDraft: ["disk"], hideDockDraft: false, trayPreview: null, updateProxyDraft: false, preferencesBusy: false, preferencesError: "" };
+    const state: SettingsState = { startup: { enabled: true, available: true, error: "" }, startupBusy: false, startupError: "", preferences: { language: "system", menuBarItems: ["disk"], hideDockOnClose: false, updateUseSystemProxy: false }, languageDraft: "system", menuBarDraft: ["disk"], hideDockDraft: false, trayPreview: null, updateProxyDraft: false, preferencesBusy: false, preferencesError: "" };
     expect(preferencesDirty(state)).toBe(false);
     state.languageDraft = "en";
     expect(preferencesDirty(state)).toBe(true);
@@ -45,7 +45,7 @@ test("both catalogs cover UI keys and preserve interpolation contracts", () => {
     const placeholders = (text: string) => [...text.matchAll(/{{\w+}}|%[-.\d]*[a-z%]/g)].map(match => match[0]).sort();
     expect(placeholders(value), key).toEqual(placeholders(zh[key as keyof typeof zh]));
   }
-  for (const path of ["src/main.ts", "src/views.ts", "src/charts.ts", "src/format.ts", "src/dropdown.ts", "src/settings-view.tsx", "src/menu-bar-view.tsx"]) {
+  for (const path of ["src/main.ts", "src/views.ts", "src/ports-view.ts", "src/charts.ts", "src/format.ts", "src/dropdown.ts", "src/settings-view.tsx", "src/menu-bar-view.tsx", "src/space-view.tsx"]) {
     const source = readFileSync(path, "utf8");
     for (const match of source.matchAll(/\bt\(["']([^"']+)["']/g)) expect(Object.hasOwn(en, match[1]!), `${path}: ${match[1]}`).toBe(true);
   }

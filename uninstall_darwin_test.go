@@ -91,8 +91,8 @@ func TestAppReviewDoesNotWaitForDiskScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.cleanupMu.Lock()
-	defer s.cleanupMu.Unlock()
+	s.spaceMu.Lock()
+	defer s.spaceMu.Unlock()
 	done := make(chan error, 1)
 	go func() { done <- s.CancelAppReview(quick.ReviewID) }()
 	select {
@@ -132,7 +132,7 @@ func TestReviewAppFindsCandidatesWithoutSelectingThem(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(otherBundle, "Contents"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	s := &System{config: Config{ScanMaxEntries: 100, ScanTimeoutSeconds: 2}}
+	s := &System{}
 	quick, err := s.ReviewAppQuick(app)
 	if err != nil || !slices.ContainsFunc(quick.Files, func(file AppFile) bool { return file.Path == cache }) {
 		t.Fatalf("quick review missed the common cache: %+v %v", quick, err)

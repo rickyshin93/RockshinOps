@@ -2,62 +2,7 @@ import { expect, test } from "bun:test";
 import { toggleAllAppFiles, reconcileAppFiles } from "../src/app-selection";
 import { renderBody, type ViewState } from "../src/views";
 
-const state = {
-  page: "cleanup", info: { scanTargets: [] }, snapshot: {}, scanning: true,
-  spaceMode: true, spaceHistory: ["/Users/example"], scanError: "", scan: null,
-  cleanupMessage: "", cleanupBusy: false,
-} as unknown as ViewState;
-
-test.each([false, true])("cleanup landing keeps capacity truthful when collection fails: %s", (failed) => {
-  const previousDocument = globalThis.document;
-  globalThis.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {}, outerHTML: "<svg></svg>" }) } as unknown as Document;
-  try {
-    const html = renderBody({ ...state, scanning: false,
-      info: { scanTargets: [{ name: "应用缓存", path: "/Users/example/Cache<&>" }] },
-      snapshot: { disk: { volume: { name: "Data", mount: "/", total: 1e12, available: 250e9 }, capacityError: failed ? "Permission denied" : "" } },
-    } as unknown as ViewState);
-    expect(html).toContain('data-action="space-start"');
-    expect(html).toContain('data-action="cleanup-targets"');
-    expect(html).toContain("/Users/example/Cache&lt;&amp;&gt;");
-    expect(html).not.toContain("data-cleanup-path");
-    if (failed) {
-      expect(html).toContain("Permission denied");
-      expect(html).not.toContain("250.0 GB");
-      expect(html).not.toContain("scaleX(");
-    } else {
-      expect(html).toContain("250.0 GB");
-      expect(html).toContain("750.0 GB");
-      expect(html).toContain("scaleX(0.75)");
-    }
-  } finally {
-    globalThis.document = previousDocument;
-  }
-});
-
-test("shows an accessible loading indicator while recursively scanning a folder", () => {
-  const html = renderBody(state);
-  expect(html).toContain('role="status"');
-  expect(html).toContain('class="scan-spinner"');
-  expect(html).toContain('data-scan-progress');
-  expect(html).toContain("/Users/example");
-});
-
-test("offers navigation into every directory, including folders not yet scanned", () => {
-  const previousDocument = globalThis.document;
-  globalThis.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {}, outerHTML: "<svg></svg>" }) } as unknown as Document;
-  try {
-  const html = renderBody({ ...state, scanning: false, scan: {
-    complete: false, warning: "partial", startedAt: "2026-10-27T00:00:00Z", finishedAt: "2026-10-27T00:00:00Z",
-    groups: [{ name: "disk", path: "/", bytes: 0, files: 0, skipped: 1, error: "", items: [
-      { name: "Users", path: "/Users", bytes: 0, files: 0, directory: true, scanned: false },
-    ] }],
-  } });
-  expect(html).toContain('data-space-path="/Users"');
-  expect(html).toContain("Not scanned");
-  } finally {
-    globalThis.document = previousDocument;
-  }
-});
+const state = { page: "apps", info: { scanTargets: [] }, snapshot: {} } as unknown as ViewState;
 
 test("shows app candidates while the full search continues and prevents premature removal", () => {
   const html = renderBody({ ...state, page: "apps", info: { machine: { platform: "darwin" } }, appMode: true, appBusy: true, appSearching: true,

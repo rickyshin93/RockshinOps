@@ -1,36 +1,40 @@
 # RockshinOps
 
-RockshinOps is a free, open-source desktop system monitor for macOS, Windows and Linux. Track CPU, memory, disk, network, processes and connections, with persistent menu bar metrics.
+A free, open-source system monitor for macOS, Windows and Linux. CPU, memory, disk, network, processes and connections, with live readings in your menu bar.
 
 [Official website](https://rickyshin93.github.io/RockshinOps/) · [GitHub](https://github.com/rickyshin93/RockshinOps) · [MIT](https://github.com/rickyshin93/RockshinOps/blob/main/LICENSE)
 
-## See the whole picture.
+## One app for the whole system.
 
-CPU, memory, disk and network, together. Explore per-core activity and up to an hour of in-session history.
+Start with six hardware panels at a glance, then go deeper into per-core activity and up to an hour of in-session history.
 
-## Find what is busy.
+## Find what’s busy.
 
-Inspect processes, group activity by app, and see open connections. Follow the resource usage back to its source.
+Sort processes, group usage by app, and see every open TCP and UDP connection.
 
-## Know where it goes.
+## See where the space went.
 
-Explore disk usage, then review selected items before moving them to the system trash.
+Analyze disk usage, review what you select, then move it to the Trash.
 
-## Close the window. Keep the signal.
+## Lives in your menu bar.
 
-Keep your chosen metrics in the menu bar. Native sampling continues when the window is hidden, ready when you come back.
+Keep the metrics you choose in the menu bar. Closing the window only hides it; native sampling keeps running.
 
-## Make yourself at home.
+## Stays on your machine.
 
-Choose your platform. No account, subscription or cloud dashboard to set up.
+Reads native system counters locally. No account, no cloud. History is kept in memory only.
 
-CURRENT RELEASE — V0.2.5
+## Download RockshinOps.
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.0.2.5.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.0.2.5.amd64.dmg)
-- [Download installer](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.Setup.0.2.5.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/rockshinops_0.2.5_amd64.deb)
-- [Linux archive.tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/rockshinops-0.2.5-linux-amd64.tar.gz)
+Free for macOS, Windows and Linux. No account or subscription required.
+
+Version 0.2.6
+
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.amd64.dmg)
+- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.Setup.0.2.6.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops_0.2.6_amd64.deb)
+- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops-0.2.6-linux-amd64.tar.gz)
 
 Ad-hoc signed. Not notarized.
 
@@ -52,6 +56,6 @@ Analysis is read-only. You can review and move selected items to the system tras
 
 Yes. The app follows your system language by default. Choose System default, 中文 or English in Settings; changes are saved automatically.
 
-### Can I look under the hood?
+### Is the source code available?
 
-Absolutely. RockshinOps is MIT-licensed and built with Go, MyGo and TypeScript.
+Yes. RockshinOps is MIT-licensed and built with Go, MyGo and TypeScript.

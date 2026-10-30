@@ -1,36 +1,40 @@
 # RockshinOps
 
-RockshinOps 是免费开源的桌面系统监控工具，支持 macOS、Windows 和 Linux。查看 CPU、内存、磁盘、网络、进程与连接，在菜单栏持续掌握系统活动。
+免费开源的系统监控工具，支持 macOS、Windows 和 Linux。CPU、内存、磁盘、网络、进程与连接尽在掌握，常用指标常驻菜单栏。
 
 [官网](https://rickyshin93.github.io/RockshinOps/zh/) · [GitHub](https://github.com/rickyshin93/RockshinOps) · [MIT](https://github.com/rickyshin93/RockshinOps/blob/main/LICENSE)
 
-## 看清整个系统。
+## 一个应用，看清整个系统。
 
-CPU、内存、磁盘与网络，一处掌握。查看每个核心的活动，回顾本次运行中最近一小时的变化。
+从六个硬件面板的概览开始，再深入到每个核心的活动，回看本次运行最近一小时的变化。
 
-## 找到忙碌的源头。
+## 找到谁在占用。
 
-查看进程，按应用归集资源占用，检查当前连接。顺着资源消耗，找到对应的活动。
+按资源排序进程，按应用汇总占用，查看每一条 TCP 与 UDP 连接。
 
-## 知道空间去了哪里。
+## 看清空间去向。
 
-查看磁盘空间占用，核对所选项目后可移入系统废纸篓。
+分析磁盘占用，逐项核对所选内容，再移入废纸篓。
 
-## 关上窗口，仍然心中有数。
+## 常驻菜单栏。
 
-把关心的指标留在菜单栏。隐藏窗口后，原生采样继续运行；再次打开时，变化尽在眼前。
+把想看的指标放进菜单栏。关闭窗口只是隐藏，原生采样不会中断。
 
-## 为你的电脑，准备好了。
+## 数据只在本机。
 
-选择你的平台。无需账户、订阅，也不用配置云端控制台。
+直接读取系统原生计数器。无需账户，不连云端，历史只保存在内存中。
 
-当前版本 — V0.2.5
+## 下载 RockshinOps
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.0.2.5.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.0.2.5.amd64.dmg)
-- [下载安装程序](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/RockshinOps.Setup.0.2.5.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/rockshinops_0.2.5_amd64.deb)
-- [Linux 压缩包.tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.5/rockshinops-0.2.5-linux-amd64.tar.gz)
+macOS、Windows 和 Linux 均免费。无需账户，无需订阅。
+
+版本 0.2.6
+
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.0.2.6.amd64.dmg)
+- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/RockshinOps.Setup.0.2.6.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops_0.2.6_amd64.deb)
+- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.6/rockshinops-0.2.6-linux-amd64.tar.gz)
 
 采用临时签名，尚未公证。
 
@@ -50,7 +54,7 @@ CPU、内存、磁盘与网络，一处掌握。查看每个核心的活动，�
 
 ### 应用支持中文吗？
 
-支持。应用默认跟随系统语言。也可以在设置中选择“跟随系统”“中文”或“English”，选择后自动保存。
+支持。应用默认跟随系统语言。也可以在设置中选择「跟随系统」「中文」或「English」，选择后自动保存。
 
 ### 可以查看源代码吗？
 

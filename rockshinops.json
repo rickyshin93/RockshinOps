@@ -1,4 +1,5 @@
 {
+  "defaultOpenAtLogin": true,
   "defaultHideDockOnClose": false,
   "defaultLanguage": "system",
   "defaultUpdateUseSystemProxy": false,
@@ -13,9 +14,6 @@
   "connectionTimeoutSeconds": 10,
   "connectionSampleIntervalSeconds": 1,
   "machineInfoTimeoutSeconds": 5,
-  "scanTimeoutSeconds": 20,
-  "scanMaxEntries": 200000,
-  "scanMaxItems": 20,
   "scanTargets": {
     "darwin": [
       {

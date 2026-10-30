@@ -5,7 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
+
+	"rockshinops/internal/metrics"
 )
 
 func TestEmptyTrashKeepsRootAndOutsideSymlinkTarget(t *testing.T) {
@@ -44,55 +45,112 @@ func TestEmptyTrashKeepsRootAndOutsideSymlinkTarget(t *testing.T) {
 	}
 }
 
-func TestCleanupRejectsUnscannedPath(t *testing.T) {
-	s := &System{}
-	if err := s.TrashCleanupItem(t.TempDir()); err == nil {
-		t.Fatal("accepted unscanned item")
+func TestSpaceCleanupOnlyAllowsReviewedItemsInsideHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	trash := filepath.Join(home, ".Trash")
+	caches := filepath.Join(home, "Library", "Caches")
+	for _, dir := range []string{trash, filepath.Join(caches, "app"), filepath.Join(home, "Library", "Mail"), filepath.Join(home, "Downloads", "old")} {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := s.EmptyCleanupTrash(t.TempDir()); err == nil {
-		t.Fatal("accepted unscanned trash")
+	if err := os.WriteFile(filepath.Join(trash, "junk"), make([]byte, 2_000_000), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "Library", "Mail", "box"), make([]byte, 1_500_000), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s := &System{info: AppInfo{ScanTargets: []metrics.ScanTarget{{Name: "应用缓存", Path: caches}, {Name: trashTargetName, Path: trash}}}}
+	for path, want := range map[string]bool{
+		filepath.Join(home, "Downloads", "old"): true,
+		filepath.Join(caches, "app"):            true,
+		filepath.Join(home, "Downloads"):        false,
+		filepath.Join(home, "Library", "Mail"):  false,
+		caches:                                  false,
+		filepath.Join(trash, "junk"):            false,
+		home:                                    false,
+		filepath.Dir(home):                      false,
+	} {
+		if got := s.trashable(path); got != want {
+			t.Errorf("trashable(%s) = %v, want %v", path, got, want)
+		}
+	}
+	summary, err := s.scanSpace(context.Background(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Bytes < 3_500_000 || len(summary.Suggestions) != 2 || !summary.Suggestions[1].Trash || summary.Suggestions[1].Bytes < 2_000_000 || len(summary.Largest) != 1 || !summary.Suggestions[0].Found {
+		t.Fatalf("unexpected summary: %+v", summary)
+	}
+	listing, err := s.SpaceListing(filepath.Join(home, "Library"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listing.Children) == 0 {
+		t.Fatal("Library listing is empty")
+	}
+	for _, child := range listing.Children {
+		if child.Trashable {
+			t.Fatalf("app data root offered for removal: %+v", child)
+		}
+	}
+	// A folder replaced after the scan must not be trashed under the old review.
+	old := filepath.Join(home, "Downloads", "old")
+	if err := os.Rename(old, old+"-moved"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(old, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TrashSpaceItem(old); err == nil {
+		t.Fatal("trashed an item replaced after the scan")
+	}
+	if summary, err := s.EmptySpaceTrash(); err != nil || summary.Suggestions[1].Bytes != 0 || summary.Bytes >= 2_000_000 || summary.Bytes < 1_500_000 {
+		t.Fatalf("empty trash: %+v %v", summary, err)
+	}
+	if entries, _ := os.ReadDir(trash); len(entries) != 0 {
+		t.Fatalf("trash not emptied: %v", entries)
 	}
 }
 
-func TestScanDiskBrowsesOnlyRealDirectories(t *testing.T) {
+func TestCancelledSpaceScanKeepsPreviousResult(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	folder := filepath.Join(home, "folder")
-	if err := os.Mkdir(folder, 0700); err != nil {
+	s := &System{}
+	if _, err := s.scanSpace(context.Background(), home); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(folder, "data"), []byte("content"), 0600); err != nil {
-		t.Fatal(err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.scanSpace(ctx, home); err != errScanCancelled {
+		t.Fatalf("cancelled scan returned %v", err)
 	}
-	if err := os.Symlink(t.TempDir(), filepath.Join(home, "outside")); err != nil {
-		t.Fatal(err)
+	if _, err := s.SpaceListing(""); err != nil {
+		t.Fatalf("previous result was discarded: %v", err)
 	}
-	s := &System{config: Config{ScanMaxEntries: 100, ScanTimeoutSeconds: int(time.Second.Seconds())}}
-	result, err := s.scanDisk(context.Background(), home, "")
-	if err != nil || len(result.Groups) != 1 || len(result.Groups[0].Items) != 1 || !result.Groups[0].Items[0].Directory {
-		t.Fatalf("unexpected scan: %+v %v", result, err)
+	if s.SpaceProgress().Scanning {
+		t.Fatal("progress still reports a running scan")
 	}
-	child, err := s.scanDisk(context.Background(), home, folder)
-	if err != nil || len(child.Groups[0].Items) != 1 || child.Groups[0].Items[0].Name != "data" {
-		t.Fatalf("unexpected nested scan: %+v %v", child, err)
+}
+
+func TestCancelScanStopsRunningScan(t *testing.T) {
+	s := &System{}
+	ctx, done := s.beginScan(context.Background())
+	defer done()
+	s.CancelScan()
+	if ctx.Err() == nil {
+		t.Fatal("scan context was not cancelled")
 	}
-	// Restore the parent scan before verifying protection against replacement.
-	if _, err := s.scanDisk(context.Background(), home, ""); err != nil {
-		t.Fatal(err)
+}
+
+func TestScanProgressShowsShallowFolder(t *testing.T) {
+	root := filepath.VolumeName(os.TempDir()) + string(filepath.Separator)
+	deep := filepath.Join(root, "Users", "me", "work", "app", "node_modules", "pkg")
+	if got, want := shallowPath(deep, 4), filepath.Join(root, "Users", "me", "work", "app"); got != want {
+		t.Fatalf("got %q, want %q", got, want)
 	}
-	if _, err := s.scanDisk(context.Background(), home, filepath.Join(home, "outside")); err == nil {
-		t.Fatal("followed symlink")
-	}
-	if _, err := s.scanDisk(context.Background(), home, filepath.Dir(home)); err == nil {
-		t.Fatal("accepted path outside home")
-	}
-	if err := os.Rename(folder, filepath.Join(home, "original")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(folder, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.TrashCleanupItem(folder); err == nil {
-		t.Fatal("accepted a replacement after scanning")
+	if got := shallowPath(filepath.Join(root, "Users"), 4); got != filepath.Join(root, "Users") {
+		t.Fatalf("short path changed: %q", got)
 	}
 }
