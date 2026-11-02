@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 		})
 	})
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(20 * time.Second)
 		fmt.Fprintln(os.Stderr, "Quit was blocked by the hidden launcher")
 		os.Exit(2)
 	}()

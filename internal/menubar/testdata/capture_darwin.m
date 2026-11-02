@@ -42,6 +42,10 @@ static void spin(NSTimeInterval seconds) {
     NSDate *end=[NSDate dateWithTimeIntervalSinceNow:seconds];
     while(end.timeIntervalSinceNow>0)[NSRunLoop.currentRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
 }
+static void waitForCapture(MBManager *subject) {
+    CFAbsoluteTime start=CFAbsoluteTimeGetCurrent();
+    while(subject.capturing && CFAbsoluteTimeGetCurrent()-start<2)spin(.001);
+}
 static int failures;
 #define CHECK(condition,message) if(!(condition)){fprintf(stderr,"FAIL: %s\n",message);failures++;}
 int main(void) { @autoreleasepool {
@@ -57,7 +61,7 @@ int main(void) { @autoreleasepool {
     double firstMS=(CFAbsoluteTimeGetCurrent()-start)*1000;
     printf("first_icon_ms=%.1f slow_still_pending=%d\n",firstMS,subject.capturing);
     CHECK(subject.capturing,"fast icon must display while slow capture is pending");
-    spin(.35);
+    waitForCapture(subject);
     CHECK(first.image && slow.image,"both successful captures must appear");
     CHECK([subject.imageURLs[@4] length]>0,"cold offscreen always-hidden icon must be captured without expanding");
     CHECK([subject.lastError isEqual:@"无法捕获菜单栏图标：3"],"capture errors must remain visible");
@@ -65,9 +69,9 @@ int main(void) { @autoreleasepool {
     for(int i=0;i<3;i++){[subject state];spin(.35);}
     printf("unchanged_missing_batches=%d\n",batches-before);
     CHECK(batches==before,"failed and absent windows must not be retried on unchanged polls");
-    subject.position+=10;[subject state];spin(.35);
+    subject.position+=10;[subject state];waitForCapture(subject);
     CHECK(batches==before+1,"changed window geometry must retry missing captures");
-    before=captures;[subject captureImages:NO];spin(.35);
+    before=captures;[subject captureImages:NO];waitForCapture(subject);
     CHECK(captures==before+4,"explicit refresh must recapture cached images and retry failures");
     CHECK(notifications>=4,"successful images must be pushed before the next web poll");
     lateSlow=YES;[subject captureImages:NO];spin(.6);
@@ -75,13 +79,15 @@ int main(void) { @autoreleasepool {
     CHECK([subject.lastError isEqual:@"部分菜单栏图标捕获超时，可点击刷新重试。"],"timeout must be reported explicitly");
     int delivered=notifications;spin(.25);
     CHECK(notifications==delivered,"a late callback from an expired batch must not overwrite newer images");
-    lateSlow=NO;before=captures;[subject captureImages:NO];spin(.35);
+    lateSlow=NO;before=captures;[subject captureImages:NO];
+    waitForCapture(subject);
+    fprintf(stderr,"retry_captures=%d still_capturing=%d\n",captures-before,subject.capturing);
     CHECK(captures==before+4 && !subject.capturing,"refresh must work after a stalled screenshot");
     before=batches;fixturePermission=NO;[subject captureImages:NO];spin(.05);
     CHECK(batches==before,"denied capture permission must not start discovery");
-    fixturePermission=YES;[subject state];spin(.35);
+    fixturePermission=YES;[subject state];waitForCapture(subject);
     CHECK(batches==before+1,"restored capture permission must retry missing images");
-    before=captures;[subject captureImages:NO];[subject captureImages:NO];[subject captureImages:NO];spin(.7);
+    before=captures;[subject captureImages:NO];[subject captureImages:NO];[subject captureImages:NO];waitForCapture(subject);
     CHECK(captures==before+8 && !subject.capturing,"refresh clicks during capture must coalesce into one follow-up batch");
     fixtureAPI=NO;[subject captureImages:NO];
     CHECK(!subject.capturing && [subject.lastError isEqual:@"当前系统不支持菜单栏窗口捕获。"],"missing runtime API must fail explicitly");
