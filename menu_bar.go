@@ -25,8 +25,10 @@ type menuBarService struct {
 
 var menuBar menuBarService
 
+var MenuBarImageChanged = mygo.NewEvent[menubar.ImageUpdate]("menuBarImageChanged")
+
 func menuBarStrings() map[string]string {
-	keys := []string{"打开 RockshinOps", "菜单栏设置…", "应用设置…", "刷新图标", "退出 RockshinOps", "请先关闭当前图标菜单，再操作其他图标。", "系统未确认移动事件，请检查辅助功能权限后重试。", "打开展开栏", "请先启用始终隐藏分区。", "图标位于可用菜单栏之外，请在空间更大的显示器上按住 Command 拖动。", "移动菜单栏图标前请松开鼠标。", "macOS 未将图标移入目标分区，请在菜单栏中按住 Command 拖动。", "展开或收起隐藏图标", "分区边界", "按住 Command 拖动图标到分区边界左侧以隐藏", "搜索菜单栏图标", "显示全部分区", "请先退出 Ice，避免两个菜单栏管理器同时运行。", "请先启用菜单栏管理", "展开栏需要屏幕录制权限以显示真实菜单栏图标。", "此分区没有图标", "需要辅助功能权限以操作菜单栏图标。", "图标已经退出，请刷新后重试。", "此应用未提供可操作的菜单栏辅助功能，请在菜单栏中手动打开。", "无法打开此图标，请展开分区后从系统菜单栏点击。"}
+	keys := []string{"打开 RockshinOps", "菜单栏设置…", "应用设置…", "刷新图标", "退出 RockshinOps", "请先关闭当前图标菜单，再操作其他图标。", "系统未确认移动事件，请检查辅助功能权限后重试。", "打开展开栏", "请先启用始终隐藏分区。", "图标位于可用菜单栏之外，请在空间更大的显示器上按住 Command 拖动。", "移动菜单栏图标前请松开鼠标。", "macOS 未将图标移入目标分区，请在菜单栏中按住 Command 拖动。", "展开或收起隐藏图标", "分区边界", "按住 Command 拖动图标到分区边界左侧以隐藏", "搜索菜单栏图标", "显示全部分区", "请先退出 Ice，避免两个菜单栏管理器同时运行。", "请先启用菜单栏管理", "展开栏需要屏幕录制权限以显示真实菜单栏图标。", "此分区没有图标", "当前系统不支持菜单栏窗口捕获。", "无法捕获菜单栏图标：", "部分菜单栏图标捕获超时，可点击刷新重试。", "需要辅助功能权限以操作菜单栏图标。", "图标已经退出，请刷新后重试。", "此应用未提供可操作的菜单栏辅助功能，请在菜单栏中手动打开。", "无法打开此图标，请展开分区后从系统菜单栏点击。"}
 	out := map[string]string{}
 	for _, key := range keys {
 		out[key] = localization.T(key)
@@ -76,6 +78,11 @@ func unregisterMenuBarHotkeys(s menubar.Settings) {
 	}
 }
 func startMenuBar(defaults menubar.Settings, dir string) {
+	menubar.SetImageHandler(func(image menubar.ImageUpdate) {
+		if err := MenuBarImageChanged.Broadcast(image); err != nil {
+			log.Printf("publish menu bar image: %v", err)
+		}
+	})
 	menuBar.path = filepath.Join(dir, "menu-bar.json")
 	saved, err := menubar.Load(menuBar.path, defaults)
 	if err != nil {

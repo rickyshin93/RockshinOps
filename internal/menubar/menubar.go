@@ -15,6 +15,17 @@ var actionHandler func(string)
 // SetActionHandler installs the app actions before native menu-bar management starts.
 func SetActionHandler(handler func(string)) { actionHandler = handler }
 
+// ImageHandler only enqueues a frontend event; it must not call native UI work.
+var imageHandler func(ImageUpdate)
+
+func SetImageHandler(handler func(ImageUpdate)) { imageHandler = handler }
+
+type ImageUpdate struct {
+	ID    uint32 `json:"id"`
+	PID   int    `json:"pid"`
+	Image string `json:"image"`
+}
+
 type Appearance struct {
 	Tint   string `json:"tint"`
 	Color  string `json:"color"`
@@ -31,6 +42,7 @@ type Settings struct {
 	RehideDelay            float64    `json:"rehideDelay"`
 	RevealCheckInterval    float64    `json:"revealCheckInterval"`
 	TemporaryRevealSeconds float64    `json:"temporaryRevealSeconds"`
+	CaptureTimeoutSeconds  float64    `json:"captureTimeoutSeconds"`
 	ShowAllOnDrag          bool       `json:"showAllOnDrag"`
 	HideAppMenus           bool       `json:"hideAppMenus"`
 	SecondaryMenu          bool       `json:"secondaryMenu"`
@@ -67,6 +79,9 @@ type State struct {
 }
 
 func (s Settings) Validate() error {
+	if math.IsNaN(s.CaptureTimeoutSeconds) || math.IsInf(s.CaptureTimeoutSeconds, 0) || s.CaptureTimeoutSeconds <= 0 {
+		return fmt.Errorf("menu bar capture timeout must be positive and finite")
+	}
 	if math.IsNaN(s.TemporaryRevealSeconds) || math.IsInf(s.TemporaryRevealSeconds, 0) || s.TemporaryRevealSeconds < 5 || s.TemporaryRevealSeconds > 60 {
 		return fmt.Errorf("temporary menu bar reveal duration must be 5–60 seconds")
 	}

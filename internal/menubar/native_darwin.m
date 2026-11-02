@@ -1,9 +1,10 @@
 #import <Cocoa/Cocoa.h>
 #import <ApplicationServices/ApplicationServices.h>
-#import <ScreenCaptureKit/ScreenCaptureKit.h>
+#import <dlfcn.h>
 #import "events_darwin.h"
 
 extern void rockshin_menubar_action(char *action);
+extern void rockshin_menubar_image(unsigned int wid, int pid, const char *image);
 
 static id MBMain(id (^work)(void)) {
     if (NSThread.isMainThread) return work();
@@ -171,6 +172,9 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
 @property NSTimer *revealTimer;
 @property CFAbsoluteTime revealDeadline;
 @property BOOL capturing;
+@property BOOL refreshPending;
+@property NSUInteger captureGeneration;
+@property NSMutableDictionary<NSNumber *,NSArray *> *captureAttempts;
 @property NSArray<NSDictionary *> *panelItems;
 @property NSArray<NSButton *> *panelButtons;
 @property NSArray<NSPanel *> *overlays;
@@ -193,7 +197,7 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
 @implementation MBManager
 - (instancetype)init {
     if ((self=[super init])) {
-        _images=[NSMutableDictionary new]; _imageURLs=[NSMutableDictionary new]; _strings=@{}; _lastError=@"";
+        _images=[NSMutableDictionary new]; _imageURLs=[NSMutableDictionary new]; _captureAttempts=[NSMutableDictionary new]; _strings=@{}; _lastError=@"";
         NSUserDefaults *defaults=NSUserDefaults.standardUserDefaults;
         // Seed first-run positions; AppKit owns subsequent user ordering.
         if(![defaults objectForKey:@"NSStatusItem Preferred Position rockshinops.storage"])
@@ -204,7 +208,7 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
     }
     return self;
 }
-- (void)screenChanged:(NSNotification *)note { [self collapse]; [self refreshAppearance]; }
+- (void)screenChanged:(NSNotification *)note { [self.captureAttempts removeAllObjects]; [self collapse]; [self refreshAppearance]; }
 - (CGFloat)hiddenLength {
     CGFloat width=0; for (NSScreen *screen in NSScreen.screens) width+=screen.frame.size.width;
     return width*2;
@@ -342,6 +346,7 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
     return nil;
 }
 - (void)stop {
+    self.captureGeneration++;self.capturing=NO;self.refreshPending=NO;
     // Snapshot every position before removing any item shifts its neighbors.
     MBSaveStatusItemPosition(self.control);MBSaveStatusItemPosition(self.divider);MBSaveStatusItemPosition(self.always);
     [self collapse];
@@ -375,6 +380,9 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
         pid_t pid=[w[(__bridge NSString *)kCGWindowOwnerPID] intValue];
         NSRunningApplication *app=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         NSString *name=w[(__bridge NSString *)kCGWindowName];
+        // WindowServer gives secondary-display replicas an explicitly empty title.
+        // A missing title is permission-redacted; keep it, and keep offscreen real items.
+        if([name isEqualToString:@""])continue;
         if(wid.integerValue==self.control.button.window.windowNumber)name=MBText(self.strings,@"展开或收起隐藏图标");
         else if([name hasPrefix:@"RockshinOps.MenuBar."])continue;
         NSString *owner=w[(__bridge NSString *)kCGWindowOwnerName] ?: app.localizedName ?: @"";
@@ -394,34 +402,64 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
     return items;
 }
 - (void)captureImages:(BOOL)missingOnly {
-    if(self.capturing || self.moving || self.activating || !CGPreflightScreenCaptureAccess()) return;
+    if(self.capturing) { if(!missingOnly)self.refreshPending=YES;return; }
+    if(self.moving || self.activating)return;
+    if(!CGPreflightScreenCaptureAccess()){[self.captureAttempts removeAllObjects];return;}
+    NSMutableDictionary *requested=[NSMutableDictionary new];
+    for(NSDictionary *item in [self items]) {
+        NSNumber *wid=item[@"id"];
+        // Retry unavailable windows when their placement changes, or on explicit refresh.
+        // A successful image remains usable while its window is offscreen.
+        NSArray *placement=@[item[@"pid"],item[@"x"],item[@"width"],item[@"section"],@(self.expanded),@(self.showingAll)];
+        if(missingOnly && ([self.imageURLs[wid] length] || [self.captureAttempts[wid] isEqual:placement]))continue;
+        requested[wid]=item;
+        self.captureAttempts[wid]=placement;
+    }
+    if(!requested.count)return;
+    // ScreenCaptureKit enumerates offscreen status windows but can stall capturing them.
+    // The window-array API retains their backing surfaces (also used by Ice). New SDKs
+    // mark it obsolete, so resolve the runtime symbol and fail explicitly if absent.
+    typedef CGImageRef (*CaptureWindows)(CGRect,CFArrayRef,CGWindowImageOption);
+    CaptureWindows capture=(CaptureWindows)dlsym(RTLD_DEFAULT,"CGWindowListCreateImageFromArray");
+    if(!capture){self.lastError=MBText(self.strings,@"当前系统不支持菜单栏窗口捕获。");return;}
     self.capturing=YES;
+    NSUInteger generation=++self.captureGeneration;
     __weak MBManager *weak=self;
-    [SCShareableContent getShareableContentExcludingDesktopWindows:YES onScreenWindowsOnly:NO completionHandler:^(SCShareableContent *content,NSError *error){
-        dispatch_async(dispatch_get_main_queue(),^{
-            MBManager *self=weak; if(!self) return;
-            if(error) {self.lastError=error.localizedDescription;self.capturing=NO;return;}
-            NSMutableSet *ids=[NSMutableSet new];for(NSDictionary *i in [self items]) [ids addObject:i[@"id"]];
-            dispatch_group_t group=dispatch_group_create();
-            for(SCWindow *w in content.windows) {
-                if(![ids containsObject:@(w.windowID)]) continue;
-                if(missingOnly && [self.imageURLs[@(w.windowID)] length]) continue;
-                SCContentFilter *filter=[[SCContentFilter alloc] initWithDesktopIndependentWindow:w];
-                SCStreamConfiguration *config=[SCStreamConfiguration new];config.width=MAX(1,w.frame.size.width*2);config.height=MAX(1,w.frame.size.height*2);config.showsCursor=NO;
-                if(@available(macOS 14.0,*)){config.ignoreShadowsSingleWindow=YES;config.shouldBeOpaque=NO;}
-                dispatch_group_enter(group);
-                [SCScreenshotManager captureImageWithFilter:filter configuration:config completionHandler:^(CGImageRef image,NSError *err){
-                    NSImage *result=image?[[NSImage alloc] initWithCGImage:image size:w.frame.size]:nil;
-                    NSString *url=MBPNG(result);
-                    dispatch_async(dispatch_get_main_queue(),^{if(url.length){self.images[@(w.windowID)]=result;self.imageURLs[@(w.windowID)]=url;}else if(err)self.lastError=err.localizedDescription;dispatch_group_leave(group);});
-                }];
-            }
-            dispatch_group_notify(group,dispatch_get_main_queue(),^{
-                self.capturing=NO;
-                for(NSButton *button in self.panelButtons)if(self.images[@(button.tag)]){button.image=self.images[@(button.tag)];if(!self.searchMode)button.title=@"";}
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,[self.settings[@"captureTimeoutSeconds"] doubleValue]*NSEC_PER_SEC),dispatch_get_main_queue(),^{
+        MBManager *self=weak;
+        if(self && self.captureGeneration==generation) {
+            self.lastError=MBText(self.strings,@"部分菜单栏图标捕获超时，可点击刷新重试。");
+            [self finishCapture];
+        }
+    });
+    __block NSUInteger remaining=requested.count;
+    for(NSNumber *wid in requested) {
+        NSDictionary *item=requested[wid];
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{ @autoreleasepool {
+            const void *window=(void *)(uintptr_t)wid.unsignedIntValue;
+            CFArrayRef windows=CFArrayCreate(NULL,&window,1,NULL);
+            CGImageRef image=capture(CGRectNull,windows,kCGWindowImageBoundsIgnoreFraming|kCGWindowImageBestResolution);
+            CFRelease(windows);
+            CGFloat width=[item[@"width"] doubleValue];
+            NSImage *result=image?[[NSImage alloc] initWithCGImage:image size:NSMakeSize(width,CGImageGetHeight(image)*width/CGImageGetWidth(image))]:nil;
+            if(image)CGImageRelease(image);
+            NSString *url=MBPNG(result);
+            dispatch_async(dispatch_get_main_queue(),^{
+                MBManager *self=weak;if(!self || self.captureGeneration!=generation)return;
+                if(url.length) {
+                    self.images[wid]=result;self.imageURLs[wid]=url;
+                    for(NSButton *button in self.panelButtons)if(button.tag==wid.integerValue){button.image=result;if(!self.searchMode)button.title=@"";}
+                    rockshin_menubar_image(wid.unsignedIntValue,[item[@"pid"] intValue],url.UTF8String);
+                } else self.lastError=[MBText(self.strings,@"无法捕获菜单栏图标：") stringByAppendingString:item[@"name"]];
+                if(--remaining==0)[self finishCapture];
             });
-        });
-    }];
+        }});
+    }
+}
+- (void)finishCapture {
+    self.captureGeneration++; // Ignore late completions from a timed-out batch.
+    self.capturing=NO;
+    if(self.refreshPending){self.refreshPending=NO;[self captureImages:NO];}
 }
 - (void)showPanel:(BOOL)search {
     if(!self.control) {self.lastError=MBText(self.strings,@"请先启用菜单栏管理");return;}
@@ -436,7 +474,10 @@ static NSStatusItem *MBCreateStatusItem(NSString *name, CGFloat length, NSNumber
     self.panelItems=[self items];
     self.panel.appearance=self.control.button.effectiveAppearance;
     self.panel.title=MBText(self.strings,search?@"搜索菜单栏图标":@"打开展开栏");
-    [self renderPanel];[self.panel present];[self captureImages:NO];
+    [self renderPanel];[self.panel present];
+    // Keep the cached preview visible while updating dynamic titles/icons.
+    // An existing capture already supplies updates; opening is not an explicit retry.
+    if(!self.capturing)[self captureImages:NO];
     if(search) [self.panel makeFirstResponder:self.search];
     [self armRehide];
 }

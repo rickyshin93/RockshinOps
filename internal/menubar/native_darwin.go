@@ -2,7 +2,7 @@ package menubar
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc
-#cgo LDFLAGS: -framework Cocoa -framework ApplicationServices -framework ScreenCaptureKit
+#cgo LDFLAGS: -framework Cocoa -framework ApplicationServices
 #include <stdlib.h>
 char *rockshin_menubar_request(const char *request);
 */
@@ -12,6 +12,14 @@ import (
 	"fmt"
 	"unsafe"
 )
+
+//export rockshin_menubar_image
+func rockshin_menubar_image(wid C.uint, pid C.int, image *C.char) {
+	if imageHandler != nil {
+		// Broadcast enqueues without waiting for AppKit, preserving capture order.
+		imageHandler(ImageUpdate{ID: uint32(wid), PID: int(pid), Image: C.GoString(image)})
+	}
+}
 
 //export rockshin_menubar_action
 func rockshin_menubar_action(action *C.char) {

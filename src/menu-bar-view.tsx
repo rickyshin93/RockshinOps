@@ -1,8 +1,8 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent, type ButtonHTMLAttributes, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction, type ReactNode, type KeyboardEvent, type ButtonHTMLAttributes, type PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { System, type MenuBarConfiguration, type Settings as MenuBarSettings, type State as MenuBarState, type Item as MenuBarItem, type Appearance } from "./mygo";
+import { System, events, type ImageUpdate, type MenuBarConfiguration, type Settings as MenuBarSettings, type State as MenuBarState, type Item as MenuBarItem, type Appearance } from "./mygo";
 import { icon } from "./icons";
-import { moveMenuBarItem, reconcileMenuBarState } from "./menu-bar-layout";
+import { mergeMenuBarImages, moveMenuBarItem, reconcileMenuBarState } from "./menu-bar-layout";
 import { MenuBarIcon } from "./menu-bar-icon";
 
 const sections = [["visible", "可见"], ["hidden", "隐藏"], ["alwaysHidden", "始终隐藏"]] as const;
@@ -36,7 +36,16 @@ function Hotkey({ label, value, disabled, change }: { label: string; value: stri
 }
 export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }: { isMacOS: boolean; refreshSeconds: number }) {
   const { t } = useTranslation();
-  const [config, setConfig] = useState<MenuBarConfiguration | null>(null);
+  const [config, setConfiguration] = useState<MenuBarConfiguration | null>(null);
+  const images = useRef(new Map<number, ImageUpdate>());
+  function setConfig(value: SetStateAction<MenuBarConfiguration | null>) {
+    setConfiguration(old => {
+      const next = typeof value === "function" ? value(old) : value;
+      if (!next) return next;
+      const state = mergeMenuBarImages(next.state, images.current);
+      return state === next.state ? next : { ...next, state };
+    });
+  }
   const [tab, setTab] = useState<Tab>("layout");
   const [busy, setBusy] = useState(false);
   const operation = useRef(false);
@@ -65,8 +74,21 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
     if (!isMacOS) return;
     let active = true;
     const version = revision.current;
-    System.menuBarConfiguration().then(async value => { if (active) { setConfig(value); setError(value.state.error); if (value.state.screenRecording) { const snapshot = await System.menuBarAction("refresh"); if(active && version === revision.current) updateState(snapshot); } } }).catch(reason => { if (active && version === revision.current) setError(String(reason)); });
-    return () => { active = false; };
+    const off = events.menuBarImageChanged.on(image => {
+      images.current.set(image.id, image);
+      setConfig(old => old);
+    });
+    System.menuBarConfiguration().then(async value => {
+      if (!active || version !== revision.current) return;
+      setConfig(value); setError(value.state.error);
+      // Keep cached images visible, but refresh dynamic menu text on reopening.
+      // Cold reads already start capture; do not queue a duplicate full batch.
+      if (value.state.screenRecording && !value.state.capturing) {
+        const snapshot = await System.menuBarAction("refresh");
+        if (active && version === revision.current) updateState(snapshot);
+      }
+    }).catch(reason => { if (active && version === revision.current) setError(String(reason)); });
+    return () => { active = false; off(); };
   }, [isMacOS]);
   useEffect(() => {
     if ((!config?.settings.enabled && !config?.state.capturing) || busy || drag || moving !== null) return;

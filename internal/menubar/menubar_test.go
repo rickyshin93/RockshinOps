@@ -10,7 +10,7 @@ import (
 
 func testSettings() Settings {
 	a := Appearance{Tint: "none", Color: "#34465C", Shape: "none"}
-	return Settings{UsePanel: true, HoverDelay: 0.2, RehideDelay: 15, RevealCheckInterval: 0.5, TemporaryRevealSeconds: 15, ShowAllOnDrag: true, Divider: "line", Light: a, Dark: a}
+	return Settings{UsePanel: true, HoverDelay: 0.2, RehideDelay: 15, RevealCheckInterval: 0.5, TemporaryRevealSeconds: 15, CaptureTimeoutSeconds: 5, ShowAllOnDrag: true, Divider: "line", Light: a, Dark: a}
 }
 func TestSettingsRoundTripAndUpgrade(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "preferences", "menu-bar.json")
@@ -33,7 +33,7 @@ func TestSettingsRoundTripAndUpgrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved, err = Load(path, defaults)
-	if err != nil || !saved.Enabled || saved.HoverDelay != defaults.HoverDelay || saved.RevealCheckInterval != defaults.RevealCheckInterval || saved.TemporaryRevealSeconds != defaults.TemporaryRevealSeconds {
+	if err != nil || !saved.Enabled || saved.HoverDelay != defaults.HoverDelay || saved.RevealCheckInterval != defaults.RevealCheckInterval || saved.TemporaryRevealSeconds != defaults.TemporaryRevealSeconds || saved.CaptureTimeoutSeconds != defaults.CaptureTimeoutSeconds {
 		t.Fatalf("missing new fields: %#v %v", saved, err)
 	}
 	if err = os.WriteFile(path, []byte(`{"divider":"invalid"}`), 0600); err != nil {
@@ -41,6 +41,16 @@ func TestSettingsRoundTripAndUpgrade(t *testing.T) {
 	}
 	if _, err = Load(path, defaults); err == nil {
 		t.Fatal("corrupt settings accepted")
+	}
+}
+
+func TestCaptureTimeoutBounds(t *testing.T) {
+	for _, value := range []float64{0, -1, math.NaN(), math.Inf(1)} {
+		s := testSettings()
+		s.CaptureTimeoutSeconds = value
+		if err := s.Validate(); err == nil {
+			t.Fatalf("accepted capture timeout %v", value)
+		}
 	}
 }
 func TestRejectInvalidSettingsWithoutReplacingSavedFile(t *testing.T) {

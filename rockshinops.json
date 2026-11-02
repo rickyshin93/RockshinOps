@@ -102,6 +102,7 @@
     "rehideDelay": 15,
     "revealCheckInterval": 0.5,
     "temporaryRevealSeconds": 15,
+    "captureTimeoutSeconds": 5,
     "showAllOnDrag": true,
     "hideAppMenus": false,
     "secondaryMenu": false,

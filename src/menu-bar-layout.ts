@@ -1,4 +1,17 @@
-import type { Item, State } from "./mygo";
+import type { ImageUpdate, Item, State } from "./mygo";
+
+// A capture event can arrive before an older configuration/poll response.
+// Overlay received images only; never let it change layout or process identity.
+export function mergeMenuBarImages(state: State, images: ReadonlyMap<number, ImageUpdate>): State {
+  let changed = false;
+  const items = state.items.map(item => {
+    const image = images.get(item.id);
+    if (!image || image.pid !== item.pid || image.image === item.image) return item;
+    changed = true;
+    return { ...item, image: image.image };
+  });
+  return changed ? { ...state, items } : state;
+}
 
 // Expansion moves native windows, but does not change their preview content.
 export function reconcileMenuBarState(previous: State, next: State): State {

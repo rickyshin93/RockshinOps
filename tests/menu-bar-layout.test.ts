@@ -1,8 +1,20 @@
 import { expect, test } from "bun:test";
-import { moveMenuBarItem, reconcileMenuBarState } from "../src/menu-bar-layout";
+import { mergeMenuBarImages, moveMenuBarItem, reconcileMenuBarState } from "../src/menu-bar-layout";
 import type { Item } from "../src/mygo";
 
 const item = (id: number, section: string): Item => ({ id, pid: 42, section, name: String(id), owner: "test", image: "", x: id * 20, width: 20, movable: true });
+test("capture events survive stale reads without undoing moves or crossing process identity", () => {
+  const state = { supported: true, accessibility: true, screenRecording: true, capturing: true, expanded: false, panelVisible: false, iceRunning: false, error: "", items: [item(1, "hidden"), item(2, "visible")] };
+  const images = new Map([[1, { id: 1, pid: 42, image: "captured" }]]);
+  const updated = mergeMenuBarImages(state, images);
+  expect(updated.items[0]!.image).toBe("captured");
+  expect(updated.items[0]!.section).toBe("hidden");
+  expect(updated.items[1]).toBe(state.items[1]);
+  expect(mergeMenuBarImages(updated, images)).toBe(updated);
+  const moved = { ...state, items: [item(1, "visible"), { ...item(2, "hidden"), pid: 99 }] };
+  images.set(2, { id: 2, pid: 42, image: "exited-process" });
+  expect(mergeMenuBarImages(moved, images).items.map(i => [i.section, i.image])).toEqual([["visible", "captured"], ["hidden", ""]]);
+});
 test("moving an icon updates section and inserts before the target immediately", () => {
   const original = [item(1, "visible"), item(2, "visible"), item(3, "hidden"), item(4, "hidden")];
   const result = moveMenuBarItem(original, 2, "hidden", 4);

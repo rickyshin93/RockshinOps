@@ -205,9 +205,13 @@ func (l *launcher) ensurePanel() {
 			Panel: true, Hidden: true, Frameless: true, Transparent: true, DisableResize: true,
 		})
 		panel.SetHasShadow(false) // the page draws the card's shadow; the window grows with results
+		quitting := false         // both callbacks run on MyGo's main thread
+		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting = true })
 		panel.OnClose(func(e *mygo.CloseEvent) {
-			e.PreventDefault()
-			panel.Hide()
+			if !quitting {
+				e.PreventDefault()
+				panel.Hide()
+			}
 		})
 		panel.OnBlur(panel.Hide)
 		l.panel.Store(panel)

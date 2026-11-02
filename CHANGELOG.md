@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.9
+
+- Fix application Quit when the Launcher panel has been opened.
+- Fix duplicate menu-bar items on secondary displays and restore previews for hidden macOS menu-bar icons. Deliver captured images as they become available.
+
+### 中文
+
+- 修复打开启动器面板后应用无法退出的问题。
+- 修复多显示器下菜单栏项目重复和隐藏图标预览缺失，并在图像采集完成时逐项显示。
+
 ## 0.2.8
 
 - Add a global-shortcut launcher for apps and indexed files, including pinyin matching, reveal and copy-path actions, and a dedicated settings page.

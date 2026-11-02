@@ -141,6 +141,12 @@ export interface GPU {
   error: string;
 }
 
+export interface ImageUpdate {
+  id: number;
+  pid: number;
+  image: string;
+}
+
 export interface InstalledApp {
   name: string;
   path: string;
@@ -323,6 +329,7 @@ export interface Settings {
   rehideDelay: number;
   revealCheckInterval: number;
   temporaryRevealSeconds: number;
+  captureTimeoutSeconds: number;
   showAllOnDrag: boolean;
   hideAppMenus: boolean;
   secondaryMenu: boolean;
@@ -597,4 +604,5 @@ export const events = {
   metricsChanged: event<Snapshot>("metricsChanged"),
   settingsOpened: event<boolean>("settingsOpened"),
   menuBarSettingsOpened: event<boolean>("menuBarSettingsOpened"),
+  menuBarImageChanged: event<ImageUpdate>("menuBarImageChanged"),
 } as const;
