@@ -2,9 +2,10 @@ package appicon
 
 /*
 #cgo CFLAGS: -fobjc-arc
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework UniformTypeIdentifiers
 #include <stdlib.h>
 void *rockshinops_app_icon_png(const char *path, int pixels, size_t *length);
+void *rockshinops_type_icon_png(const char *ext, int folder, int pixels, size_t *length);
 */
 import "C"
 
@@ -25,9 +26,27 @@ func render(path string, pixels int) ([]byte, error) {
 
 func renderComputer() ([]byte, error) { return renderPNG(nil, 256) }
 
+// renderType draws the generic icon of a folder, or of files with extension ext.
+func renderType(ext string, folder bool, pixels int) ([]byte, error) {
+	var length C.size_t
+	var cext *C.char
+	if ext != "" {
+		cext = C.CString(ext)
+		defer C.free(unsafe.Pointer(cext))
+	}
+	isFolder := C.int(0)
+	if folder {
+		isFolder = 1
+	}
+	return goPNG(C.rockshinops_type_icon_png(cext, isFolder, C.int(pixels), &length), length)
+}
+
 func renderPNG(path *C.char, pixels int) ([]byte, error) {
 	var length C.size_t
-	data := C.rockshinops_app_icon_png(path, C.int(pixels), &length)
+	return goPNG(C.rockshinops_app_icon_png(path, C.int(pixels), &length), length)
+}
+
+func goPNG(data unsafe.Pointer, length C.size_t) ([]byte, error) {
 	if data == nil {
 		return nil, errors.New("icon unavailable")
 	}

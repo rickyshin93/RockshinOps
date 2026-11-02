@@ -35,6 +35,9 @@ func TestIncrementalHistoryRetentionAndIsolation(t *testing.T) {
 func performanceMonitor() *Monitor {
 	m := NewMonitor(Options{Interval: 2 * time.Second, DiskInterval: 30 * time.Second, ProcessInterval: 5 * time.Second, HistorySeconds: 3600})
 	m.read = func() rawSample { return rawSample{memory: Memory{Total: 1000, Used: 500}} }
+	m.readSensors = func() Sensors { return Sensors{} }
+	m.readThermal = func() Thermal { return Thermal{} }
+	m.readAssertions = func() PowerAssertions { return PowerAssertions{} }
 	m.readVolume = func() (storage.Volume, error) { return storage.Volume{Total: 1000}, nil }
 	items := make([]rawProcess, 850)
 	for i := range items {

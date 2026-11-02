@@ -37,6 +37,23 @@ func TestConfigRequiresUpdateInterval(t *testing.T) {
 	}
 }
 
+func TestConfigRequiresPowerAssertionInterval(t *testing.T) {
+	var values map[string]any
+	if err := json.Unmarshal(configJSON, &values); err != nil {
+		t.Fatal(err)
+	}
+	for _, interval := range []any{nil, 0, -1} {
+		values["powerAssertionIntervalSeconds"] = interval
+		input, err := json.Marshal(values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := parseConfig(input); err == nil {
+			t.Fatalf("accepted power assertion interval %v", interval)
+		}
+	}
+}
+
 func TestConnectionSampleIntervalFitsTimeout(t *testing.T) {
 	var values map[string]any
 	if err := json.Unmarshal(configJSON, &values); err != nil {

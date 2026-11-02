@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.8
+
+- Add a global-shortcut launcher for apps and indexed files, including pinyin matching, reveal and copy-path actions, and a dedicated settings page.
+- Show available macOS chip temperatures, SMC power and fan readings, thermal pressure and active power assertions on the Energy page.
+- Fix shortcut recording focus in the macOS WebView.
+
+### 中文
+
+- 新增全局快捷键启动器，可搜索应用及索引文件，支持拼音匹配、显示位置和复制路径，并提供独立设置页。
+- 能耗页展示可用的 macOS 芯片温度、SMC 功率与风扇转速、热压力及电源断言。
+- 修复 macOS 窗口中快捷键录制无法获取焦点的问题。
+
 ## 0.2.7
 
 - Rebuild space analysis around a single allocated-size scan with folder browsing, largest files, cleanup suggestions and reviewed trash actions.

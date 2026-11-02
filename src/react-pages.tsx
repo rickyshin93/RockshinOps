@@ -1,6 +1,7 @@
 import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
 import { I18nextProvider } from "react-i18next";
+import { LauncherSettingsView } from "./launcher-settings-view";
 import { SettingsView } from "./settings-view";
 import { MenuBarView } from "./menu-bar-view";
 import { SpaceView } from "./space-view";
@@ -10,7 +11,7 @@ import type { ViewState } from "./views";
 let root: Root | null = null;
 let menuProps: { isMacOS: boolean; refreshSeconds: number } | null = null;
 
-export function renderReactPage(container: HTMLElement, state: ViewState, onLanguage: (language: Language) => void, openDiskAccess: () => void): void {
+export function renderReactPage(container: HTMLElement, state: ViewState, onLanguage: (language: Language) => void, openDiskAccess: () => void, onLauncherShortcut: (shortcut: string) => void): void {
   if (!root) { container.replaceChildren(); root = createRoot(container); }
   const isMacOS = state.info?.machine.platform === "darwin";
   if (state.page === "menubar") {
@@ -23,6 +24,9 @@ export function renderReactPage(container: HTMLElement, state: ViewState, onLang
     menuProps = null;
     const disk = state.snapshot?.disk;
     if (disk) root.render(createElement(I18nextProvider, { i18n }, createElement(SpaceView, { volume: disk.volume, capacityError: disk.capacityError, isMacOS, openDiskAccess })));
+  } else if (state.page === "launcher") {
+    menuProps = null;
+    root.render(createElement(I18nextProvider, { i18n }, createElement(LauncherSettingsView, { state, isMacOS, onLauncherShortcut })));
   } else {
     menuProps = null;
     root.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, version: state.info?.version ?? "", isMacOS, onLanguage })));

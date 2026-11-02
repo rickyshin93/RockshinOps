@@ -31,15 +31,16 @@ var MenuBarSettingsOpened = mygo.NewEvent[bool]("menuBarSettingsOpened")
 func (s *System) CheckForUpdates() { updater.CheckForUpdates() }
 
 type AppInfo struct {
-	Machine               metrics.Machine      `json:"machine"`
-	Displays              []DisplayInfo        `json:"displays"`
-	GoVersion             string               `json:"goVersion"`
-	Version               string               `json:"version"`
-	RefreshSeconds        int                  `json:"refreshSeconds"`
-	DiskRefreshSeconds    int                  `json:"diskRefreshSeconds"`
-	ProcessRefreshSeconds int                  `json:"processRefreshSeconds"`
-	HistorySeconds        int                  `json:"historySeconds"`
-	ScanTargets           []metrics.ScanTarget `json:"scanTargets"`
+	Machine                      metrics.Machine      `json:"machine"`
+	Displays                     []DisplayInfo        `json:"displays"`
+	GoVersion                    string               `json:"goVersion"`
+	Version                      string               `json:"version"`
+	RefreshSeconds               int                  `json:"refreshSeconds"`
+	DiskRefreshSeconds           int                  `json:"diskRefreshSeconds"`
+	ProcessRefreshSeconds        int                  `json:"processRefreshSeconds"`
+	HistorySeconds               int                  `json:"historySeconds"`
+	PowerAssertionRefreshSeconds int                  `json:"powerAssertionRefreshSeconds"`
+	ScanTargets                  []metrics.ScanTarget `json:"scanTargets"`
 }
 
 type DisplayInfo struct {
@@ -77,6 +78,7 @@ type System struct {
 	appReviewSeq    uint64
 	scanCancelMu    sync.Mutex
 	scanCancel      context.CancelFunc
+	launcher        *launcher
 }
 
 func (s *System) Initialize() Bootstrap {
@@ -157,15 +159,22 @@ func main() {
 		targets[i] = target
 	}
 	service := &System{config: cfg, preferences: preferences, preferencesPath: preferencesPath, monitor: metrics.NewMonitor(metrics.Options{
-		Interval:        time.Duration(cfg.MetricsIntervalSeconds) * time.Second,
-		DiskInterval:    time.Duration(cfg.SampleIntervalSeconds) * time.Second,
-		ProcessInterval: time.Duration(cfg.ProcessIntervalSeconds) * time.Second,
-		HistorySeconds:  cfg.HistorySeconds,
+		Interval:               time.Duration(cfg.MetricsIntervalSeconds) * time.Second,
+		DiskInterval:           time.Duration(cfg.SampleIntervalSeconds) * time.Second,
+		ProcessInterval:        time.Duration(cfg.ProcessIntervalSeconds) * time.Second,
+		HistorySeconds:         cfg.HistorySeconds,
+		PowerAssertionInterval: time.Duration(cfg.PowerAssertionIntervalSeconds) * time.Second,
 	}), info: AppInfo{Machine: metrics.ReadMachine(time.Duration(cfg.MachineInfoTimeoutSeconds) * time.Second), Version: mygo.App.Version(), RefreshSeconds: cfg.MetricsIntervalSeconds,
 		DiskRefreshSeconds: cfg.SampleIntervalSeconds, ProcessRefreshSeconds: cfg.ProcessIntervalSeconds,
-		HistorySeconds: cfg.HistorySeconds, ScanTargets: targets}}
+		HistorySeconds: cfg.HistorySeconds, ScanTargets: targets, PowerAssertionRefreshSeconds: cfg.PowerAssertionIntervalSeconds}}
 	configureUpdateProxy(service, systemUpdateProxy)
 	service.startup = newStartupSettings(configDir)
+	service.launcher, err = newLauncher(filepath.Join(configDir, "launcher.json"),
+		launcherPrefs{Enabled: cfg.Launcher.DefaultEnabled, Files: cfg.Launcher.DefaultFiles, Shortcut: cfg.Launcher.DefaultShortcut[runtime.GOOS]},
+		home, cfg.Launcher.Files[runtime.GOOS], time.Duration(cfg.Launcher.FileRebuildMinutes)*time.Minute)
+	if err != nil {
+		log.Fatal(err)
+	}
 	mygo.Bind(service)
 	if err := mygo.Protocol.Handle(appicon.Scheme, appicon.Handler()); err != nil {
 		log.Fatal(err)
@@ -221,6 +230,7 @@ func main() {
 			})
 		})
 		startMenuBar(cfg.MenuBarManager, filepath.Dir(preferencesPath))
+		service.launcher.start()
 		mygo.App.SetMenu(localizedMenu([]*mygo.MenuItem{
 			{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{
 				{Role: mygo.RoleAbout},

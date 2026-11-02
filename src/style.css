@@ -111,6 +111,7 @@ nav { @apply shrink-0;  }
 .nav-icon svg { @apply size-3.5; }
 .nav-item[data-page="overview"] .nav-icon,
 .nav-item[data-page="network"] .nav-icon,
+.nav-item[data-page="launcher"] .nav-icon,
 .nav-item[data-page="connections"] .nav-icon { --nav-icon-color: var(--color-network); }
 .nav-item[data-page="cpu"] .nav-icon,
 .nav-item[data-page="apps"] .nav-icon { --nav-icon-color: var(--color-cpu); }
@@ -212,6 +213,7 @@ dd { @apply text-body font-medium tabular-nums wrap-anywhere; margin: 2px 0 0; }
 .notice { @apply py-2.5 px-3 rounded-md bg-surface shadow-card text-muted text-small leading-[1.6] mb-4 wrap-anywhere;  }
 .notice.error { @apply text-error shadow-none; background: color-mix(in oklab, var(--color-error) 8%, var(--color-surface)); }
 .notice[hidden], [hidden] { display: none !important; }
+.notice.warning { @apply shadow-none; color: var(--color-warning); background: color-mix(in oklab, var(--color-warning) 8%, var(--color-surface)); }
 .empty-state { @apply min-h-65 flex flex-col items-center justify-center text-center p-10 gap-3;  }
 .empty-state p { @apply max-w-130 text-muted leading-[1.6];  }
 .empty-state button, .secondary-button, .primary-button { @apply py-1 px-3 bg-surface rounded-sm shadow-thumb font-medium inline-flex items-center justify-center gap-1.5; transition: background-color 150ms ease; }
@@ -341,6 +343,7 @@ button.space-row-main:hover { @apply bg-fill; }
 
 .settings-page { @apply grid gap-6 items-start; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); }
 .settings-page > .notice { @apply col-span-full mb-0;  }
+.launcher-settings-page { max-width: 900px; }
 .settings-column { @apply flex flex-col gap-6 min-w-0;  }
 .settings-group { @apply flex flex-col gap-1.5;  }
 .settings-group > h2, .settings-note { @apply pl-3.5;  }
@@ -355,6 +358,8 @@ button.space-row-main:hover { @apply bg-fill; }
 .setting-copy p { @apply text-muted text-caption leading-[1.45] mt-[1px];  }
 .setting-control { @apply flex items-center gap-2.5 shrink-0;  }
 .setting-value { @apply text-muted tabular-nums;  }
+.shortcut-recorder { @apply py-1 px-3 min-w-24 rounded-sm bg-fill font-medium tabular-nums text-center; border: 1px solid transparent; }
+.shortcut-recorder.recording { @apply text-accent; border-color: var(--color-accent); background: color-mix(in oklab, var(--color-accent) 8%, var(--color-surface)); }
 .tray-preview { @apply flex items-center justify-end gap-3 h-8 m-2 py-0 px-3 rounded-md bg-bg font-medium whitespace-nowrap overflow-hidden;  }
 .tray-preview img { @apply block h-4.5 max-w-full object-contain object-right;  }
 .tray-icon { @apply flex;  }
@@ -737,3 +742,56 @@ button.app-row:hover { @apply bg-fill;  }
 }
 @media (prefers-reduced-motion: reduce) { .port-close[aria-busy="true"] svg { animation: none; } }
 @property --scan-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+/* Space each energy group as well as the cards inside it. */
+.sensor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.sensor-card h2 { margin-bottom: 16px; }
+.sensor-primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, .8fr); gap: 20px; }
+.sensor-label { margin: 0 0 8px; color: var(--color-muted); font-size: var(--text-small); }
+.sensor-temperature { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+.sensor-temperature > span { font-size: 32px; font-weight: 650; line-height: 1.2; }
+.sensor-temperature small, .sensor-rails small, .sensor-fans small { color: var(--color-muted); font-size: var(--text-caption); font-weight: 500; }
+.sensor-caption { margin: 12px 0 0; color: var(--color-muted); font-size: var(--text-caption); line-height: 1.5; }
+.sensor-fans { display: grid; gap: 10px; }
+.sensor-fans > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: var(--text-small); }
+.sensor-fans strong, .sensor-rails strong { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sensor-rails { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.sensor-rails > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--color-bg); border-radius: var(--radius-sm); }
+.sensor-rails > div > span { color: var(--color-muted); font-size: var(--text-caption); }
+@media (max-width: 900px) { .sensor-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .sensor-primary { grid-template-columns: 1fr; } }
+
+/* Energy: keep system identifiers secondary to the state and process. */
+.power-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-top: 16px; }
+.thermal-status { color: var(--color-text); font-size: 22px; font-weight: 650; line-height: 1.35; }
+.thermal-description { margin: 12px 0 0; color: var(--color-muted); font-size: var(--text-small); line-height: 1.55; }
+.thermal-source { margin: 10px 0 0; color: var(--color-muted); font-size: var(--text-caption); }
+.assertion-summary { list-style: none; padding: 0; margin: 0; }
+.assertion-summary li { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; padding: 8px 0; font-size: var(--text-small); border-bottom: 1px solid var(--color-line); }
+.assertion-summary li:first-child { padding-top: 0; }
+.assertion-summary li:last-child { border-bottom: 0; padding-bottom: 0; }
+.assertion-summary li > span { min-width: 0; overflow-wrap: anywhere; }
+.assertion-summary strong { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.assertion-summary small { color: var(--color-muted); font-size: var(--text-caption); font-weight: 500; }
+.assertion-table col:nth-child(1) { width: 22%; }
+.assertion-table col:nth-child(2) { width: 24%; }
+.assertion-table col:nth-child(3) { width: 42%; }
+.assertion-table col:nth-child(4) { width: 12%; }
+.assertion-table td { padding: 11px 10px; vertical-align: top; line-height: 1.5; }
+.assertion-table td:last-child { white-space: nowrap; }
+.assertion-table .connection-process { align-items: flex-start; }
+.assertion-table .connection-process > span:last-child { white-space: normal; overflow-wrap: anywhere; }
+.assertion-table .connection-process small { display: block; color: var(--color-muted); font-size: var(--text-caption); }
+.assertion-table td p { margin: 3px 0 0; }
+@media (max-width: 900px) {
+  .power-grid { grid-template-columns: 1fr; }
+  .assertion-table, .assertion-table tbody { display: block; }
+  .assertion-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .assertion-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px; }
+  .assertion-table tbody tr:nth-child(even) { background: rgb(0 0 0 / .025); }
+  .assertion-table tbody tr td { padding: 0; background: transparent; }
+  .assertion-table td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .assertion-table td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; padding-left: 30px; }
+  .assertion-table td:nth-child(3) { grid-column: 1 / -1; grid-row: 3; padding-left: 30px; color: var(--color-muted); }
+  .assertion-table td:nth-child(4) { grid-column: 2; grid-row: 1; color: var(--color-muted); }
+}

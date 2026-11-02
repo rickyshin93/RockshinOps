@@ -14,6 +14,37 @@
   "connectionTimeoutSeconds": 10,
   "connectionSampleIntervalSeconds": 1,
   "machineInfoTimeoutSeconds": 5,
+  "powerAssertionIntervalSeconds": 10,
+  "launcher": {
+    "defaultEnabled": false,
+    "defaultFiles": true,
+    "defaultShortcut": {
+      "darwin": "Cmd+Space",
+      "windows": "Alt+Space",
+      "linux": "Alt+Space"
+    },
+    "fileRebuildMinutes": 60,
+    "files": {
+      "darwin": {
+        "skipNames": ["node_modules", ".git", ".svn", ".hg", "__pycache__", ".venv", ".next", ".turbo", ".pnpm-store", "DerivedData", ".gradle"],
+        "skipPaths": ["Library", ".Trash", ".cache", ".npm", ".bun", ".cargo", ".rustup", "go/pkg", ".m2", ".docker", ".orbstack", ".colima", ".local/share", ".vscode/extensions", ".cursor/extensions"],
+        "include": [
+          "Library/Mobile Documents/com~apple~CloudDocs",
+          "Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/*/msg/file"
+        ]
+      },
+      "windows": {
+        "skipNames": ["node_modules", ".git", ".svn", ".hg", "__pycache__", ".venv", ".next", ".turbo", ".pnpm-store", ".gradle"],
+        "skipPaths": ["AppData", ".cache", ".npm", ".bun", ".cargo", ".rustup", "go/pkg", ".m2", ".docker", ".vscode/extensions", ".cursor/extensions"],
+        "include": []
+      },
+      "linux": {
+        "skipNames": ["node_modules", ".git", ".svn", ".hg", "__pycache__", ".venv", ".next", ".turbo", ".pnpm-store", ".gradle"],
+        "skipPaths": [".cache", ".npm", ".bun", ".cargo", ".rustup", "go/pkg", ".m2", ".docker", ".local/share", ".vscode/extensions", ".cursor/extensions"],
+        "include": []
+      }
+    }
+  },
   "scanTargets": {
     "darwin": [
       {

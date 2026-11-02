@@ -1,0 +1,41 @@
+:root {
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --line: rgb(0 0 0 / .08);
+  --selected: #338ef5;
+  --margin: 12px;
+  color-scheme: light;
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", system-ui, sans-serif;
+  color: var(--text);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; overflow: hidden; }
+body { padding: var(--margin) var(--margin) 20px; }
+
+.launcher {
+  background: rgb(255 255 255 / .97);
+  border: 1px solid rgb(0 0 0 / .1);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / .18), 0 1px 3px rgb(0 0 0 / .1);
+  overflow: hidden;
+}
+
+.launcher-search { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; }
+.launcher-glass { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+#launcher-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 22px; color: var(--text); }
+#launcher-input::placeholder { color: #aeaeb2; }
+
+.launcher-results { list-style: none; margin: 0; padding: 6px; border-top: 1px solid var(--line); }
+.launcher-results li { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 10px; border-radius: 8px; cursor: default; }
+.launcher-results li[aria-selected="true"] { background: var(--selected); color: #fff; }
+.launcher-results img { width: 32px; height: 32px; flex: none; }
+.launcher-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.launcher-title, .launcher-subtitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.launcher-title { font-weight: 500; }
+.launcher-subtitle { font-size: 12px; color: var(--muted); }
+.launcher-hint { flex: none; font-size: 12px; color: var(--muted); }
+[aria-selected="true"] .launcher-subtitle, [aria-selected="true"] .launcher-hint { color: rgb(255 255 255 / .85); }
+.launcher-hint { visibility: hidden; }
+[aria-selected="true"] .launcher-hint { visibility: visible; }
+
+.launcher-empty { margin: 0; padding: 14px 18px 16px; border-top: 1px solid var(--line); color: var(--muted); }

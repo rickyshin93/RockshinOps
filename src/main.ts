@@ -22,9 +22,10 @@ const state: ViewState = {
   busy: false, processError: "", connectionError: "",
   appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
   startup: null, startupBusy: false, startupError: "",
+  launcher: null, launcherBusy: false, launcherError: "",
   preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
-const reactPage = (page: Page) => ["settings", "menubar", "cleanup"].includes(page);
+const reactPage = (page: Page) => ["settings", "menubar", "cleanup", "launcher"].includes(page);
 let reactPages: typeof import("./react-pages") | null = null;
 let reactPageError = "";
 const loadReactPages = singleFlight(async () => {
@@ -92,7 +93,7 @@ function renderNow(filters = false) {
   const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.selectProcess || focused?.dataset.metric || focused?.dataset.connectionSort || focused?.dataset.processSort || focused?.dataset.processScope || focused?.dataset.connectionMode || focused?.dataset.favoritePort || focused?.dataset.copyPort || focused?.dataset.portProcess || focused?.dataset.closePort || focused?.dataset.portScope || focused?.dataset.portQuery : undefined;
   const title = t(page.title);
   let subtitle = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
-  if (state.page === "settings") subtitle = t("更改会自动保存");
+  if (state.page === "settings" || state.page === "launcher") subtitle = t("更改会自动保存");
   if (state.page === "menubar") subtitle = t("管理系统菜单栏图标、分区与外观");
   if (state.page === "about" && state.info) subtitle = state.info.machine.name || state.info.machine.model;
   if (state.page === "connections") subtitle = connectionSubtitle(state);
@@ -118,7 +119,7 @@ function renderNow(filters = false) {
     renderedPage = null;
     renderedAppReview = "";
     if (reactPages) {
-      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings());
+      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings(), shortcut => { if (state.launcher) void setLauncher(state.launcher.enabled, state.launcher.files, shortcut); });
     } else {
       el("page-body").textContent = reactPageError ? `${t("页面加载失败，请重试。")} ${reactPageError}` : t("正在加载页面…");
       void loadReactPages();
@@ -234,6 +235,7 @@ async function receive(snapshot: Snapshot) {
     if (epoch === navigationEpoch) render();
     if (["processes", "apps", "connections"].includes(state.page)) void refreshProcessView();
     if (state.page === "connections") void refreshConnectionView();
+    if (state.page === "launcher" && state.launcher?.indexing) void loadLauncherSettings();
     if (state.page === "settings" && state.preferences) void refreshTrayPreview();
   } catch (reason) { error(`${t("读取历史失败：")}${String(reason)}${t("。当前显示上次成功的数据。")}`); render(); }
   finally {
@@ -364,6 +366,7 @@ async function navigate(page: Page, query = "") {
     if (!state.preferences) await loadSettings();
     await loadStartupSettings();
   }
+  if (page === "launcher") await loadLauncherSettings();
   if (!isMyGo() || !state.info) return;
   if (page === "connections") {
     await Promise.all([loadProcesses(), connections(true), state.portsLoaded ? Promise.resolve() : loadPortFavorites()]);
@@ -437,6 +440,28 @@ async function loadStartupSettings() {
   }
   if (state.page === "settings") render();
 }
+let launcherRequest = 0;
+async function loadLauncherSettings() {
+  if (state.launcherBusy || !isMyGo()) return;
+  const request = ++launcherRequest;
+  try {
+    const launcher = await System.launcherSettings();
+    if (request !== launcherRequest) return;
+    state.launcher = launcher; state.launcherError = "";
+  } catch (reason) {
+    if (request !== launcherRequest) return;
+    state.launcherError = `${t("无法读取设置：")}${String(reason)}`;
+  }
+  if (state.page === "launcher") render();
+}
+async function setLauncher(enabled: boolean, files: boolean, shortcut: string) {
+  if (state.launcherBusy) return;
+  launcherRequest++;
+  state.launcherBusy = true; state.launcherError = ""; render();
+  try { state.launcher = await System.setLauncher(enabled, files, shortcut); }
+  catch (reason) { state.launcherError = `${t("无法设置启动器：")}${String(reason)}`; }
+  finally { state.launcherBusy = false; render(); }
+}
 async function toggleStartup() {
   if (state.startupBusy || !state.startup?.available) return;
   startupRequest++;
@@ -498,6 +523,9 @@ document.addEventListener("click", event => {
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
   if (button.dataset.action === "toggle-startup") { void toggleStartup(); return; }
   if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
+  if (button.dataset.action === "toggle-launcher" && state.launcher) { void setLauncher(!state.launcher.enabled, state.launcher.files, state.launcher.shortcut); return; }
+  if (button.dataset.action === "toggle-launcher-files" && state.launcher) { void setLauncher(state.launcher.enabled, !state.launcher.files, state.launcher.shortcut); return; }
+  if (button.dataset.action === "open-shortcut-settings") { void System.openShortcutSettings().catch(reason => { state.launcherError = String(reason); render(); }); return; }
   if (button.dataset.action === "toggle-hide-dock") { state.hideDockDraft = !state.hideDockDraft; render(); void saveSettings(); return; }
   if (button.dataset.action === "toggle-update-proxy") { state.updateProxyDraft = !state.updateProxyDraft; render(); void saveSettings(); return; }
   if (button.dataset.metric) {
@@ -536,6 +564,7 @@ document.addEventListener("click", event => {
     case "remove-app-files": void removeAppFiles(); break;
     case "stop-app-search": void stopAppSearch(); break;
     case "hide": void hide(); break;
+    case "load-launcher": void loadLauncherSettings(); break;
     case "load-settings": void loadSettings(); break;
     case "check-updates": void System.checkForUpdates().catch(reason => error(`${t("无法打开更新窗口：")}${String(reason)}`, "action")); break;
   }
@@ -597,9 +626,11 @@ if (isMyGo()) {
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && queuedSnapshot && !state.paused) void receive(queuedSnapshot);
     if (!document.hidden && state.page === "settings") void loadStartupSettings();
+    if (!document.hidden && state.page === "launcher") void loadLauncherSettings();
   });
   window.addEventListener("focus", () => {
     if (state.page === "settings") void loadStartupSettings();
+    if (state.page === "launcher") void loadLauncherSettings();
   });
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });

@@ -1,4 +1,4 @@
-import type { MenuBarPreview, Preferences, StartupSettings } from "./mygo";
+import type { LauncherSettings, MenuBarPreview, Preferences, StartupSettings } from "./mygo";
 import type { Language } from "./i18n";
 
 export const menuBarChoices = [
@@ -14,6 +14,9 @@ export interface SettingsState {
   startup: StartupSettings | null;
   startupBusy: boolean;
   startupError: string;
+  launcher: LauncherSettings | null;
+  launcherBusy: boolean;
+  launcherError: string;
   preferences: Preferences | null;
   menuBarDraft: string[];
   trayPreview: MenuBarPreview | null;

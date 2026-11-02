@@ -7,9 +7,19 @@ import (
 	"path/filepath"
 	"strings"
 
+	"rockshinops/internal/fileindex"
 	"rockshinops/internal/menubar"
 	"rockshinops/internal/metrics"
 )
+
+// LauncherConfig holds the first-run launcher defaults; the user's choice is saved in launcher.json.
+type LauncherConfig struct {
+	DefaultEnabled     bool                       `json:"defaultEnabled"`
+	DefaultFiles       bool                       `json:"defaultFiles"`
+	DefaultShortcut    map[string]string          `json:"defaultShortcut"`
+	Files              map[string]fileindex.Rules `json:"files"`
+	FileRebuildMinutes int                        `json:"fileRebuildMinutes"`
+}
 
 //go:embed rockshinops.json
 var configJSON []byte
@@ -29,7 +39,9 @@ type Config struct {
 	HistorySeconds                  int                             `json:"historySeconds"`
 	ConnectionTimeoutSeconds        int                             `json:"connectionTimeoutSeconds"`
 	MachineInfoTimeoutSeconds       int                             `json:"machineInfoTimeoutSeconds"`
+	PowerAssertionIntervalSeconds   int                             `json:"powerAssertionIntervalSeconds"`
 	ScanTargets                     map[string][]metrics.ScanTarget `json:"scanTargets"`
+	Launcher                        LauncherConfig                  `json:"launcher"`
 }
 
 func parseConfig(data []byte) (Config, error) {
@@ -55,6 +67,12 @@ func parseConfig(data []byte) (Config, error) {
 	if c.MetricsIntervalSeconds <= 0 || c.ProcessIntervalSeconds <= 0 || c.HistorySeconds < 3600 || c.ConnectionTimeoutSeconds <= 0 {
 		return c, fmt.Errorf("rockshinops.json: monitoring parameters must be positive; historySeconds must be at least 3600")
 	}
+	if c.PowerAssertionIntervalSeconds <= 0 {
+		return c, fmt.Errorf("rockshinops.json: powerAssertionIntervalSeconds must be positive")
+	}
+	if c.Launcher.FileRebuildMinutes <= 0 {
+		return c, fmt.Errorf("rockshinops.json: launcher.fileRebuildMinutes must be positive")
+	}
 	if len(c.ScanTargets) == 0 {
 		return c, fmt.Errorf("rockshinops.json: scanTargets is required")
 	}
@@ -62,6 +80,12 @@ func parseConfig(data []byte) (Config, error) {
 		return c, fmt.Errorf("rockshinops.json: %w", err)
 	}
 	for _, platform := range []string{"darwin", "windows", "linux"} {
+		if c.Launcher.DefaultShortcut[platform] == "" {
+			return c, fmt.Errorf("rockshinops.json: launcher.defaultShortcut.%s is required", platform)
+		}
+		if _, ok := c.Launcher.Files[platform]; !ok {
+			return c, fmt.Errorf("rockshinops.json: launcher.files.%s is required", platform)
+		}
 		targets := c.ScanTargets[platform]
 		if len(targets) == 0 {
 			return c, fmt.Errorf("rockshinops.json: scanTargets.%s is required", platform)

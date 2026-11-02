@@ -11,3 +11,7 @@ func render(string, int) ([]byte, error) {
 func renderComputer() ([]byte, error) {
 	return nil, errors.New("computer icons are not implemented on this platform")
 }
+
+func renderType(string, bool, int) ([]byte, error) {
+	return nil, errors.New("file type icons are not implemented on this platform")
+}

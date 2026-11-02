@@ -10,6 +10,7 @@ const icons: Record<string, IconNode> = {
   copy: Copy,
   ports: EthernetPort,
   settings: Settings,
+  launcher: Search,
   menubar: PanelTop,
   down: ChevronDown,
   check: Check,

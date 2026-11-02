@@ -16,6 +16,8 @@ type Options struct {
 	DiskInterval    time.Duration
 	ProcessInterval time.Duration
 	HistorySeconds  int
+
+	PowerAssertionInterval time.Duration
 }
 
 type Monitor struct {
@@ -33,12 +35,18 @@ type Monitor struct {
 	processes       ProcessList
 	snapshot        Snapshot
 	history         []Trend
+
+	readSensors    func() Sensors
+	readThermal    func() Thermal
+	readAssertions func() PowerAssertions
+	assertionsAt   time.Time
 }
 
 func NewMonitor(options Options) *Monitor {
 	return &Monitor{options: options, read: func() rawSample { return readNative(options.Interval) }, readProcesses: readProcesses, readVolume: storage.Read,
 		processPrevious: make(map[int]processCounters), history: []Trend{}, processes: ProcessList{Items: []Process{}},
-		snapshot: Snapshot{CPU: CPU{Cores: []float64{}}, TopCPU: []Process{}, TopMemory: []AppUsage{}}}
+		snapshot:    Snapshot{CPU: CPU{Cores: []float64{}}, TopCPU: []Process{}, TopMemory: []AppUsage{}, PowerAssertions: PowerAssertions{Items: []PowerAssertion{}}},
+		readSensors: CollectSensors, readThermal: readThermal, readAssertions: readPowerAssertions}
 }
 
 func (m *Monitor) Current() Snapshot { m.mu.RLock(); defer m.mu.RUnlock(); return m.snapshot }
@@ -168,6 +176,14 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 		s.TopCPU = s.TopCPU[:min(6, len(s.TopCPU))]
 		s.TopMemory = GroupApps(processes.Items)
 		s.TopMemory = s.TopMemory[:min(6, len(s.TopMemory))]
+	}
+	s.Sensors = m.readSensors()
+	s.Thermal = m.readThermal()
+	s.PowerAssertions = m.snapshot.PowerAssertions
+	if force || m.assertionsAt.IsZero() || now.Sub(m.assertionsAt) >= m.options.PowerAssertionInterval {
+		s.PowerAssertions = m.readAssertions()
+		s.PowerAssertions.UpdatedAt = now.UTC()
+		m.assertionsAt = now
 	}
 	m.previous, m.previousAt = raw, now
 	t := Trend{At: s.UpdatedAt}

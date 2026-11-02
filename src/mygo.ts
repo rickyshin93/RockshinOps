@@ -18,6 +18,7 @@ export interface AppInfo {
   diskRefreshSeconds: number;
   processRefreshSeconds: number;
   historySeconds: number;
+  powerAssertionRefreshSeconds: number;
   scanTargets: ScanTarget[];
 }
 
@@ -126,6 +127,12 @@ export interface DisplayInfo {
   primary: boolean;
 }
 
+export interface FanReading {
+  index: number;
+  rpm: number;
+  source: string;
+}
+
 export interface GPU {
   name: string;
   usage: number;
@@ -149,6 +156,25 @@ export interface Item {
   x: number;
   width: number;
   movable: boolean;
+}
+
+export interface LauncherResult {
+  id: string;
+  /** app, file or folder */
+  kind: string;
+  title: string;
+  subtitle: string;
+  path: string;
+}
+
+export interface LauncherSettings {
+  enabled: boolean;
+  files: boolean;
+  shortcut: string;
+  spotlightConflict: boolean;
+  fileCount: number;
+  indexing: boolean;
+  error: string;
 }
 
 export interface Machine {
@@ -218,6 +244,23 @@ export interface NetworkInterface {
   ready: boolean;
 }
 
+export interface PowerAssertion {
+  pid: number;
+  process: string;
+  app: string;
+  type: string;
+  name: string;
+  details: string;
+  since: string | null;
+}
+
+export interface PowerAssertions {
+  items: PowerAssertion[];
+  source: string;
+  updatedAt: string;
+  error: string;
+}
+
 export interface Preferences {
   hideDockOnClose: boolean;
   updateUseSystemProxy: boolean;
@@ -258,6 +301,19 @@ export interface ScanTarget {
   path: string;
 }
 
+export interface SensorReading {
+  key: string;
+  value: number;
+  source: string;
+}
+
+export interface Sensors {
+  dieTemperature: number | null;
+  temperatureSource: string;
+  powerRails: SensorReading[];
+  fans: FanReading[];
+}
+
 export interface Settings {
   enabled: boolean;
   alwaysHidden: boolean;
@@ -295,6 +351,9 @@ export interface Snapshot {
   topCPU: Process[];
   topMemory: AppUsage[];
   uptimeSeconds: number;
+  sensors: Sensors;
+  thermal: Thermal;
+  powerAssertions: PowerAssertions;
 }
 
 export interface SpaceEntry {
@@ -358,6 +417,12 @@ export interface State {
   panelVisible: boolean;
   iceRunning: boolean;
   items: Item[];
+  error: string;
+}
+
+export interface Thermal {
+  pressure: string;
+  source: string;
   error: string;
 }
 
@@ -425,6 +490,23 @@ export const System = {
   installedApps(): Promise<InstalledApp[]> {
     return call("System.InstalledApps");
   },
+  launcherHide(): Promise<void> {
+    return call("System.LauncherHide");
+  },
+  /** LauncherOpen acts on a result: action is "open", "reveal" or "copy". */
+  launcherOpen(id: string, action: string): Promise<void> {
+    return call("System.LauncherOpen", id, action);
+  },
+  launcherQuery(query: string): Promise<LauncherResult[]> {
+    return call("System.LauncherQuery", query);
+  },
+  /** LauncherResize fits the panel to the page's card, growing downwards. */
+  launcherResize(height: number): Promise<void> {
+    return call("System.LauncherResize", height);
+  },
+  launcherSettings(): Promise<LauncherSettings> {
+    return call("System.LauncherSettings");
+  },
   menuBarAction(action: string): Promise<State> {
     return call("System.MenuBarAction", action);
   },
@@ -443,6 +525,10 @@ export const System = {
   },
   openFullDiskAccessSettings(): Promise<void> {
     return call("System.OpenFullDiskAccessSettings");
+  },
+  /** OpenShortcutSettings opens the Keyboard settings, where Spotlight's shortcut is turned off. */
+  openShortcutSettings(): Promise<void> {
+    return call("System.OpenShortcutSettings");
   },
   preferences(): Promise<Preferences> {
     return call("System.Preferences");
@@ -478,6 +564,9 @@ export const System = {
   scanSpace(): Promise<SpaceSummary> {
     return call("System.ScanSpace");
   },
+  setLauncher(enabled: boolean, files: boolean, shortcut: string): Promise<LauncherSettings> {
+    return call("System.SetLauncher", enabled, files, shortcut);
+  },
   setOpenAtLogin(enabled: boolean): Promise<StartupSettings> {
     return call("System.SetOpenAtLogin", enabled);
   },
@@ -503,6 +592,8 @@ export const System = {
 
 /** Events sent by the Go side. Subscribe with `events.name.on(listener)`. */
 export const events = {
+  /** LauncherShown tells the launcher page that the panel was summoned. */
+  launcherShown: event<boolean>("launcherShown"),
   metricsChanged: event<Snapshot>("metricsChanged"),
   settingsOpened: event<boolean>("settingsOpened"),
   menuBarSettingsOpened: event<boolean>("menuBarSettingsOpened"),

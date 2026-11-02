@@ -1,13 +1,12 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.7
+### New in v0.2.8
 
-- Rebuilt space analysis with a single scan, folder browsing, largest files, cleanup suggestions and reviewed trash actions.
-- Developer ports panel with listener search, favorites, address copying and process details.
-- OS-backed Open at login setting for packaged builds.
-- Redesigned bilingual website with platform-aware download links.
+- Search apps and indexed files from a global-shortcut launcher, with pinyin matching, reveal and copy-path actions. Configure it in the new Launcher sidebar page.
+- View available macOS chip temperatures, SMC power and fan readings, thermal pressure and active power assertions on the Energy page. Availability depends on hardware.
+- Fix shortcut recording focus in the macOS WebView.
 
-**中文：**重做空间分析，新增开发者端口面板和开机启动设置，并改版双语官网。
+**中文：**新增支持拼音搜索应用和文件的快捷键启动器；能耗页显示可用的 macOS 温度、功率、风扇、热压力及电源断言；修复快捷键录制焦点问题。
 
 ### Upgrade notice / 升级说明
 

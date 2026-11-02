@@ -136,6 +136,11 @@ type Snapshot struct {
 	TopCPU           []Process  `json:"topCPU"`
 	TopMemory        []AppUsage `json:"topMemory"`
 	UptimeSeconds    float64    `json:"uptimeSeconds"`
+
+	// Thermal pressure and power assertions are defined in power.go.
+	Sensors         Sensors         `json:"sensors"`
+	Thermal         Thermal         `json:"thermal"`
+	PowerAssertions PowerAssertions `json:"powerAssertions"`
 }
 
 type Trend struct {

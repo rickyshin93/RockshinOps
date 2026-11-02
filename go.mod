@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/egoist/mygo v0.6.4
+	github.com/mozillazg/go-pinyin v0.21.0
 	github.com/shirou/gopsutil/v4 v4.26.9
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.43.0
