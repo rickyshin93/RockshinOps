@@ -34,6 +34,8 @@
 
 ## Done
 
+- 2026-11-02: Published [v0.2.9](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.9) with Launcher quit and macOS menu-bar preview fixes. Four-target signed release CI passed; all 12 published checksums and four update signatures verified. Website update pending deployment; native lifecycle and cross-platform interactive limits remain in Doing.
+
 - 2026-11-02: Published [v0.2.8](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.8) with Launcher and macOS Energy telemetry. Four-target signed release CI passed; all 12 published checksums and four update signatures verified. Bilingual website deployed and live version/download links checked; native lifecycle and cross-platform interactive limits remain in Doing.
 
 - 2026-10-30: Published [v0.2.7](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.7) with space analysis, developer ports, open at login and the redesigned website. [Four-target signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/41066610530) and [website deployment](https://github.com/rickyshin93/RockshinOps/actions/runs/41067075667) passed; live bilingual pages show v0.2.7. The v0.2.6 tag produced no release after a Windows fixture assertion failed; the corrected test passed on Windows. Local Go/frontend checks and macOS arm64 package passed; native and cross-platform interactive acceptance remains in Doing.
