@@ -163,7 +163,7 @@ func TestLauncherMergesAppsAndFiles(t *testing.T) {
 	l.index.Store(ix)
 
 	got := l.query("safari")
-	if len(got) != 3 || got[0].Kind != "app" || got[1].Title != "safari-bugs.md" || got[1].Subtitle != "~/notes" || got[2].Subtitle != "~" {
+	if len(got) != 3 || got[0].Kind != "app" || got[1].Title != "safari-bugs.md" || got[1].Subtitle != filepath.Join("~", "notes") || got[2].Subtitle != "~" {
 		t.Fatalf("merged results: %+v", got)
 	}
 	if got := l.query("a"); len(got) != 1 || got[0].Kind != "app" {
