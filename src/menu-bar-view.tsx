@@ -171,7 +171,7 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
   async function save(patch: Partial<MenuBarSettings>) {
     if (!settings || !beginOperation()) return;
     setBusy(true); setError(""); setMessage("");
-    try { setConfig(await System.saveMenuBarSettings({ ...settings, ...patch })); setMessage(t("已保存")); }
+    try { const next = await System.saveMenuBarSettings({ ...settings, ...patch }); setConfig(next); if (!next.settings.enabled) setSelected(null); setMessage(t("已保存")); }
     catch (reason) { setError(`${t("保存失败，设置已恢复：")}${String(reason)}`); }
     finally { operation.current = false; setBusy(false); }
   }
@@ -293,9 +293,10 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
   if (!config) return <div className="empty-state"><h2>{t("读取菜单栏")}</h2><p role={error ? "alert" : "status"}>{error || t("正在读取本机偏好…")}</p>{error && <ActionButton blocked={busy || moving !== null} className="secondary-button" onClick={() => void reload()}>{t("重试")}</ActionButton>}</div>;
   const editable = Boolean(settings?.enabled && state?.accessibility && !state.iceRunning);
   return <div className="menu-manager" aria-busy={busy || moving !== null}>
-    <div className="settings-card menu-enable">{toggle("enabled", "启用菜单栏管理", "将不常用图标收进隐藏分区，点击菜单栏箭头随时展开。")}</div>
+    <div className="settings-card menu-enable"><Row label={t("启用菜单栏管理")} description={settings?.enabled ? t("将不常用图标收进隐藏分区，点击菜单栏箭头随时展开。") : t("开启后可拖动图标、调整分区和修改下方设置。") }><span className="menu-enable-state">{settings?.enabled ? t("已启用") : t("未开启")}</span><Toggle label={t("启用菜单栏管理")} on={Boolean(settings?.enabled)} disabled={busy} change={() => void save({ enabled: !settings?.enabled })} /></Row></div>
     {state?.iceRunning && <div className="notice">{t("请先退出 Ice，避免两个菜单栏管理器同时运行。")}</div>}
     {error && <div className="notice error" role="alert">{error}</div>}
+    <fieldset className="menu-controls" disabled={!settings?.enabled} inert={!settings?.enabled} aria-label={t("菜单栏管理")}>
     <div className="menu-toolbar">
       <div className="segmented menu-tabs" role="tablist" aria-label={t("菜单栏管理")}>{tabs.map(([id, label]) => <button key={id} id={`menu-tab-${id}`} tabIndex={tab === id ? 0 : -1} onKeyDown={e => { if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) { e.preventDefault(); const index=tabs.findIndex(([key])=>key===id); const next=e.key==="Home"?0:e.key==="End"?tabs.length-1:(index+(e.key==="ArrowRight"?1:tabs.length-1))%tabs.length; setTab(tabs[next]![0]); document.getElementById(`menu-tab-${tabs[next]![0]}`)?.focus(); } }} role="tab" aria-selected={tab === id} aria-controls="menu-tab-panel" className={tab === id ? "selected" : ""} onClick={() => setTab(id)}>{t(label)}</button>)}</div>
       <ActionButton blocked={busy || moving !== null} type="button" className="secondary-button" onClick={() => void reload()}><span dangerouslySetInnerHTML={{ __html: icon("refresh") }} />{t("刷新")}</ActionButton>
@@ -317,7 +318,7 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
             </div>
           </section>;
         })}
-        <div className="menu-selection">{selected ? <><span className="menu-selection-name">{selected.name}{selected.owner !== selected.name && <span>{selected.owner}</span>}</span><ActionButton blocked={busy || moving !== null} className="secondary-button" disabled={!editable} onClick={() => void run(() => System.activateMenuBarItem(selected.id))}>{t("打开图标菜单")}</ActionButton>{(["previous", "next"] as const).map(direction => { const same = state!.items.filter(i => i.section === selected.section); const index = same.findIndex(i => i.id === selected.id); const target = direction === "previous" ? same[index - 1] : same[index + 2]; return <ActionButton blocked={busy || moving !== null} key={direction} className="secondary-button" disabled={!editable || !selected.movable || (direction === "previous" ? index <= 0 : index >= same.length - 1)} onClick={() => move(selected, selected.section, target?.id || 0)}>{direction === "previous" ? t("向左移动") : t("向右移动")}</ActionButton>; })}<button className="menu-clear" onClick={() => setSelected(null)}>{t("取消选择")}</button></> : <span className="menu-selection-hint">{t("点击图标选择，拖动调整位置")}</span>}</div>
+        {settings?.enabled && <div className="menu-selection">{selected ? <><span className="menu-selection-name">{selected.name}{selected.owner !== selected.name && <span>{selected.owner}</span>}</span><ActionButton blocked={busy || moving !== null} className="secondary-button" disabled={!editable} onClick={() => void run(() => System.activateMenuBarItem(selected.id))}>{t("打开图标菜单")}</ActionButton>{(["previous", "next"] as const).map(direction => { const same = state!.items.filter(i => i.section === selected.section); const index = same.findIndex(i => i.id === selected.id); const target = direction === "previous" ? same[index - 1] : same[index + 2]; return <ActionButton blocked={busy || moving !== null} key={direction} className="secondary-button" disabled={!editable || !selected.movable || (direction === "previous" ? index <= 0 : index >= same.length - 1)} onClick={() => move(selected, selected.section, target?.id || 0)}>{direction === "previous" ? t("向左移动") : t("向右移动")}</ActionButton>; })}<button className="menu-clear" onClick={() => setSelected(null)}>{t("取消选择")}</button></> : <span className="menu-selection-hint">{t("点击图标选择，拖动调整位置")}</span>}</div>}
       </div>}
       {tab === "general" && <div className="settings-card">
         {toggle("usePanel", "使用独立展开栏", "在菜单栏下方显示隐藏图标，适合带刘海的显示器。")}
@@ -337,6 +338,7 @@ export const MenuBarView = memo(function MenuBarView({ isMacOS, refreshSeconds }
       </div></div>}
     </div>
     <section className="settings-group menu-permissions" aria-labelledby="menu-permissions"><h2 id="menu-permissions">{t("权限")}</h2><div className="settings-card">{([["accessibility", "辅助功能", "允许移动和打开其他应用的菜单栏图标。"], ["screenRecording", "屏幕录制", "仅捕获菜单栏图标窗口，用于布局预览与展开栏。"]] as const).map(([key, label, description]) => <Row key={key} label={t(label)} description={t(description)}>{state?.[key] ? <span className="menu-granted">{t("已授权")}</span> : <ActionButton blocked={busy || moving !== null} className="secondary-button" onClick={() => void run(() => System.menuBarPermission(key))}>{t("授权")}</ActionButton>}</Row>)}</div>{(!state?.accessibility || !state?.screenRecording) && <p className="settings-note">{t("授权后点击刷新；macOS 可能要求退出并重新打开应用。")}</p>}</section>
+    </fieldset>
     <span className="menu-save-status" role="status" aria-live="polite">{busy || moving !== null ? t("正在应用…") : message}</span>
   </div>;
 });

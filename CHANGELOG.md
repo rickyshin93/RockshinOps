@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.10
+
+- Clarify when menu-bar management is off, show how to enable it, and disable dependent controls until it is turned on.
+- Clear the selected menu-bar item when management is switched off.
+
+### 中文
+
+- 菜单栏管理关闭时显示状态和启用说明，并禁用相关控件。
+- 关闭菜单栏管理时清除已选图标。
+
 ## 0.2.9
 
 - Fix application Quit when the Launcher panel has been opened.

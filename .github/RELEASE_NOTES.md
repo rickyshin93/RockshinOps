@@ -1,11 +1,10 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.9
+### New in v0.2.10
 
-- Fix application Quit after the Launcher panel has been opened.
-- Fix duplicate menu-bar items on secondary displays and restore previews for hidden macOS menu-bar icons. Captured images appear as they become available.
+- Menu-bar management now shows an explicit Off state and enable guidance. Dependent controls are disabled while management is off, and selection is cleared when it is disabled.
 
-**中文：**修复打开启动器后无法退出的问题；修复多显示器菜单栏项目重复和隐藏图标预览缺失，并逐项显示已采集的图像。
+**中文：**菜单栏管理关闭时显示明确状态和启用说明，禁用相关控件，并清除已选图标。
 
 ### Upgrade notice / 升级说明
 

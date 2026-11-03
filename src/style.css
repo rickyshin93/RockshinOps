@@ -621,6 +621,10 @@ button.app-row:hover { @apply bg-fill;  }
 .menu-manager button:disabled { opacity: .45; cursor: default; }
 .menu-manager button[data-pending] { opacity: 1; }
 .menu-enable .setting-label { font-weight: 600; }
+.menu-enable-state { color: var(--color-muted); font-size: 13px; white-space: nowrap; }
+.menu-controls { display: flex; flex-direction: column; gap: 20px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.menu-controls:disabled { opacity: .45; }
+.menu-controls:disabled button:disabled { opacity: 1; }
 .menu-toolbar, .menu-layout-actions, .menu-section-heading, .menu-selection, .menu-hotkey { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .menu-toolbar { justify-content: space-between; }
 .menu-toolbar .secondary-button { display: inline-flex; align-items: center; gap: 6px; }

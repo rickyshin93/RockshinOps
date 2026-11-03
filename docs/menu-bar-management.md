@@ -23,6 +23,8 @@ Each successful capture updates the native panel immediately and sends a MyGo im
 
 Settings live in the existing user configuration directory as `menu-bar.json`; root `rockshinops.json` defines first-run defaults. Management is disabled by default. The macOS status bar owns ordering persistence; no private preference database is edited. Disabling management removes its boundary items and reveals hidden items. Existing metric sampling remains independent.
 
+When management is off, the page labels the switch **Off** and explains how to enable dragging and configuration. All controls below it remain visible but dimmed and unavailable to mouse and keyboard, including icon selection, tabs, settings and permission actions. Drag guidance is hidden, and a successful disable clears the selected icon. Enabling restores the controls; permission requirements still apply. Save failures keep the prior state and display the error outside the disabled area. Browser regression evidence is in ignored `work/menu-disabled/`.
+
 ## Usage and boundaries
 
 1. Quit Ice, open **Menu Bar Management**, and enable management.
