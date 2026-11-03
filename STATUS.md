@@ -34,7 +34,7 @@
 
 ## Done
 
-- 2026-11-03: Published [v0.2.10](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.10) with a clearer disabled state for menu-bar management. [Four-target signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/41567713197), Go/frontend checks and local macOS arm64 package passed; native and cross-platform interactive acceptance remains in Doing.
+- 2026-11-03: Published [v0.2.10](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.10) with a clearer disabled state for menu-bar management. [Four-target signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/41567713197), Go/frontend checks and local macOS arm64 package passed. All 12 published checksums and four update signatures verified; bilingual website deployed and live links checked. Main CI passed after rerunning Intel (see Known issues); native and cross-platform interactive acceptance remains in Doing.
 
 - 2026-11-02: Published [v0.2.9](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.9) with Launcher quit and macOS menu-bar preview fixes. Four-target signed release CI passed; all 12 published checksums and four update signatures verified. Bilingual website deployed and live version/download links checked; native lifecycle and cross-platform interactive limits remain in Doing.
 
@@ -74,6 +74,8 @@
 - 2026-10-26: Expanded LocalOps 0.2 into a Pulse-style two-pane monitor with real hardware metrics/history, processes, connections, running Apps, read-only space analysis and machine information. Native navigation, search/sort, minimum-size scrolling, hidden-window sampling, reopen and quit verified; app rebuilt and left running. Automated checks and finish review passed. Verification boundaries remain below.
 
 ## Known issues
+
+- 2026-11-03: Main CI Intel native smoke test observed CPU usage 100.00000000000001%, failing its ≤100 assertion; rerun passed. Floating-point boundary remains unresolved. [CI run](https://github.com/rickyshin93/RockshinOps/actions/runs/41568010391).
 
 - CPU temperature and App-level watt measurements are not implemented; GPU/system power availability depends on hardware.
 - Space and uninstall scans can be partial when macOS denies directory access; the current uninstall comparison encountered 371 protected locations. Full Disk Access may improve coverage but does not guarantee access to all system directories. Name matches do not prove ownership or complete residual detection; REA coverage is representative, not exhaustive. Space results are logical file sizes, not guaranteed reclaimable space.
