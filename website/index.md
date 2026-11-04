@@ -34,7 +34,7 @@ System readings and file search stay on your computer. No account or hosted moni
 
 ## A closer look at your hardware.
 
-In development for macOS: dedicated Sensors and Devices pages. These previews are not included in the v0.2.11 download.
+New in v0.2.12 for macOS: dedicated Sensors and Devices pages for hardware readings and everyday connections.
 
 ## Temperature, with context.
 
@@ -52,15 +52,15 @@ Enable Launcher and choose a shortcut in the app. It starts off by default.
 
 macOS only. Accessibility allows icon movement; Screen Recording supplies icon previews.
 
-Current development interface with demonstration data. Download v0.2.11 below; preview features are shown separately.
+RockshinOps v0.2.12 interface with demonstration data. Features and readings vary by platform and hardware.
 
-Version 0.2.11
+Version 0.2.12
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/RockshinOps.0.2.11.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/RockshinOps.0.2.11.amd64.dmg)
-- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/RockshinOps.Setup.0.2.11.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/rockshinops_0.2.11_amd64.deb)
-- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/rockshinops-0.2.11-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/RockshinOps.0.2.12.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/RockshinOps.0.2.12.amd64.dmg)
+- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/RockshinOps.Setup.0.2.12.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/rockshinops_0.2.12_amd64.deb)
+- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/rockshinops-0.2.12-linux-amd64.tar.gz)
 
 Ad-hoc signed. Not notarized.
 

@@ -34,7 +34,7 @@
 
 ## 再深入一点，看清硬件。
 
-macOS 开发预览：独立的传感器与设备连接页面。以下功能尚未包含在 v0.2.11 下载版本中。
+v0.2.12 新增 macOS 传感器与设备连接页面，集中查看硬件读数与日常连接。
 
 ## 温度高低，变化有迹可循。
 
@@ -52,15 +52,15 @@ macOS、Windows 和 Linux 均免费。无需账户，无需订阅。
 
 仅支持 macOS。辅助功能权限用于移动图标；屏幕录制权限用于图标预览。
 
-当前开发版界面，使用演示数据。下方下载版本为 v0.2.11；未发布功能另列于开发预览。
+RockshinOps v0.2.12 界面，使用演示数据。功能与读数因平台和硬件而异。
 
-版本 0.2.11
+版本 0.2.12
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/RockshinOps.0.2.11.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/RockshinOps.0.2.11.amd64.dmg)
-- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/RockshinOps.Setup.0.2.11.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/rockshinops_0.2.11_amd64.deb)
-- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.11/rockshinops-0.2.11-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/RockshinOps.0.2.12.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/RockshinOps.0.2.12.amd64.dmg)
+- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/RockshinOps.Setup.0.2.12.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/rockshinops_0.2.12_amd64.deb)
+- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.12/rockshinops-0.2.12-linux-amd64.tar.gz)
 
 采用临时签名，尚未公证。
 
