@@ -216,7 +216,8 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 		first++
 	}
 	if first > 0 {
-		m.history = slices.Clone(m.history[first:])
+		// Public reads clone the history, so rolling it can reuse this storage.
+		m.history = slices.Delete(m.history, 0, first)
 	}
 	return s
 }

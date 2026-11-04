@@ -171,7 +171,7 @@ func main() {
 	service.startup = newStartupSettings(configDir)
 	service.launcher, err = newLauncher(filepath.Join(configDir, "launcher.json"),
 		launcherPrefs{Enabled: cfg.Launcher.DefaultEnabled, Files: cfg.Launcher.DefaultFiles, Shortcut: cfg.Launcher.DefaultShortcut[runtime.GOOS]},
-		home, cfg.Launcher.Files[runtime.GOOS], time.Duration(cfg.Launcher.FileRebuildMinutes)*time.Minute)
+		home, cfg.Launcher.Files[runtime.GOOS], cfg.Launcher.WeChatPaths, time.Duration(cfg.Launcher.FileRebuildMinutes)*time.Minute)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,10 +1,11 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.10
+### New in v0.2.11
 
-- Menu-bar management now shows an explicit Off state and enable guidance. Dependent controls are disabled while management is off, and selection is cleared when it is disabled.
+- Startup file indexing skips other apps' private directories. On macOS, you can opt in to searching received WeChat files for the current session; the choice resets when the app quits or file search is disabled.
+- Launcher indexing uses less retained memory and fewer allocations. Its search window is created on first use, and settings forms load on demand.
 
-**中文：**菜单栏管理关闭时显示明确状态和启用说明，禁用相关控件，并清除已选图标。
+**中文：**启动文件索引默认跳过其他应用的私有目录；macOS 微信接收文件可按需在本次运行中加入搜索，退出应用或关闭文件搜索后重置。启动器索引减少内存占用和分配，搜索窗口及设置页面按需加载。
 
 ### Upgrade notice / 升级说明
 

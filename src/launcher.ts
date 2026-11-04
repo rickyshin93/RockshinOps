@@ -127,3 +127,6 @@ events.launcherShown.on(() => {
 });
 onLocaleChange(applyLanguage);
 applyLanguage(locale());
+// The first invocation creates this page; its shown event may precede loading.
+input.focus();
+void search();

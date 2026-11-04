@@ -34,6 +34,7 @@ const (
 type LauncherSettings struct {
 	Enabled           bool   `json:"enabled"`
 	Files             bool   `json:"files"`
+	WeChat            bool   `json:"weChat"`
 	Shortcut          string `json:"shortcut"`
 	SpotlightConflict bool   `json:"spotlightConflict"`
 	FileCount         int    `json:"fileCount"`
@@ -69,14 +70,17 @@ type launcher struct {
 	appsMu    sync.Mutex
 	apps      []mygo.InstalledApp
 
-	home      string // "" leaves file search off, as in tests
-	rules     fileindex.Rules
-	rebuild   time.Duration
-	index     atomic.Pointer[fileindex.Index]
-	indexing  atomic.Bool
-	stopFiles context.CancelFunc
-	shownMu   sync.Mutex
-	shown     map[string]bool // files the last query returned, which open may act on
+	home        string // "" leaves file search off, as in tests
+	rules       fileindex.Rules
+	rebuild     time.Duration
+	index       atomic.Pointer[fileindex.Index]
+	indexing    atomic.Bool
+	stopFiles   context.CancelFunc
+	filesDone   chan struct{}
+	weChat      bool // session only: container access must never resume at startup
+	weChatPaths []string
+	shownMu     sync.Mutex
+	shown       map[string]bool // files the last query returned, which open may act on
 }
 
 func readLauncherPrefs(path string, defaults launcherPrefs) (launcherPrefs, error) {
@@ -132,13 +136,12 @@ func (l *launcher) apply(p launcherPrefs) error {
 	}
 	switch files := p.Enabled && p.Files && l.home != ""; {
 	case files && l.stopFiles == nil:
-		ctx, cancel := context.WithCancel(context.Background())
-		l.stopFiles = cancel
-		go l.indexFiles(ctx)
+		l.startIndexing()
 	case !files && l.stopFiles != nil:
-		l.stopFiles()
-		l.stopFiles = nil
-		l.index.Store(nil) // free the names
+		l.stopIndexing()
+	}
+	if !p.Enabled || !p.Files {
+		l.weChat = false
 	}
 	return nil
 }
@@ -150,10 +153,12 @@ func (l *launcher) set(p launcherPrefs) (launcherPrefs, error) {
 		return l.prefs, errors.New("launcher shortcut is required")
 	}
 	old := l.prefs
+	oldWeChat := l.weChat
 	if err := l.apply(p); err != nil {
 		return old, err
 	}
 	if err := writeLauncherPrefs(l.path, p); err != nil {
+		l.weChat = oldWeChat
 		if rollback := l.apply(old); rollback != nil {
 			log.Printf("restore launcher shortcut: %v", rollback)
 		}
@@ -166,7 +171,7 @@ func (l *launcher) set(p launcherPrefs) (launcherPrefs, error) {
 func (l *launcher) settings() LauncherSettings {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	s := LauncherSettings{Enabled: l.prefs.Enabled, Files: l.prefs.Files, Shortcut: l.prefs.Shortcut, SpotlightConflict: spotlightHoldsShortcut(l.prefs.Shortcut), Indexing: l.indexing.Load(), Error: l.lastError}
+	s := LauncherSettings{Enabled: l.prefs.Enabled, Files: l.prefs.Files, WeChat: l.weChat, Shortcut: l.prefs.Shortcut, SpotlightConflict: spotlightHoldsShortcut(l.prefs.Shortcut), Indexing: l.indexing.Load(), Error: l.lastError}
 	if ix := l.index.Load(); ix != nil {
 		s.FileCount = ix.Len()
 	}
@@ -183,21 +188,23 @@ func (l *launcher) start() {
 	}
 }
 
-func newLauncher(path string, defaults launcherPrefs, home string, rules fileindex.Rules, rebuild time.Duration) (*launcher, error) {
+func newLauncher(path string, defaults launcherPrefs, home string, rules fileindex.Rules, weChatPaths []string, rebuild time.Duration) (*launcher, error) {
 	p, err := readLauncherPrefs(path, defaults)
 	if err != nil {
 		return nil, err
 	}
-	l := &launcher{path: path, prefs: p, unregister: mygo.GlobalShortcut.Unregister, home: home, rules: rules, rebuild: rebuild}
+	l := &launcher{path: path, prefs: p, unregister: mygo.GlobalShortcut.Unregister, home: home, rules: rules, weChatPaths: weChatPaths, rebuild: rebuild}
 	l.register = func(acc string) error {
-		l.ensurePanel()
-		return mygo.GlobalShortcut.Register(acc, l.toggle)
+		if err := mygo.GlobalShortcut.Register(acc, l.toggle); err != nil {
+			return err
+		}
+		go l.loadApps()
+		return nil
 	}
 	return l, nil
 }
 
-// ensurePanel creates the hidden panel the first time the launcher is
-// enabled, so that it shows at once on the shortcut.
+// ensurePanel creates a WebView only on the first shortcut invocation.
 func (l *launcher) ensurePanel() {
 	l.panelOnce.Do(func() {
 		panel := mygo.NewWindow(mygo.WindowOptions{
@@ -215,12 +222,12 @@ func (l *launcher) ensurePanel() {
 		})
 		panel.OnBlur(panel.Hide)
 		l.panel.Store(panel)
-		go l.loadApps()
 	})
 }
 
 // toggle runs on the main thread from the global shortcut.
 func (l *launcher) toggle() {
+	l.ensurePanel()
 	panel := l.panel.Load()
 	if panel.IsVisible() {
 		panel.Hide()
@@ -367,6 +374,13 @@ func rankApps(apps []mygo.InstalledApp, q string, limit int) []scoredApp {
 }
 
 func (s *System) LauncherSettings() LauncherSettings { return s.launcher.settings() }
+
+func (s *System) SetLauncherWeChat(enabled bool) (LauncherSettings, error) {
+	if err := s.launcher.setWeChat(enabled); err != nil {
+		return s.launcher.settings(), err
+	}
+	return s.launcher.settings(), nil
+}
 
 func (s *System) SetLauncher(enabled, files bool, shortcut string) (LauncherSettings, error) {
 	if _, err := s.launcher.set(launcherPrefs{Enabled: enabled, Files: files, Shortcut: shortcut}); err != nil {

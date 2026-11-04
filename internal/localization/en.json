@@ -705,7 +705,6 @@
   "在访达中显示": "Show in Finder",
   "在文件夹中显示": "Show in folder",
   "搜索文件": "Search files",
-  "只索引个人文件夹中的文件名，不读取内容；跳过依赖、缓存和资源库，但包含 iCloud 云盘和微信收到的文件。": "Indexes file names in your home folder, never their contents. Skips dependencies, caches and Library, but includes iCloud Drive and files received in WeChat.",
   "正在建立索引…": "Indexing…",
   "{{count}} 个项目": "{{count}} items",
   "按快捷键在任意应用上方搜索并打开应用和文件。": "Press the shortcut over any app to search for and open apps and files.",
@@ -752,5 +751,13 @@
   "来源：HID 芯片传感器": "Source: HID die sensors",
   "温度与风扇": "Temperature and fans",
   "HID 芯片传感器最高读数，非 CPU 核心温度。": "Highest HID die sensor reading, not CPU core temperature.",
-  "AppleSMC 通道独立显示，不可相加；含义和可用性随机型变化。": "AppleSMC rails are separate and must not be added; their meaning and availability vary by model."
+  "AppleSMC 通道独立显示，不可相加；含义和可用性随机型变化。": "AppleSMC rails are separate and must not be added; their meaning and availability vary by model.",
+  "只索引个人文件夹中的文件名，不读取内容；包含 iCloud 云盘，跳过依赖、缓存和其他 App 的私有目录。": "Index filenames in your home folder, including iCloud Drive, without reading contents. Skip dependencies, caches and other apps’ private directories.",
+  "只索引个人文件夹中的文件名，不读取内容；跳过依赖和缓存。": "Index filenames in your home folder without reading contents. Skip dependencies and caches.",
+  "搜索微信文件（仅本次运行）": "Search WeChat files (this session only)",
+  "手动开启后索引微信收到的文件，macOS 可能请求访问其他 App 的数据。退出应用后自动关闭，下次启动不会扫描微信目录。": "Turn on to index received WeChat files. macOS may ask to access other apps’ data. Turns off when you quit; the next launch will not scan WeChat directories.",
+  "微信文件搜索仅支持 macOS。": "WeChat file search is only available on macOS.",
+  "请先启用启动器和文件搜索。": "Enable the launcher and file search first.",
+  "无法访问微信文件：": "Unable to access WeChat files: ",
+  "未找到可访问的微信文件目录，请确认微信已接收文件并允许访问后重试。": "No accessible WeChat file folder found. Check that WeChat has received files and allow access, then try again."
 }

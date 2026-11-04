@@ -6,6 +6,7 @@ package fileindex
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -37,21 +38,19 @@ type Match struct {
 const (
 	flagDir uint8 = 1 << iota
 	flagDeleted
-	flagHidden // a folder leading to an included place: kept for paths, never a result
-	flagFolded // the lower-case name differs and is kept in Index.lower
+	flagHidden  // a folder leading to an included place: kept for paths, never a result
+	flagFolded  // the lower-case name follows the original name in Index.names
 	flagSpelled // the name has Chinese characters, spelled out in Index.spelled
 )
 
 // entry is one file or folder; names live in shared byte arenas so a
 // million entries take tens of megabytes.
 type entry struct {
-	parent   int32
-	name     uint32
-	lower    uint32
-	nameLen  uint16
-	lowerLen uint16
-	mod      uint32 // Unix seconds
-	flags    uint8
+	parent  int32
+	name    uint32
+	mod     uint32 // Unix seconds
+	nameLen uint16
+	flags   uint8
 }
 
 type Index struct {
@@ -63,7 +62,6 @@ type Index struct {
 	mu       sync.RWMutex
 	entries  []entry
 	names    []byte
-	lower    []byte
 	children map[int32][]int32
 	spelled  map[int32][]syllable
 	deleted  int
@@ -125,8 +123,8 @@ func (ix *Index) skip(rel, name string) bool {
 // Build indexes the root from scratch, then the included places.
 func (ix *Index) Build(ctx context.Context) error {
 	ix.mu.Lock()
-	ix.entries, ix.names, ix.lower, ix.children, ix.spelled, ix.deleted, ix.included = nil, nil, nil, map[int32][]int32{}, map[int32][]syllable{}, 0, nil
-	ix.add(-1, "", time.Time{}, flagDir|flagHidden)
+	ix.entries, ix.names, ix.children, ix.spelled, ix.deleted, ix.included = nil, nil, map[int32][]int32{}, map[int32][]syllable{}, 0, nil
+	ix.add(-1, "", 0, flagDir|flagHidden)
 	ix.mu.Unlock()
 	ix.scan(ctx, 0, ix.root, "")
 	for _, pattern := range ix.include {
@@ -147,7 +145,37 @@ func (ix *Index) Build(ctx context.Context) error {
 			ix.scan(ctx, idx, abs, rel)
 		}
 	}
+	if ctx.Err() == nil {
+		ix.compactNames()
+	}
 	return ctx.Err()
+}
+
+// compactNames shares identical names after a full scan. Entry order matches
+// arena order, so packing in place cannot overwrite a name still to be read.
+func (ix *Index) compactNames() {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	seen := make(map[string]uint32)
+	var size uint32
+	for i := range ix.entries {
+		e := &ix.entries[i]
+		name := ix.nameOf(int32(i))
+		if offset, ok := seen[string(name)]; ok {
+			e.name = offset
+			continue
+		}
+		key := string(name) // Own the key before packing can overwrite its bytes.
+		end := e.name + uint32(e.nameLen)
+		if e.flags&flagFolded != 0 {
+			end += 2 + uint32(binary.LittleEndian.Uint16(ix.names[end:]))
+		}
+		n := copy(ix.names[size:], ix.names[e.name:end])
+		e.name = size
+		seen[key] = size
+		size += uint32(n)
+	}
+	ix.names = bytes.Clone(ix.names[:size])
 }
 
 // ensure adds the hidden folders leading to rel and returns rel's entry.
@@ -159,7 +187,7 @@ func (ix *Index) ensure(rel string) int32 {
 			idx = c
 			continue
 		}
-		idx = ix.add(idx, part, time.Time{}, flagDir|flagHidden)
+		idx = ix.add(idx, part, 0, flagDir|flagHidden)
 	}
 	return idx
 }
@@ -183,22 +211,23 @@ func (ix *Index) lowerOf(i int32) []byte {
 	if e.flags&flagFolded == 0 {
 		return ix.names[e.name : e.name+uint32(e.nameLen)]
 	}
-	return ix.lower[e.lower : e.lower+uint32(e.lowerLen)]
+	start := e.name + uint32(e.nameLen)
+	length := uint32(binary.LittleEndian.Uint16(ix.names[start:]))
+	return ix.names[start+2 : start+2+length]
 }
 
 // add appends an entry. Call with ix.mu held.
-func (ix *Index) add(parent int32, name string, mod time.Time, flags uint8) int32 {
+func (ix *Index) add(parent int32, name string, mod uint32, flags uint8) int32 {
 	name = name[:min(len(name), 0xffff)]
-	e := entry{parent: parent, name: uint32(len(ix.names)), nameLen: uint16(len(name)), flags: flags}
-	if !mod.IsZero() {
-		e.mod = uint32(max(mod.Unix(), 0))
-	}
+	e := entry{parent: parent, name: uint32(len(ix.names)), nameLen: uint16(len(name)), mod: mod, flags: flags}
 	ix.names = append(ix.names, name...)
 	if lower := strings.ToLower(name); lower != name {
 		lower = lower[:min(len(lower), 0xffff)]
 		e.flags |= flagFolded
-		e.lower, e.lowerLen = uint32(len(ix.lower)), uint16(len(lower))
-		ix.lower = append(ix.lower, lower...)
+		// Only folded names need a second length; Unicode lowercasing can
+		// change the UTF-8 byte length. Keep it beside the folded bytes.
+		ix.names = binary.LittleEndian.AppendUint16(ix.names, uint16(len(lower)))
+		ix.names = append(ix.names, lower...)
 	}
 	idx := int32(len(ix.entries))
 	if sp := spell(name); sp != nil {
@@ -235,7 +264,7 @@ func (ix *Index) remove(i int32) {
 
 type item struct {
 	name string
-	mod  time.Time
+	mod  uint32 // Unix seconds, matching entry.mod.
 	dir  bool
 }
 
@@ -253,7 +282,7 @@ func list(abs string) ([]item, error) {
 		if err != nil {
 			continue
 		}
-		items = append(items, item{name: d.Name(), mod: info.ModTime(), dir: kind.IsDir()})
+		items = append(items, item{name: d.Name(), mod: uint32(max(info.ModTime().Unix(), 0)), dir: kind.IsDir()})
 	}
 	return items, err
 }
@@ -292,11 +321,11 @@ func (ix *Index) scan(ctx context.Context, idx int32, abs, rel string) {
 			pending--
 			ix.mu.Lock()
 			for _, it := range f.items {
-				childRel := join(f.rel, it.name)
-				if it.dir && ix.skip(childRel, it.name) {
-					continue
-				}
 				if it.dir {
+					childRel := join(f.rel, it.name)
+					if ix.skip(childRel, it.name) {
+						continue
+					}
 					c := ix.add(f.idx, it.name, it.mod, flagDir)
 					queue = append(queue, folder{idx: c, abs: filepath.Join(f.abs, it.name), rel: childRel})
 				} else {
@@ -374,11 +403,10 @@ func (ix *Index) refresh(idx int32, abs, rel string) {
 			case (e.flags&flagDir != 0) != it.dir || skipped && !hidden:
 				ix.remove(c)
 			default:
-				mod := uint32(max(it.mod.Unix(), 0))
-				if it.dir && mod != e.mod {
+				if it.dir && it.mod != e.mod {
 					changed = append(changed, folder{idx: c, abs: filepath.Join(abs, it.name), rel: childRel})
 				}
-				e.mod = mod
+				e.mod = it.mod
 				continue
 			}
 		}

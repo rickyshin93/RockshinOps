@@ -32,6 +32,32 @@ func TestIncrementalHistoryRetentionAndIsolation(t *testing.T) {
 	}
 }
 
+func TestRollingHistoryPreservesWindowAndEarlierReads(t *testing.T) {
+	m := performanceMonitor()
+	m.options.HistorySeconds = 10
+	start := time.Unix(1700000000, 0)
+	for i := range 6 {
+		m.refreshAt(start.Add(time.Duration(i)*2*time.Second), false)
+	}
+	earlier := m.History()
+	for i := 6; i <= 100; i++ {
+		m.refreshAt(start.Add(time.Duration(i)*2*time.Second), false)
+	}
+	current := m.History()
+	if len(current) != 6 || !current[0].At.Equal(start.Add(190*time.Second)) || !current[5].At.Equal(start.Add(200*time.Second)) {
+		t.Fatalf("rolling window: %#v", current)
+	}
+	for i, point := range earlier {
+		if !point.At.Equal(start.Add(time.Duration(i)*2*time.Second)) || point.Memory == nil {
+			t.Fatalf("earlier read changed at %d: %#v", i, point)
+		}
+	}
+	m.refreshAt(start.Add(time.Hour), false)
+	if history := m.History(); len(history) != 1 || !history[0].At.Equal(start.Add(time.Hour)) {
+		t.Fatalf("history after long gap: %#v", history)
+	}
+}
+
 func performanceMonitor() *Monitor {
 	m := NewMonitor(Options{Interval: 2 * time.Second, DiskInterval: 30 * time.Second, ProcessInterval: 5 * time.Second, HistorySeconds: 3600})
 	m.read = func() rawSample { return rawSample{memory: Memory{Total: 1000, Used: 500}} }
@@ -79,6 +105,21 @@ func BenchmarkMonitorBetweenProcessSamples(b *testing.B) {
 		// Isolate a regular tick without resampling the process list.
 		m.history = m.history[:0]
 		m.refreshAt(now.Add(time.Second), false)
+	}
+}
+
+func BenchmarkMonitorFullHistory(b *testing.B) {
+	m := performanceMonitor()
+	now := time.Now()
+	for range 1801 {
+		m.refreshAt(now, false)
+		now = now.Add(2 * time.Second)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		m.refreshAt(now, false)
+		now = now.Add(2 * time.Second)
 	}
 }
 

@@ -33,7 +33,8 @@ export function LauncherSettingsView({ state, isMacOS, onLauncherShortcut }: { s
       {state.launcher.enabled && state.launcher.spotlightConflict && <div className="notice warning" role="status">{t("聚焦搜索仍占用 ⌘ Space，按下时两者会同时弹出。请在“键盘快捷键 › 聚焦”中关闭“显示聚焦搜索”。")}<button type="button" className="secondary-button" data-action="open-shortcut-settings">{t("打开键盘设置")}</button></div>}
     </Group>
     {state.launcher.enabled && <Group id="launcher-search-title" title={t("搜索范围")}>
-      <Row id="launcher-files-label" label={t("搜索文件")} description={t("只索引个人文件夹中的文件名，不读取内容；跳过依赖、缓存和资源库，但包含 iCloud 云盘和微信收到的文件。")}><span className="setting-value">{state.launcher.files ? state.launcher.indexing ? t("正在建立索引…") : t("{{count}} 个项目", { count: state.launcher.fileCount.toLocaleString() }) : ""}</span><Switch on={state.launcher.files} labelledBy="launcher-files-label" action="toggle-launcher-files" disabled={state.launcherBusy} /></Row>
+      <Row id="launcher-files-label" label={t("搜索文件")} description={isMacOS ? t("只索引个人文件夹中的文件名，不读取内容；包含 iCloud 云盘，跳过依赖、缓存和其他 App 的私有目录。") : t("只索引个人文件夹中的文件名，不读取内容；跳过依赖和缓存。")}><span className="setting-value">{state.launcher.files ? state.launcher.indexing ? t("正在建立索引…") : t("{{count}} 个项目", { count: state.launcher.fileCount.toLocaleString() }) : ""}</span><Switch on={state.launcher.files} labelledBy="launcher-files-label" action="toggle-launcher-files" disabled={state.launcherBusy} /></Row>
+      {isMacOS && <Row id="launcher-wechat-label" label={t("搜索微信文件（仅本次运行）")} description={t("手动开启后索引微信收到的文件，macOS 可能请求访问其他 App 的数据。退出应用后自动关闭，下次启动不会扫描微信目录。")}><Switch on={state.launcher.weChat} labelledBy="launcher-wechat-label" action="toggle-launcher-wechat" disabled={state.launcherBusy || !state.launcher.files} /></Row>}
     </Group>}
   </div>;
 }

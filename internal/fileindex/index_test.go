@@ -12,6 +12,19 @@ import (
 
 const wechat = "Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/u1/msg/file"
 
+func TestListPreservesTimestampPrecision(t *testing.T) {
+	root := t.TempDir()
+	modified := time.Now().Add(-time.Hour)
+	write(t, filepath.Join(root, "report.txt"), modified)
+	items, err := list(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].mod != uint32(modified.Unix()) {
+		t.Fatalf("expected timestamp %d, got %+v", modified.Unix(), items)
+	}
+}
+
 var testRules = Rules{
 	SkipNames: []string{"node_modules", ".git"},
 	SkipPaths: []string{"Library"},
@@ -25,13 +38,13 @@ func fixture(t *testing.T) string {
 	for path, age := range map[string]time.Duration{
 		"Documents/作业/outputs/x/第一题复核成绩.xlsx":                time.Minute,
 		"Documents/作业/outputs/x/第一题复核成绩.xlsx.inspect.ndjson": 2 * time.Minute,
-		wechat + "/2026-11/第一题复核成绩.xlsx":                      3 * time.Minute,
-		"Library/Caches/junk/第一题复核成绩.xlsx":                     time.Minute,
-		"project/node_modules/pkg/第一题复核成绩.js":                  time.Minute,
-		"project/STATUS.md":                                    time.Hour,
-		"old/STATUS.md":                                        2 * 365 * 24 * time.Hour,
-		".codex/worktrees/r/STATUS.md":                         time.Minute,
-		".zshrc":                                               24 * time.Hour,
+		wechat + "/2026-11/第一题复核成绩.xlsx":                     3 * time.Minute,
+		"Library/Caches/junk/第一题复核成绩.xlsx":                   time.Minute,
+		"project/node_modules/pkg/第一题复核成绩.js":                time.Minute,
+		"project/STATUS.md":            time.Hour,
+		"old/STATUS.md":                2 * 365 * 24 * time.Hour,
+		".codex/worktrees/r/STATUS.md": time.Minute,
+		".zshrc":                       24 * time.Hour,
 	} {
 		write(t, filepath.Join(root, path), now.Add(-age))
 	}
@@ -157,5 +170,28 @@ func TestRefreshFollowsChanges(t *testing.T) {
 	// new file + a + b + deep.txt + 合同.pdf - (old + old/STATUS.md)
 	if got := ix.Len(); got != before+3 {
 		t.Errorf("entries %d, want %d", got, before+3)
+	}
+}
+
+func TestSearchPreservesNamesWithDifferentCaseFoldLengths(t *testing.T) {
+	ix := built(t, t.TempDir())
+	// Construct names directly: some filesystems normalize Unicode spellings.
+	parent := ix.add(0, "ÜBER", uint32(time.Now().Unix()), flagDir)
+	names := []string{"İstanbul.TXT", "Kelvin.MD", "ȺBC.txt", "复核Report.PDF", "plain.txt"}
+	for _, name := range names {
+		ix.add(parent, name, uint32(time.Now().Unix()), 0)
+		ix.add(0, name, uint32(time.Now().Unix()), 0)
+	}
+	ix.compactNames()
+	// Later additions grow the arenas without invalidating earlier names.
+	for range 1000 {
+		ix.add(0, "ExtraLongMixedCaseName.TXT", uint32(time.Now().Unix()), 0)
+	}
+	for _, name := range names {
+		query := "über " + strings.ToLower(name)
+		got := ix.Search(query, 1)
+		if len(got) != 1 || got[0].Name != name || got[0].Path != filepath.Join(ix.root, "ÜBER", name) {
+			t.Errorf("query %q: %#v", query, got)
+		}
 	}
 }

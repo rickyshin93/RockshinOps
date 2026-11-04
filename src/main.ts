@@ -321,7 +321,7 @@ function preloadInspection() {
   inspectionPreloadScheduled = true;
   const preload = () => {
     if (stopped) return;
-    void loadReactPages();
+    // Forms load on first navigation; keep inspection data warm for the tables.
     void loadProcesses().then(() => {
       if (!state.paused && ["processes", "apps", "connections"].includes(state.page)) render();
     });
@@ -462,6 +462,14 @@ async function setLauncher(enabled: boolean, files: boolean, shortcut: string) {
   catch (reason) { state.launcherError = `${t("无法设置启动器：")}${String(reason)}`; }
   finally { state.launcherBusy = false; render(); }
 }
+async function setLauncherWeChat(enabled: boolean) {
+  if (state.launcherBusy) return;
+  launcherRequest++;
+  state.launcherBusy = true; state.launcherError = ""; render();
+  try { state.launcher = await System.setLauncherWeChat(enabled); }
+  catch (reason) { state.launcherError = `${t("无法设置启动器：")}${String(reason)}`; }
+  finally { state.launcherBusy = false; render(); }
+}
 async function toggleStartup() {
   if (state.startupBusy || !state.startup?.available) return;
   startupRequest++;
@@ -525,6 +533,7 @@ document.addEventListener("click", event => {
   if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
   if (button.dataset.action === "toggle-launcher" && state.launcher) { void setLauncher(!state.launcher.enabled, state.launcher.files, state.launcher.shortcut); return; }
   if (button.dataset.action === "toggle-launcher-files" && state.launcher) { void setLauncher(state.launcher.enabled, !state.launcher.files, state.launcher.shortcut); return; }
+  if (button.dataset.action === "toggle-launcher-wechat" && state.launcher) { void setLauncherWeChat(!state.launcher.weChat); return; }
   if (button.dataset.action === "open-shortcut-settings") { void System.openShortcutSettings().catch(reason => { state.launcherError = String(reason); render(); }); return; }
   if (button.dataset.action === "toggle-hide-dock") { state.hideDockDraft = !state.hideDockDraft; render(); void saveSettings(); return; }
   if (button.dataset.action === "toggle-update-proxy") { state.updateProxyDraft = !state.updateProxyDraft; render(); void saveSettings(); return; }

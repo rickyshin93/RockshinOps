@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.11
+
+- Keep other apps' private directories out of startup file indexing. On macOS, WeChat received files can be included for the current session only.
+- Reduce launcher indexing allocations and retained memory, create its search window on first use, and load settings forms on demand.
+
+### 中文
+
+- 启动文件索引默认跳过其他应用的私有目录；macOS 微信接收文件可按需在本次运行中加入搜索。
+- 减少启动器索引的内存分配和常驻占用，首次使用时创建搜索窗口，并按需加载设置页面。
+
 ## 0.2.10
 
 - Clarify when menu-bar management is off, show how to enable it, and disable dependent controls until it is turned on.

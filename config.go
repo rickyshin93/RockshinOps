@@ -19,6 +19,7 @@ type LauncherConfig struct {
 	DefaultShortcut    map[string]string          `json:"defaultShortcut"`
 	Files              map[string]fileindex.Rules `json:"files"`
 	FileRebuildMinutes int                        `json:"fileRebuildMinutes"`
+	WeChatPaths        []string                   `json:"weChatPaths"`
 }
 
 //go:embed rockshinops.json

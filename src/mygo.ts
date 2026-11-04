@@ -176,6 +176,7 @@ export interface LauncherResult {
 export interface LauncherSettings {
   enabled: boolean;
   files: boolean;
+  weChat: boolean;
   shortcut: string;
   spotlightConflict: boolean;
   fileCount: number;
@@ -573,6 +574,9 @@ export const System = {
   },
   setLauncher(enabled: boolean, files: boolean, shortcut: string): Promise<LauncherSettings> {
     return call("System.SetLauncher", enabled, files, shortcut);
+  },
+  setLauncherWeChat(enabled: boolean): Promise<LauncherSettings> {
+    return call("System.SetLauncherWeChat", enabled);
   },
   setOpenAtLogin(enabled: boolean): Promise<StartupSettings> {
     return call("System.SetOpenAtLogin", enabled);
