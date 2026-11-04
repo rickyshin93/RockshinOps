@@ -53,6 +53,20 @@ export interface Appearance {
   shape: string;
 }
 
+export interface AudioOutput {
+  id: string;
+  name: string;
+}
+
+export interface AudioState {
+  outputs: AudioOutput[];
+  defaultId: string;
+  volume: number | null;
+  volumeSettable: boolean;
+  error: string;
+  source: string;
+}
+
 export interface Battery {
   present: boolean;
   percent: number;
@@ -65,6 +79,22 @@ export interface Battery {
   systemWatts: number | null;
   temperature: number | null;
   error: string;
+}
+
+export interface BluetoothDevice {
+  id: string;
+  name: string;
+  kind: string;
+  connected: boolean;
+  battery: number | null;
+}
+
+export interface BluetoothState {
+  authorization: string;
+  available: boolean;
+  powered: boolean;
+  devices: BluetoothDevice[];
+  source: string;
 }
 
 export interface Bootstrap {
@@ -108,6 +138,15 @@ export interface Connections {
   warning: string;
 }
 
+export interface DeviceState {
+  supported: boolean;
+  updatedAt: string;
+  wifi: WiFiState;
+  bluetooth: BluetoothState;
+  audio: AudioState;
+  error: string;
+}
+
 export interface Disk {
   volume: Volume;
   capacityError: string;
@@ -127,9 +166,19 @@ export interface DisplayInfo {
   primary: boolean;
 }
 
+export interface ElectricalReading {
+  key: string;
+  kind: string;
+  value: number | null;
+  source: string;
+}
+
 export interface FanReading {
   index: number;
-  rpm: number;
+  rpm: number | null;
+  targetRPM: number | null;
+  minRPM: number | null;
+  maxRPM: number | null;
   source: string;
 }
 
@@ -319,6 +368,9 @@ export interface Sensors {
   temperatureSource: string;
   powerRails: SensorReading[];
   fans: FanReading[];
+  temperatures: TemperatureReading[];
+  temperatureSummary: TemperatureSummary;
+  electrical: ElectricalReading[];
 }
 
 export interface Settings {
@@ -428,6 +480,21 @@ export interface State {
   error: string;
 }
 
+export interface TemperatureReading {
+  key: string;
+  component: string;
+  kind: string;
+  celsius: number | null;
+  source: string;
+}
+
+export interface TemperatureSummary {
+  cpu: number | null;
+  gpu: number | null;
+  ssd: number | null;
+  battery: number | null;
+}
+
 export interface Thermal {
   pressure: string;
   source: string;
@@ -435,6 +502,10 @@ export interface Thermal {
 }
 
 export interface Trend {
+  cpuTemperature: number | null;
+  gpuTemperature: number | null;
+  ssdTemperature: number | null;
+  batteryTemperature: number | null;
   at: string;
   cpu: number | null;
   memory: number | null;
@@ -453,6 +524,32 @@ export interface Volume {
   format: string;
   total: number;
   available: number;
+}
+
+export interface WiFiNetwork {
+  ssid: string;
+  signal: number;
+  channel: number;
+  band: string;
+  secure: boolean;
+}
+
+export interface WiFiState {
+  available: boolean;
+  powered: boolean;
+  connected: boolean;
+  interface: string;
+  ssid: string;
+  location: string;
+  signal: number | null;
+  noise: number | null;
+  rate: number | null;
+  channel: number | null;
+  band: string;
+  width: number | null;
+  phy: string;
+  security: string;
+  source: string;
 }
 
 // ---- Services ----
@@ -475,6 +572,12 @@ export const System = {
   },
   copyPortAddress(address: string): Promise<void> {
     return call("System.CopyPortAddress", address);
+  },
+  deviceAction(action: string, id: string, value: number): Promise<DeviceState> {
+    return call("System.DeviceAction", action, id, value);
+  },
+  devices(): Promise<DeviceState> {
+    return call("System.Devices");
   },
   emptySpaceTrash(): Promise<SpaceSummary> {
     return call("System.EmptySpaceTrash");
@@ -531,6 +634,9 @@ export const System = {
   moveMenuBarItem(id: number, pid: number, section: string, before: number): Promise<State> {
     return call("System.MoveMenuBarItem", id, pid, section, before);
   },
+  openDeviceSettings(section: string): Promise<void> {
+    return call("System.OpenDeviceSettings", section);
+  },
   openFullDiskAccessSettings(): Promise<void> {
     return call("System.OpenFullDiskAccessSettings");
   },
@@ -546,6 +652,9 @@ export const System = {
   },
   refresh(): Promise<Snapshot> {
     return call("System.Refresh");
+  },
+  refreshDevices(): Promise<DeviceState> {
+    return call("System.RefreshDevices");
   },
   removeAppFiles(paths: string[]): Promise<void> {
     return call("System.RemoveAppFiles", paths);
@@ -571,6 +680,9 @@ export const System = {
    */
   scanSpace(): Promise<SpaceSummary> {
     return call("System.ScanSpace");
+  },
+  scanWiFi(): Promise<WiFiNetwork[]> {
+    return call("System.ScanWiFi");
   },
   setLauncher(enabled: boolean, files: boolean, shortcut: string): Promise<LauncherSettings> {
     return call("System.SetLauncher", enabled, files, shortcut);

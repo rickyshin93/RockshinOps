@@ -21,6 +21,7 @@ const state: ViewState = {
   processes: null, connections: null, connectionSort: null, connectionMode: "all", portScope: "all", favoritePorts: [], portsLoaded: false, selectedProcess: null, processOrder: { key: "cpu", descending: true }, query: "", sort: "cpu", onlyMine: false,
   busy: false, processError: "", connectionError: "",
   appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
+  devices: null, deviceBusy: "", deviceError: "", deviceNetworks: null, deviceVolumeDraft: null,
   startup: null, startupBusy: false, startupError: "",
   launcher: null, launcherBusy: false, launcherError: "",
   preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
@@ -97,6 +98,7 @@ function renderNow(filters = false) {
   if (state.page === "menubar") subtitle = t("管理系统菜单栏图标、分区与外观");
   if (state.page === "about" && state.info) subtitle = state.info.machine.name || state.info.machine.model;
   if (state.page === "connections") subtitle = connectionSubtitle(state);
+  if (state.page === "devices") subtitle = `${t("Wi-Fi、蓝牙设备与声音输出")}${state.devices?.updatedAt ? ` · ${timeLabel(state.devices.updatedAt)}` : ""}`;
   if (state.page === "processes") subtitle = processSubtitle(state);
   if (el("page-title").textContent !== title) el("page-title").textContent = title;
   if (el("page-subtitle").textContent !== subtitle) el("page-subtitle").textContent = subtitle;
@@ -140,9 +142,13 @@ function renderNow(filters = false) {
         });
       } else el("page-body").innerHTML = body;
     } else if (!unchangedReview && body !== renderedBody) {
-      const live = metricPages.includes(state.page) || ["processes", "connections"].includes(state.page) || (state.page === "apps" && !state.appMode);
+      const live = metricPages.includes(state.page) || ["processes", "connections", "devices"].includes(state.page) || (state.page === "apps" && !state.appMode);
       if (live && renderedPage === state.page) updateLiveContent(el("page-body"), body);
       else el("page-body").innerHTML = body;
+    }
+    if (state.page === "devices" && state.deviceVolumeDraft == null) {
+      const slider = document.getElementById("device-volume") as HTMLInputElement | null;
+      if (slider) slider.value = String(Math.round(state.devices?.audio.volume ?? 0));
     }
     renderedPage = state.page;
     renderedAboutLanguage = state.page === "about" ? i18n.language : "";
@@ -171,6 +177,8 @@ function renderNow(filters = false) {
     const networkReady = s.network.ready && !s.network.error;
     el("nav-network").textContent = networkReady ? `↓ ${formatRate(s.network.download)}` : "—";
     el("nav-network").title = networkReady ? t("下载") : s.network.error || t("采样中");
+    el("nav-sensors").textContent = s.sensors.dieTemperature == null ? "—" : `${s.sensors.dieTemperature.toFixed(1)}°`;
+    el("nav-sensors").title = t("HID 芯片传感器最高读数，非 CPU 核心温度。");
     const batteryAvailable = !s.battery.error && s.battery.present;
     el("nav-energy").textContent = batteryAvailable ? percent(s.battery.percent) : "—";
     el("nav-energy").title = batteryAvailable ? t("电池电量") : s.battery.error || t("未检测到内置电池");
@@ -187,7 +195,7 @@ function recordProcessSample() {
   if (!process || !state.processes) return;
   const at = state.processes.updatedAt;
   const history = (state.processHistory || []).filter(point => Date.parse(point.at) > Date.parse(at) - 60_000);
-  if (history.at(-1)?.at !== at) history.push({ at, cpu: process.cpuReady ? process.cpu : null, memory: process.memory, gpu: null, diskRead: null, diskWrite: null, download: null, upload: null, battery: null, power: null });
+  if (history.at(-1)?.at !== at) history.push({ at, cpu: process.cpuReady ? process.cpu : null, memory: process.memory, gpu: null, diskRead: null, diskWrite: null, download: null, upload: null, battery: null, power: null, cpuTemperature: null, gpuTemperature: null, ssdTemperature: null, batteryTemperature: null });
   state.processHistory = history;
 }
 async function loadProcesses(live = false) {
@@ -235,6 +243,7 @@ async function receive(snapshot: Snapshot) {
     if (epoch === navigationEpoch) render();
     if (["processes", "apps", "connections"].includes(state.page)) void refreshProcessView();
     if (state.page === "connections") void refreshConnectionView();
+    if (state.page === "devices") void loadDevices();
     if (state.page === "launcher" && state.launcher?.indexing) void loadLauncherSettings();
     if (state.page === "settings" && state.preferences) void refreshTrayPreview();
   } catch (reason) { error(`${t("读取历史失败：")}${String(reason)}${t("。当前显示上次成功的数据。")}`); render(); }
@@ -345,6 +354,7 @@ async function refresh() {
     }
     if (["processes", "apps", "connections"].includes(state.page)) await loadProcesses();
     if (state.page === "connections") await connections(false, true);
+    if (state.page === "devices") await loadDevices(true);
   } catch (reason) { error(`${t("连接采集服务失败：")}${String(reason)}${t("。可再次点击刷新重试。")}`); }
   finally { state.busy = false; render(); preloadInspection(); }
 }
@@ -368,6 +378,7 @@ async function navigate(page: Page, query = "") {
   }
   if (page === "launcher") await loadLauncherSettings();
   if (!isMyGo() || !state.info) return;
+  if (page === "devices") await loadDevices();
   if (page === "connections") {
     await Promise.all([loadProcesses(), connections(true), state.portsLoaded ? Promise.resolve() : loadPortFavorites()]);
     if (epoch === navigationEpoch) render();
@@ -377,6 +388,70 @@ async function navigate(page: Page, query = "") {
     render();
   }
 }
+const readDeviceState = singleFlight(() => System.devices());
+const refreshDeviceState = singleFlight(() => System.refreshDevices());
+async function loadDevices(force = false) {
+  if (state.deviceBusy) return;
+  try {
+    const next = force ? await refreshDeviceState() : await readDeviceState();
+    if (!state.devices || Date.parse(next.updatedAt) >= Date.parse(state.devices.updatedAt)) state.devices = next;
+    state.deviceReadError = "";
+  }
+  catch (reason) { state.deviceReadError = String(reason); }
+  if (state.page === "devices") render();
+}
+let deviceVolumeRevision = 0;
+let queuedVolume: { id: string; value: number; revision: number } | null = null;
+async function deviceAction(action: string, id: string, value = 0, volumeRevision = deviceVolumeRevision) {
+  if (state.deviceBusy) {
+    if (action === "volume" && state.deviceBusy.startsWith("volume:")) queuedVolume = { id, value, revision: volumeRevision };
+    return;
+  }
+  state.deviceBusy = `${action}:${id}`; state.deviceError = ""; state.deviceMessage = ""; render();
+  try {
+    if (action === "scan") {
+      state.deviceScanError = "";
+      state.deviceNetworks = await System.scanWiFi();
+      state.deviceScanAt = new Date().toISOString();
+    } else {
+      state.devices = await System.deviceAction(action, id, value);
+      if (action === "connect" || action === "disconnect") state.deviceMessage = t("请求已发送，连接状态以系统更新为准。");
+    }
+  } catch (reason) {
+    if (action === "scan") state.deviceScanError = String(reason);
+    else state.deviceError = String(reason);
+  } finally {
+    state.deviceBusy = "";
+    const nextVolume = queuedVolume; queuedVolume = null;
+    if (nextVolume) {
+      void deviceAction("volume", nextVolume.id, nextVolume.value, nextVolume.revision);
+    } else {
+      if (volumeRevision === deviceVolumeRevision) {
+        state.deviceVolumeDraft = null; state.deviceVolumeTarget = null;
+      }
+      render();
+      if (action !== "scan") void loadDevices();
+    }
+  }
+}
+async function openDeviceSettings(section: string) {
+  try { await System.openDeviceSettings(section); }
+  catch (reason) { state.deviceError = String(reason); render(); }
+}
+document.addEventListener("input", event => {
+  const slider = event.target as HTMLInputElement;
+  if (!slider.hasAttribute("data-device-volume")) return;
+  deviceVolumeRevision++;
+  state.deviceVolumeTarget ??= slider.dataset.deviceVolume!;
+  state.deviceVolumeDraft = Number(slider.value);
+  const value = `${slider.value} %`;
+  el("device-volume-value").textContent = value;
+  slider.setAttribute("aria-valuetext", value);
+});
+document.addEventListener("change", event => {
+  const slider = event.target as HTMLInputElement;
+  if (slider.hasAttribute("data-device-volume")) void deviceAction("volume", slider.dataset.deviceVolume!, Number(slider.value));
+});
 async function loadPortFavorites() {
   state.portsError = "";
   try { state.favoritePorts = await System.favoritePorts(); state.portsLoaded = true; }
@@ -528,6 +603,8 @@ document.addEventListener("click", event => {
   }
   const button = (event.target as Element).closest<HTMLButtonElement>("button");
   if (!button || button.disabled) return;
+  if (button.dataset.deviceAction) { void deviceAction(button.dataset.deviceAction, button.dataset.deviceId || ""); return; }
+  if (button.dataset.deviceSettings) { void openDeviceSettings(button.dataset.deviceSettings); return; }
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
   if (button.dataset.action === "toggle-startup") { void toggleStartup(); return; }
   if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
@@ -640,6 +717,7 @@ if (isMyGo()) {
   window.addEventListener("focus", () => {
     if (state.page === "settings") void loadStartupSettings();
     if (state.page === "launcher") void loadLauncherSettings();
+    if (state.page === "devices") void loadDevices(true);
   });
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });

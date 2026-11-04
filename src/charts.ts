@@ -3,7 +3,7 @@ import { t } from "./i18n";
 import type { Trend } from "./mygo";
 import { escapeHTML as e } from "./format";
 
-export type TrendKey = "cpu" | "memory" | "gpu" | "diskRead" | "diskWrite" | "download" | "upload" | "battery" | "power";
+export type TrendKey = "cpu" | "memory" | "gpu" | "diskRead" | "diskWrite" | "download" | "upload" | "battery" | "power" | "cpuTemperature" | "gpuTemperature" | "ssdTemperature" | "batteryTemperature";
 
 export function bucketHistory(history: Trend[], keys: TrendKey[], end: number, seconds: number, count: number): (number[] | null)[] {
   const start = end - seconds * 1000;

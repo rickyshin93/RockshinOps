@@ -186,7 +186,10 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 		m.assertionsAt = now
 	}
 	m.previous, m.previousAt = raw, now
-	t := Trend{At: s.UpdatedAt}
+	t := Trend{At: s.UpdatedAt,
+		CPUTemperature: s.Sensors.TemperatureSummary.CPU, GPUTemperature: s.Sensors.TemperatureSummary.GPU,
+		SSDTemperature: s.Sensors.TemperatureSummary.SSD, BatteryTemperature: s.Sensors.TemperatureSummary.Battery,
+	}
 	if s.CPU.Ready {
 		t.CPU = ptr(s.CPU.Usage)
 	}

@@ -144,16 +144,20 @@ type Snapshot struct {
 }
 
 type Trend struct {
-	At        time.Time `json:"at"`
-	CPU       *float64  `json:"cpu"`
-	Memory    *float64  `json:"memory"`
-	GPU       *float64  `json:"gpu"`
-	DiskRead  *float64  `json:"diskRead"`
-	DiskWrite *float64  `json:"diskWrite"`
-	Download  *float64  `json:"download"`
-	Upload    *float64  `json:"upload"`
-	Battery   *float64  `json:"battery"`
-	Power     *float64  `json:"power"`
+	CPUTemperature     *float64  `json:"cpuTemperature"`
+	GPUTemperature     *float64  `json:"gpuTemperature"`
+	SSDTemperature     *float64  `json:"ssdTemperature"`
+	BatteryTemperature *float64  `json:"batteryTemperature"`
+	At                 time.Time `json:"at"`
+	CPU                *float64  `json:"cpu"`
+	Memory             *float64  `json:"memory"`
+	GPU                *float64  `json:"gpu"`
+	DiskRead           *float64  `json:"diskRead"`
+	DiskWrite          *float64  `json:"diskWrite"`
+	Download           *float64  `json:"download"`
+	Upload             *float64  `json:"upload"`
+	Battery            *float64  `json:"battery"`
+	Power              *float64  `json:"power"`
 }
 
 type Machine struct {

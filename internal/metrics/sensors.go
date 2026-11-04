@@ -46,10 +46,36 @@ func decodeSMC(kind string, data []byte) (float64, bool) {
 // Sensors contains read-only hardware readings. Missing values are unavailable,
 // rather than measurements of zero.
 type Sensors struct {
-	DieTemperature    *float64        `json:"dieTemperature"`
-	TemperatureSource string          `json:"temperatureSource"`
-	PowerRails        []SensorReading `json:"powerRails"`
-	Fans              []FanReading    `json:"fans"`
+	DieTemperature     *float64             `json:"dieTemperature"`
+	TemperatureSource  string               `json:"temperatureSource"`
+	PowerRails         []SensorReading      `json:"powerRails"`
+	Fans               []FanReading         `json:"fans"`
+	Temperatures       []TemperatureReading `json:"temperatures"`
+	TemperatureSummary TemperatureSummary   `json:"temperatureSummary"`
+	Electrical         []ElectricalReading  `json:"electrical"`
+}
+
+type TemperatureReading struct {
+	Key       string   `json:"key"`
+	Component string   `json:"component"`
+	Kind      string   `json:"kind"`
+	Celsius   *float64 `json:"celsius"`
+	Source    string   `json:"source"`
+}
+
+// Summary values are the maximum available mapped channel for each component.
+type TemperatureSummary struct {
+	CPU     *float64 `json:"cpu"`
+	GPU     *float64 `json:"gpu"`
+	SSD     *float64 `json:"ssd"`
+	Battery *float64 `json:"battery"`
+}
+
+type ElectricalReading struct {
+	Key    string   `json:"key"`
+	Kind   string   `json:"kind"`
+	Value  *float64 `json:"value"`
+	Source string   `json:"source"`
 }
 
 type SensorReading struct {
@@ -59,7 +85,10 @@ type SensorReading struct {
 }
 
 type FanReading struct {
-	Index  int     `json:"index"`
-	RPM    float64 `json:"rpm"`
-	Source string  `json:"source"`
+	Index     int      `json:"index"`
+	RPM       *float64 `json:"rpm"`
+	TargetRPM *float64 `json:"targetRPM"`
+	MinRPM    *float64 `json:"minRPM"`
+	MaxRPM    *float64 `json:"maxRPM"`
+	Source    string   `json:"source"`
 }

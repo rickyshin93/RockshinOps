@@ -9,6 +9,15 @@
   ],
   "sampleIntervalSeconds": 30,
   "metricsIntervalSeconds": 2,
+  "deviceRefreshSeconds": 5,
+  "wifiSignalThresholds": {
+    "strongDbm": -67,
+    "fairDbm": -70
+  },
+  "temperatureColorThresholds": {
+    "mediumCelsius": 60,
+    "highCelsius": 80
+  },
   "processIntervalSeconds": 5,
   "historySeconds": 3600,
   "connectionTimeoutSeconds": 10,

@@ -1,4 +1,6 @@
 import { portsView } from "./ports-view";
+import { devicesView, type DevicesViewState } from "./devices-view";
+import { sensorsView } from "./sensors-view";
 import { listeningPorts, filterPorts, type PortScope } from "./ports";
 import { windowRows, type TableWindow } from "./table-window";
 import { trendTime } from "./history";
@@ -15,23 +17,25 @@ export const pages = [
   { id: "overview", title: "概览", group: "" },
   { id: "processes", title: "进程", group: "" },
   { id: "connections", title: "连接", group: "" },
+  { id: "devices", title: "设备连接", group: "" },
   { id: "cpu", title: "CPU", group: "硬件" },
   { id: "memory", title: "内存", group: "硬件" },
   { id: "gpu", title: "GPU", group: "硬件" },
   { id: "disk", title: "磁盘", group: "硬件" },
   { id: "network", title: "网络", group: "硬件" },
   { id: "energy", title: "能耗", group: "硬件" },
+  { id: "sensors", title: "传感器", group: "硬件" },
   { id: "apps", title: "App", group: "系统" },
   { id: "cleanup", title: "清理", group: "系统" },
   { id: "menubar", title: "菜单栏管理", group: "系统" },
-  { id: "about", title: "关于本机", group: "系统" },
   { id: "launcher", title: "启动器", group: "系统" },
+  { id: "about", title: "关于本机", group: "系统" },
   { id: "settings", title: "设置", group: "系统" },
 ] as const;
 export type Page = (typeof pages)[number]["id"];
-export const metricPages: Page[] = ["overview", "cpu", "memory", "gpu", "disk", "network", "energy"];
+export const metricPages: Page[] = ["overview", "cpu", "memory", "gpu", "disk", "network", "energy", "sensors"];
 
-export interface ViewState extends SettingsState {
+export interface ViewState extends SettingsState, DevicesViewState {
   page: Page;
   tableWindow?: TableWindow;
   info: AppInfo | null;
@@ -193,22 +197,11 @@ function networkView(state: ViewState): string {
 
 function energyView(state: ViewState): string {
   const b = state.snapshot!.battery;
-  if (b.error) return empty(t("电池暂不可用"), b.error) + sensorsView(state) + powerView(state);
+  if (b.error) return empty(t("电池暂不可用"), b.error) + powerView(state);
   const details = !b.present ? empty(t("未检测到内置电池"), t("当前设备未报告内置电池；进程 CPU 活动仍可查看。")) : `<div class="detail-grid">${panel(t("电池"), `<div class="detail-value">${metricValue(b.percent, "%")}</div>${badge(b.charging ? t("正在充电") : b.externalPower ? t("已连接电源") : t("使用电池"))}${stats([[b.charging ? t("充满还需") : t("预计剩余"), b.minutes > 0 ? duration(b.minutes * 60) : t("估算中")], [t("健康度"), b.health != null ? percent(b.health) : "—"], [t("循环次数"), b.cycles == null ? "—" : String(b.cycles)]])}${chart(state, "battery", t("电池电量"))}`, "memory", "span-two")}${panel(t("电源信息"), facts([[t("供电状态"), b.externalPower ? t("外部电源") : t("电池")], [t("电池充放电功率"), b.watts != null ? `${Math.abs(b.watts).toFixed(1)} W${b.watts >= 0 ? t("（充入）") : t("（输出）")}` : "—"], [t("电池温度"), b.temperature != null ? `${b.temperature.toFixed(1)} °C` : "—"], [t("系统负载"), b.systemWatts != null ? `${b.systemWatts.toFixed(1)} W` : unavailable()]]) + note((isMac(state) ? t("电池功率按电压 × 瞬时电流计算。温度是电池温度，不是 CPU 温度。") : t("Windows 显示系统电池状态；Linux 显示 sysfs 中首个系统电池，并读取驱动提供的功率、健康度与温度。温度是电池温度。"))), "energy")}${panel(t("系统负载功率"), b.systemWatts != null ? `<div class="detail-value">${metricValue(b.systemWatts, "W", 1)}</div>${chart(state, "power", t("系统负载功率"), 0)}${note(t("来自 AppleSmartBattery 的 PowerTelemetryData.SystemLoad 硬件遥测，非插座测量值。"))}` : unavailable(t("当前硬件未提供系统功率遥测")), "energy", "span-two")}${cpuSummary(state.snapshot!.topCPU)}</div>`;
-  return details + sensorsView(state) + powerView(state);
+  return details + powerView(state);
 }
 
-function sensorsView(state: ViewState): string {
-  const s = state.snapshot!.sensors;
-  const temperature = s.dieTemperature == null ? unavailable() : `<div class="sensor-temperature">${metricValue(s.dieTemperature, "°C", 1)}</div>`;
-  const fans = s.fans.length ? `<div class="sensor-fans">${s.fans.map(f => `<div title="${e(f.source)}"><span>${t("风扇")} ${f.index + 1}</span><strong>${Math.round(f.rpm)} <small>rpm</small></strong></div>`).join("")}</div>` : unavailable();
-  const hardware = `<div class="sensor-primary"><div><p class="sensor-label">${t("芯片温度")}</p>${temperature}<p class="sensor-caption" title="${e(s.temperatureSource)}">${t("HID 芯片传感器最高读数，非 CPU 核心温度。")}</p></div><div class="sensor-fan-group"><p class="sensor-label">${t("风扇转速")}</p>${fans}</div></div>`;
-  const rails = s.powerRails.length ? `<div class="sensor-rails">${s.powerRails.map(r => `<div><span>${e(r.key)}</span><strong>${r.value.toFixed(1)} <small>W</small></strong></div>`).join("")}</div><p class="sensor-caption">${t("AppleSMC 通道独立显示，不可相加；含义和可用性随机型变化。")}</p>` : unavailable();
-  return `<div class="sensor-grid">${panel(t("温度与风扇"), hardware, "energy", "sensor-card")}${panel(t("功率通道"), rails, "energy", "sensor-card")}</div>`;
-}
-
-// Status codes from Go; labels are catalog keys.
-const thermalLabels: Record<string, string> = { nominal: "热压力正常", moderate: "热压力中等", heavy: "热压力较高", trapping: "热压力严重", sleeping: "过热即将睡眠" };
 const assertionLabels: Record<string, string> = {
   PreventUserIdleSystemSleep: "阻止系统空闲睡眠", NoIdleSleepAssertion: "阻止系统空闲睡眠",
   PreventUserIdleDisplaySleep: "阻止显示器空闲睡眠", NoDisplaySleepAssertion: "阻止显示器空闲睡眠",
@@ -219,21 +212,20 @@ const assertionLabels: Record<string, string> = {
 };
 
 function powerView(state: ViewState): string {
-  const { thermal, powerAssertions: p, updatedAt } = state.snapshot!;
+  const { powerAssertions: p, updatedAt } = state.snapshot!;
   const held = (since: string | null) => {
     if (!since) return "—";
     const seconds = (Date.parse(updatedAt) - Date.parse(since)) / 1000;
     return seconds < 60 ? t("不到 1 分钟") : duration(seconds);
   };
-  const thermalPanel = panel(t("热压力"), thermal.error ? unavailable(thermal.error) : `<div class="thermal-status">${e(t(thermalLabels[thermal.pressure] || thermal.pressure))}</div>${thermal.pressure === "nominal" ? "" : badge(t("系统报告热压力升高"), "warning")}<p class="thermal-description">${e(t("热压力是 macOS 报告的系统热状态；它不是 CPU 温度或实际降频测量。"))}</p><p class="thermal-source" title="${e(thermal.source)}">${e(t("来源：macOS 系统热状态"))}</p>`, "energy", "thermal-card");
   const label = (type: string) => assertionLabels[type] ? t(assertionLabels[type]!) : type;
   const counts = new Map<string, number>();
   for (const a of p.items) counts.set(label(a.type), (counts.get(label(a.type)) || 0) + 1);
   const summary = counts.size ? `<ul class="assertion-summary">${[...counts].map(([name, count]) => `<li><span>${e(name)}</span><strong>${count} <small>${t("个请求")}</small></strong></li>`).join("")}</ul>` : `<p class="muted">${t("目前没有进程阻止睡眠。")}</p>`;
-  const summaryPanel = panel(t("唤醒请求"), p.error ? unavailable(p.error) : summary, "energy", "assertion-summary-card");
+  const summaryPanel = p.error ? unavailable(p.error) : summary;
   const rows = p.items.map(a => `<tr><td><span class="connection-process" title="${e(a.app || a.process)}">${processAppIcon(a.app, isMac(state))}<span>${e(a.process || "—")}<small>PID ${a.pid}</small></span></span></td><td><span title="${e(a.type)}">${e(label(a.type))}</span></td><td><span>${e(a.name || "—")}</span>${a.details ? `<p class="muted">${e(a.details)}</p>` : ""}</td><td>${held(a.since)}</td></tr>`).join("");
-  const list = p.error || !rows ? "" : `<section class="table-section assertion-section"><h2>${t("阻止睡眠")}</h2><table class="assertion-table"><colgroup><col><col><col><col></colgroup><thead><tr><th>${t("进程")}</th><th>${t("请求")}</th><th>${t("原因")}</th><th>${t("已持续")}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
-  return `<div class="power-grid">${thermalPanel}${summaryPanel}</div>${list}${p.error ? "" : note(`${t("进程向系统提出的保持唤醒请求，只读展示；这些请求不保证阻止合盖睡眠。每")} ${state.info!.powerAssertionRefreshSeconds} ${t("秒更新。来源：")}${p.source}`)}`;
+  const list = p.error || !rows ? "" : `<div class="table-section assertion-section"><h3>${t("保持唤醒的进程")}</h3><table class="assertion-table"><colgroup><col><col><col><col></colgroup><thead><tr><th>${t("进程")}</th><th>${t("请求")}</th><th>${t("原因")}</th><th>${t("已持续")}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<section class="energy-sleep"><h2>${t("睡眠与唤醒")}</h2>${summaryPanel}${list}${p.error ? "" : note(`${t("进程向系统提出的保持唤醒请求，只读展示；这些请求不保证阻止合盖睡眠。每")} ${state.info!.powerAssertionRefreshSeconds} ${t("秒更新。来源：")}${p.source}`)}</section>`;
 }
 
 // Each section retains only its latest immutable IPC inputs and markup.
@@ -439,7 +431,9 @@ export function renderBody(state: ViewState): string {
     case "gpu": return gpuView(state);
     case "disk": return diskView(state);
     case "network": return networkView(state);
+    case "devices": return devicesView(state);
     case "energy": return energyView(state);
+    case "sensors": return sensorsView(state.snapshot, state.info.machine.platform, state.history, state.range, state.info.refreshSeconds);
     case "processes": return processView(state);
     case "connections": return state.connectionMode === "ports" ? portsView(state) : connectionView(state);
     case "apps": return appsView(state);

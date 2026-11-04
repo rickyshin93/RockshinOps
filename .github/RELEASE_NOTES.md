@@ -1,11 +1,15 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.11
+### New in v0.2.12
 
-- Startup file indexing skips other apps' private directories. On macOS, you can opt in to searching received WeChat files for the current session; the choice resets when the app quits or file search is disabled.
-- Launcher indexing uses less retained memory and fewer allocations. Its search window is created on first use, and settings forms load on demand.
+- A dedicated macOS Sensors page shows available CPU, GPU, SSD and battery temperature trends, color-coded readings and fan speeds. Energy keeps battery, power and sleep information.
+- A new macOS Devices page shows Wi-Fi information and requested scans, paired Bluetooth devices with connect/disconnect and available battery readings, plus audio output selection and volume.
+- Keep new volume edits intact when an earlier adjustment is still waiting for the device response.
+- English navigation is shorter: Space, MenuBar and About. Launcher now appears before About.
 
-**中文：**启动文件索引默认跳过其他应用的私有目录；macOS 微信接收文件可按需在本次运行中加入搜索，退出应用或关闭文件搜索后重置。启动器索引减少内存占用和分配，搜索窗口及设置页面按需加载。
+**中文：**新增独立传感器页，展示可用的 CPU、GPU、SSD 和电池温度趋势、分段颜色及风扇转速，能耗页保留电池、功耗和睡眠信息。新增设备连接页，支持 Wi-Fi 信息和按需扫描、已配对蓝牙设备连接及可用电量、声音输出和音量控制。英文导航缩短为 Space、MenuBar、About，启动器移到关于本机之前。
+
+Sensors and Devices are macOS-only. Temperature channels depend on the hardware and do not identify individual physical cores. Wi-Fi names/scans and Bluetooth access depend on macOS permissions. Real permission recovery, Bluetooth/audio control writes, other Mac models and installed-app upgrades remain outside this release's local interactive acceptance.
 
 ### Upgrade notice / 升级说明
 

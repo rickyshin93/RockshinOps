@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.12
+
+- Add a dedicated macOS Sensors page with CPU, GPU, SSD and battery temperature trends, color-coded readings and fan speeds. Keep battery, power and sleep information on Energy.
+- Add a macOS Devices page for Wi-Fi information and requested scans, paired Bluetooth connections and available battery readings, audio output selection and volume.
+- Preserve in-progress volume edits when an earlier audio request completes.
+- Shorten English navigation labels to Space, MenuBar and About, and place Launcher before About.
+
+### 中文
+
+- 新增独立的 macOS 传感器页，展示 CPU、GPU、SSD 和电池温度趋势、分段颜色及风扇转速；能耗页保留电池、功耗和睡眠信息。
+- 新增 macOS 设备连接页，查看 Wi-Fi 信息并按需扫描、连接已配对蓝牙设备及查看可用电量、选择声音输出和调节音量。
+- 连续调节音量时，保留尚未提交的新值，避免被旧请求响应覆盖。
+- 英文导航名称缩短为 Space、MenuBar、About，启动器移到关于本机之前。
+
 ## 0.2.11
 
 - Keep other apps' private directories out of startup file indexing. On macOS, WeChat received files can be included for the current session only.

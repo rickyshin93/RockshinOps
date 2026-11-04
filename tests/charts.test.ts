@@ -3,7 +3,7 @@ import { bucketHistory, dots, lineChart } from "../src/charts";
 import type { Trend } from "../src/mygo";
 const end = Date.parse("2026-10-26T12:00:00Z");
 function point(secondsAgo: number, cpu: number | null): Trend {
-  return { at: new Date(end - secondsAgo * 1000).toISOString(), cpu, memory: null, gpu: null, diskRead: null, diskWrite: null, download: null, upload: null, battery: null, power: null };
+  return { at: new Date(end - secondsAgo * 1000).toISOString(), cpu, memory: null, gpu: null, diskRead: null, diskWrite: null, download: null, upload: null, battery: null, power: null, cpuTemperature: null, gpuTemperature: null, ssdTemperature: null, batteryTemperature: null };
 }
 describe("real history rendering", () => {
   test("compact process dots leave unrecorded time empty and use only measured samples", () => {
@@ -27,4 +27,14 @@ describe("real history rendering", () => {
     expect(path.match(/M/g)?.length).toBe(3);
     expect(path.match(/L/g)?.length).toBe(1);
   });
+});
+
+
+test("temperature charts break across invalid samples and sleep without inventing zero temperatures", () => {
+ const samples = [55, 56, null, 57].map((v,i) => ({...point(10-i*2, null), cpuTemperature:v}));
+ const html = lineChart(samples, "cpuTemperature", end, 60, "CPU °C", 125);
+ const path = html.match(/<path d="([^"]*)" class="series-primary"/)![1]!;
+ expect(path.match(/M/g)?.length).toBe(2);
+ expect(path.match(/L/g)?.length).toBe(1);
+ expect(path).not.toContain(",160.0");
 });

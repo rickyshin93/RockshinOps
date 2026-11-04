@@ -17,6 +17,7 @@ import (
 	_ "github.com/egoist/mygo/locales/zh-Hans"
 	"github.com/egoist/mygo/plugins/updater"
 	"rockshinops/internal/appicon"
+	"rockshinops/internal/devices"
 	"rockshinops/internal/localization"
 	"rockshinops/internal/menubar"
 	"rockshinops/internal/metrics"
@@ -58,6 +59,7 @@ type Bootstrap struct {
 }
 
 type System struct {
+	devices         *devices.Monitor
 	startup         *startupSettings
 	preferences     Preferences
 	preferencesPath string
@@ -158,7 +160,7 @@ func main() {
 		}
 		targets[i] = target
 	}
-	service := &System{config: cfg, preferences: preferences, preferencesPath: preferencesPath, monitor: metrics.NewMonitor(metrics.Options{
+	service := &System{devices: devices.NewMonitor(time.Duration(cfg.DeviceRefreshSeconds) * time.Second), config: cfg, preferences: preferences, preferencesPath: preferencesPath, monitor: metrics.NewMonitor(metrics.Options{
 		Interval:               time.Duration(cfg.MetricsIntervalSeconds) * time.Second,
 		DiskInterval:           time.Duration(cfg.SampleIntervalSeconds) * time.Second,
 		ProcessInterval:        time.Duration(cfg.ProcessIntervalSeconds) * time.Second,
@@ -313,7 +315,12 @@ func main() {
 		})
 		ctx, cancel := context.WithCancel(context.Background())
 		quitting := false
-		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting = true; cancel(); _, _ = menubar.Native("stop", nil) })
+		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
+			quitting = true
+			service.devices.Stop()
+			cancel()
+			_, _ = menubar.Native("stop", nil)
+		})
 		win.OnClose(func(e *mygo.CloseEvent) {
 			if !quitting {
 				e.PreventDefault()

@@ -17,5 +17,5 @@ export default defineConfig({
   resources: ["LICENSE", "THIRD_PARTY_NOTICES.md"],
   bindings: "src/mygo.ts",
   out: "build",
-  macos: { infoPlist: { CFBundleName: "RockshinOps", CFBundleDisplayName: "RockshinOps", CFBundleDevelopmentRegion: "en", CFBundleLocalizations: ["en", "zh-Hans"] } },
+  macos: { infoPlist: { NSLocationUsageDescription: "RockshinOps uses location permission to show Wi-Fi network names and nearby networks when you request them.", NSLocationWhenInUseUsageDescription: "RockshinOps uses location permission to show Wi-Fi network names and nearby networks when you request them.", NSBluetoothAlwaysUsageDescription: "RockshinOps uses Bluetooth permission to show and connect your paired devices when you request it.", CFBundleName: "RockshinOps", CFBundleDisplayName: "RockshinOps", CFBundleDevelopmentRegion: "en", CFBundleLocalizations: ["en", "zh-Hans"] } },
 });

@@ -7,10 +7,10 @@ package metrics
 import "C"
 
 import (
-	"fmt"
-	"math"
+	"log"
 	"strings"
 	"sync"
+	"syscall"
 	"unsafe"
 )
 
@@ -66,16 +66,29 @@ func hidTemperatures() ([]hidReading, bool) {
 var sensorMu sync.Mutex
 var sensorInfo = map[string]smcEntry{}
 
-func readSMC(name string) (float64, bool) {
-	entry, ok := sensorInfo[name]
-	if !ok {
-		entry, ok = smcInfo(smcKey(name))
-		if !ok {
-			return 0, false
+var sensorChip = sync.OnceValue(func() string {
+	chip, err := syscall.Sysctl("machdep.cpu.brand_string")
+	if err != nil {
+		log.Printf("sensor chip identification: %v", err)
+	}
+	return chip // An unknown model leaves component temperatures unavailable.
+})
+
+func readSMC(name string) (*float64, bool) {
+	entry, known := sensorInfo[name]
+	if !known {
+		var present bool
+		entry, present = smcInfo(smcKey(name))
+		if !present {
+			return nil, false
 		}
 		sensorInfo[name] = entry
 	}
-	return smcValue(entry)
+	value, ok := smcValue(entry)
+	if !ok {
+		return nil, true
+	}
+	return &value, true
 }
 
 // CollectSensors reads the SMC and HID clients serially; these clients are
@@ -83,29 +96,17 @@ func readSMC(name string) (float64, bool) {
 func CollectSensors() Sensors {
 	sensorMu.Lock()
 	defer sensorMu.Unlock()
-	result := Sensors{PowerRails: []SensorReading{}, Fans: []FanReading{}}
+	result := emptySensors()
+	if C.lo_smc_open() == 0 {
+		result = collectSMCSensors(sensorChip(), readSMC)
+	}
 	if readings, ok := hidTemperatures(); ok {
 		if value, ok := hottestDie(readings); ok {
 			result.DieTemperature = &value
 			result.TemperatureSource = "IOHIDEventSystem: PMU tdie (max)"
 		}
 	}
-	if C.lo_smc_open() != 0 {
-		return result
-	}
-	for _, key := range []string{"PSTR", "PDTR", "PPBR", "PMVC"} {
-		if value, ok := readSMC(key); ok && value >= 0 {
-			result.PowerRails = append(result.PowerRails, SensorReading{key, value, "AppleSMC"})
-		}
-	}
-	if count, ok := readSMC("FNum"); ok && count >= 0 && count <= 16 && count == math.Trunc(count) {
-		for i := 0; i < int(count); i++ {
-			key := fmt.Sprintf("F%XAc", i)
-			if rpm, ok := readSMC(key); ok && rpm >= 0 {
-				result.Fans = append(result.Fans, FanReading{i, rpm, "AppleSMC: " + key})
-			}
-		}
-	}
+
 	return result
 }
 
@@ -113,7 +114,7 @@ func hottestDie(readings []hidReading) (float64, bool) {
 	var max float64
 	found := false
 	for _, r := range readings {
-		if !r.valid || !strings.HasPrefix(r.name, "PMU tdie") || math.IsNaN(r.celsius) || math.IsInf(r.celsius, 0) || r.celsius < 10 || r.celsius > 125 {
+		if !r.valid || !strings.HasPrefix(r.name, "PMU tdie") || !validTemperature(r.celsius) {
 			continue
 		}
 		if !found || r.celsius > max {

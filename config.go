@@ -26,6 +26,7 @@ type LauncherConfig struct {
 var configJSON []byte
 
 type Config struct {
+	DeviceRefreshSeconds            int                             `json:"deviceRefreshSeconds"`
 	DefaultOpenAtLogin              bool                            `json:"defaultOpenAtLogin"`
 	ConnectionSampleIntervalSeconds int                             `json:"connectionSampleIntervalSeconds"`
 	MenuBarManager                  menubar.Settings                `json:"menuBarManager"`
@@ -55,6 +56,9 @@ func parseConfig(data []byte) (Config, error) {
 	}
 	if c.ConnectionSampleIntervalSeconds <= 0 || c.ConnectionSampleIntervalSeconds >= c.ConnectionTimeoutSeconds {
 		return c, fmt.Errorf("rockshinops.json: connectionSampleIntervalSeconds must be positive and less than connectionTimeoutSeconds")
+	}
+	if c.DeviceRefreshSeconds <= 0 {
+		return c, fmt.Errorf("rockshinops.json: deviceRefreshSeconds must be positive")
 	}
 	if c.SampleIntervalSeconds <= 0 {
 		return c, fmt.Errorf("rockshinops.json: sampleIntervalSeconds must be positive")

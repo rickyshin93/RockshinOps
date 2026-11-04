@@ -42,9 +42,12 @@ function patchNode(current: Node, next: Node): void {
     current.parentNode!.replaceChild(next, current);
   } else if (current instanceof Element && next instanceof Element) {
     for (const attribute of Array.from(current.attributes)) {
+      // Disclosure state belongs to the reader, not the incoming sample.
+      if (current.tagName === "DETAILS" && attribute.name === "open") continue;
       if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
     }
     for (const attribute of next.attributes) {
+      if (current.tagName === "DETAILS" && attribute.name === "open") continue;
       if (current.getAttribute(attribute.name) !== attribute.value) current.setAttribute(attribute.name, attribute.value);
     }
     patchChildren(current, next);
