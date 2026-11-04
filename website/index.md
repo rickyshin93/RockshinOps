@@ -1,20 +1,28 @@
 # RockshinOps
 
-A free, open-source system monitor for macOS, Windows and Linux. CPU, memory, disk, network, processes and connections, with live readings in your menu bar.
+A free, open-source desktop toolkit. Monitor your system, find apps and files with Launcher, and bring order to your Mac menu bar.
 
 [Official website](https://rickyshin93.github.io/RockshinOps/) · [GitHub](https://github.com/rickyshin93/RockshinOps) · [MIT](https://github.com/rickyshin93/RockshinOps/blob/main/LICENSE)
 
-## One app for the whole system.
+## One shortcut. Straight to what you need.
 
-Start with six hardware panels at a glance, then go deeper into per-core activity and up to an hour of in-session history.
+Search apps and local filenames together. Type a name, a few initials or Chinese pinyin, then open the result without hunting through folders.
+
+## A calmer menu bar. Everything still within reach.
+
+Organize your Mac’s menu bar into visible, hidden and always-hidden sections. Drag icons into place and bring back just the one you need.
+
+## See more. Find faster. Stay in control.
+
+Live system monitoring is just the start. Launch what you need, organize your menu bar, inspect busy processes and reclaim disk space.
 
 ## Find what’s busy.
 
-Sort processes, group usage by app, and see every open TCP and UDP connection.
+Sort processes, group resource use by app, and inspect TCP/UDP connections. Find listening developer ports, save favorites and copy addresses.
 
 ## See where the space went.
 
-Analyze disk usage, review what you select, then move it to the Trash.
+Scan disk usage, browse large folders and files, and review selected items before moving them to the Trash. On macOS, review apps and their possible associated files too.
 
 ## Lives in your menu bar.
 
@@ -22,11 +30,29 @@ Keep the metrics you choose in the menu bar. Closing the window only hides it; n
 
 ## Stays on your machine.
 
-Reads native system counters locally. No account, no cloud. History is kept in memory only.
+System readings and file search stay on your computer. No account or hosted monitoring service. Metric history stays in memory.
+
+## A closer look at your hardware.
+
+In development for macOS: dedicated Sensors and Devices pages. These previews are not included in the v0.2.11 download.
+
+## Temperature, with context.
+
+CPU, GPU, SSD and battery temperature trends, color-coded readings, system thermal pressure and detailed fan speeds. Missing readings stay explicit; availability depends on the Mac model.
+
+## Your everyday connections, together.
+
+Wi-Fi signal and nearby networks, paired Bluetooth devices, sound outputs and volume in one place. Network names and scans need Location permission; battery levels appear only when available.
 
 ## Download RockshinOps.
 
 Free for macOS, Windows and Linux. No account or subscription required.
+
+Enable Launcher and choose a shortcut in the app. It starts off by default.
+
+macOS only. Accessibility allows icon movement; Screen Recording supplies icon previews.
+
+Current development interface with demonstration data. Download v0.2.11 below; preview features are shown separately.
 
 Version 0.2.11
 

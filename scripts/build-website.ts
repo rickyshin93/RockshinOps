@@ -8,12 +8,12 @@ const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"',
 const plain = (value: string) => value.replace(/<[^>]*>/g, "").replaceAll("&amp;", "&").replaceAll("&gt;", ">").replaceAll("&lt;", "<").trim();
 const en = Object.fromEntries([...source.matchAll(/data-i18n="([^"]+)"[^>]*>([^<]*)</g)].map(match => [match[1]!, plain(match[2]!)]));
 const titles = {
-  en: "RockshinOps — Open-source system monitor for macOS, Windows & Linux",
-  zh: "RockshinOps — macOS、Windows、Linux 免费开源系统监控工具",
+  en: "RockshinOps — System monitor, Launcher & Mac menu bar manager",
+  zh: "RockshinOps — 免费开源系统监控、启动器与 Mac 菜单栏管理",
 };
 const descriptions = {
-  en: "Monitor CPU, memory, disk, network, processes and connections with RockshinOps. Free, open-source desktop monitoring with menu bar metrics and English/Chinese UI.",
-  zh: "RockshinOps 免费开源桌面系统监控工具：查看 CPU、内存、磁盘、网络、进程和连接，支持菜单栏指标、中英文界面及 macOS、Windows、Linux。",
+  en: "Monitor your system, search apps and files with Launcher, manage the Mac menu bar, inspect developer ports and clean up disk space. Free and open source.",
+  zh: "RockshinOps 免费开源桌面工具箱：系统监控、应用与文件启动器、Mac 菜单栏管理、开发者端口和磁盘清理，支持中英文。",
 };
 
 for (const language of ["en", "zh"] as const) {
@@ -66,18 +66,23 @@ for (const language of ["en", "zh"] as const) {
       if (!(key in zh)) throw new Error(`Missing Chinese website translation: ${key}`);
       return before + escape(copy[key]!) + after;
     });
+    html = html.replace(/data-i18n-alt="([^"]+)" alt="[^"]*"/g, (_, key) => {
+      if (!(key in zh)) throw new Error(`Missing Chinese image description: ${key}`);
+      return `data-i18n-alt="${key}" alt="${escape(copy[key]!)}"`;
+    });
     html = html.replaceAll('href="assets/', 'href="../assets/').replaceAll('src="assets/', 'src="../assets/').replace('href="styles.css"', 'href="../styles.css"').replace('src="main.js"', 'src="../main.js"');
     html = html.replace('href="zh/" hreflang="zh-CN"', 'href="../" hreflang="en"').replace('id="language-label">中文', 'id="language-label">English').replace('aria-label="切换为中文"', 'aria-label="Switch to English"');
-    html = html.replace('aria-label="Main navigation"', 'aria-label="主导航"').replace('aria-label="RockshinOps home"', 'aria-label="RockshinOps 首页"').replace('overview-en.jpg', 'overview-zh.jpg').replace('RockshinOps overview showing CPU, memory, GPU, disk, network and battery panels with demonstration data.', 'RockshinOps 概览，展示 CPU、内存、GPU、磁盘、网络与电池面板，使用演示数据。');
+    html = html.replace('aria-label="Main navigation"', 'aria-label="主导航"').replace('aria-label="RockshinOps home"', 'aria-label="RockshinOps 首页"').replaceAll(/(overview|launcher|menubar|sensors|devices)-en\.jpg/g, '$1-zh.jpg').replace('RockshinOps overview showing CPU, memory, GPU, disk, network and battery panels with demonstration data.', 'RockshinOps 概览，展示 CPU、内存、GPU、磁盘、网络与电池面板，使用演示数据。');
+    html = html.replace('src="../assets/rockshinops-brand/launcher-zh.jpg" width="800" height="334"', 'src="../assets/rockshinops-brand/launcher-zh.jpg" width="800" height="286"');
     html = html.replace('href="llms.txt"', 'href="../llms.txt"');
   }
   const directory = "website/" + (chinese ? "zh/" : "");
   mkdirSync(directory, { recursive: true });
   writeFileSync(directory + "index.html", html);
-  const sections = [["monitorTitle", "monitorCopy"], ["inspectTitle", "inspectCopy"], ["spaceTitle", "spaceCopy"], ["quietTitle", "quietCopy"], ["privateTitle", "privateCopy"], ["downloadTitle", "downloadIntro"]].map(([title, body]) => `## ${copy[title!]}\n\n${copy[body!]}`);
+  const sections = [["launcherTitle", "launcherCopy"], ["menubarTitle", "menubarCopy"], ["monitorTitle", "monitorCopy"], ["inspectTitle", "inspectCopy"], ["spaceTitle", "spaceCopy"], ["quietTitle", "quietCopy"], ["privateTitle", "privateCopy"], ["previewTitle", "previewCopy"], ["sensorsTitle", "sensorsCopy"], ["devicesTitle", "devicesCopy"], ["downloadTitle", "downloadIntro"]].map(([title, body]) => `## ${copy[title!]}\n\n${copy[body!]}`);
   const downloads = [...html.matchAll(/class="download-link" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map(match => `- [${plain(match[2]!).replace(/[↓↗]/g, "").trim()}](${match[1]})`);
   const faq = [1, 2, 3, 4].map(n => `### ${copy["faq" + n]}\n\n${copy["answer" + n]}`);
-  writeFileSync(directory + "index.md", `# RockshinOps\n\n${copy.heroCopy}\n\n[${chinese ? "官网" : "Official website"}](${url}) · [GitHub](${repo}) · [MIT](${repo}/blob/main/LICENSE)\n\n${sections.join("\n\n")}\n\n${copy.version}\n\n${downloads.join("\n")}\n\n${copy.macNote}\n\n${copy.winNote}\n\n${copy.linuxNote}\n\n${copy.platformNote}\n\n${faq.join("\n\n")}\n`);
+  writeFileSync(directory + "index.md", `# RockshinOps\n\n${copy.heroCopy}\n\n[${chinese ? "官网" : "Official website"}](${url}) · [GitHub](${repo}) · [MIT](${repo}/blob/main/LICENSE)\n\n${sections.join("\n\n")}\n\n${copy.launcherNote}\n\n${copy.menubarNote}\n\n${copy.caption}\n\n${copy.version}\n\n${downloads.join("\n")}\n\n${copy.macNote}\n\n${copy.winNote}\n\n${copy.linuxNote}\n\n${copy.platformNote}\n\n${faq.join("\n\n")}\n`);
 }
 writeFileSync("website/sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${site}</loc></url>\n  <url><loc>${site}zh/</loc></url>\n</urlset>\n`);
-writeFileSync("website/llms.txt", `# RockshinOps\n\n> Free, MIT-licensed desktop system monitor for macOS, Windows and Linux.\n\nRockshinOps reads native CPU, memory, disk, network, process and connection data. It provides persistent menu bar metrics, disk-space analysis and reviewed cleanup. History stays in memory for the current session; no cloud account is required. Menu-bar icon management and app-uninstall review are macOS features. Hardware telemetry and desktop acceptance vary by platform; see the product pages for limits.\n\n## Product\n\n- [English product facts and downloads](${site}index.md): Features, installation notes, platform limits and FAQs, generated from the visible website.\n- [中文产品说明与下载](${site}zh/index.md): 功能、安装要求、平台边界与常见问题。\n\n## Source and releases\n\n- [GitHub repository](${repo}): Source, README and MIT license.\n- [Latest release](${repo}/releases/latest): Published installers and release notes; repository main can contain unreleased changes.\n- [Platform support](${repo}/blob/main/docs/platforms.md): Collector sources and availability.\n- [Project status](${repo}/blob/main/STATUS.md): Verification boundaries and known issues.\n`);
+writeFileSync("website/llms.txt", `# RockshinOps\n\n> Free, MIT-licensed desktop toolkit with system monitoring, app and file search, and macOS menu-bar management.\n\nRockshinOps reads native CPU, memory, disk, network, process and connection data. It provides a global-shortcut Launcher with local app/filename search and Chinese pinyin matching, persistent menu bar metrics, developer port inspection, disk-space analysis and reviewed cleanup. Launcher is off by default; file search is optional and skips other apps’ private folders. History stays in memory for the current session; no cloud account is required. Menu-bar icon management (visible/hidden/always-hidden groups, drag sorting, search and temporary reveal) and app-uninstall review are macOS features. The current published download is v0.2.11. Dedicated Sensors and Devices pages are clearly labeled development previews, not included in that release. Website screenshots use current development components with synthetic demonstration data. Hardware telemetry and desktop acceptance vary by platform; see the product pages for limits.\n\n## Product\n\n- [English product facts and downloads](${site}index.md): Features, installation notes, platform limits and FAQs, generated from the visible website.\n- [中文产品说明与下载](${site}zh/index.md): 功能、安装要求、平台边界与常见问题。\n\n## Source and releases\n\n- [GitHub repository](${repo}): Source, README and MIT license.\n- [Latest release](${repo}/releases/latest): Published installers and release notes; repository main can contain unreleased changes.\n- [Platform support](${repo}/blob/main/docs/platforms.md): Collector sources and availability.\n- [Project status](${repo}/blob/main/STATUS.md): Verification boundaries and known issues.\n`);

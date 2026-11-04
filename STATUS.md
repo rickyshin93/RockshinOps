@@ -24,6 +24,8 @@
 
 ## Next
 
+- 2026-11-04: Website refresh ready for Pages deployment: dedicated Launcher/MenuBar stories, developer ports and cleanup, ten new bilingual component screenshots, and clearly separated Sensors/Devices development previews. EN/ZH responsive, no-JS, image and download checks passed; release remains v0.2.11.
+
 - Launcher P2: RockshinOps commands (pages, processes with confirmed quit, ports) and web-search fallback.
 
 ## Backlog
