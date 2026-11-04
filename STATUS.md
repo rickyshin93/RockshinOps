@@ -24,8 +24,6 @@
 
 ## Next
 
-- 2026-11-04: Website refresh ready for Pages deployment: dedicated Launcher/MenuBar stories, developer ports and cleanup, ten new bilingual component screenshots, and clearly separated Sensors/Devices development previews. EN/ZH responsive, no-JS, image and download checks passed; release remains v0.2.11.
-
 - Launcher P2: RockshinOps commands (pages, processes with confirmed quit, ports) and web-search fallback.
 
 ## Backlog
@@ -35,6 +33,8 @@
 - Windows/Linux interactive desktop acceptance beyond CI native collector smoke tests.
 
 ## Done
+
+- 2026-11-04: Refreshed the bilingual [website](https://rickyshin93.github.io/RockshinOps/zh/) with Launcher/MenuBar stories, developer-port and cleanup details, ten new EN/ZH component screenshots, and separate Sensors/Devices development previews. Responsive/no-JS/browser review passed; [Pages deployment](https://github.com/rickyshin93/RockshinOps/actions/runs/41809989610) succeeded and public pages/assets matched the verified build. Downloads remain v0.2.11.
 
 - 2026-11-04: Published [v0.2.11](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.11) with Launcher privacy and memory improvements. [Four-target signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/41760849155), local Go/web/race checks and macOS arm64 package passed; user confirmed native tray text and main-window close/reopen. All 12 published checksums and four update signatures verified; [bilingual website](https://github.com/rickyshin93/RockshinOps/actions/runs/41762407668) deployed and live download links checked. Real WeChat TCC and Windows/Linux interactive acceptance remain open.
 
