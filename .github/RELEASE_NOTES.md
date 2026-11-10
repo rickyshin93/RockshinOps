@@ -1,6 +1,6 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.13
+### New in v0.2.14
 
 - Calculator adds editable calculation history, linked answers, and grouping and precision settings shared with Launcher.
 - Evaluate expressions in Launcher, copy the answer or open it in Calculator.

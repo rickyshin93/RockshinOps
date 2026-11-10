@@ -457,6 +457,9 @@ func (s *System) saveCalculation(expression string, createdAt time.Time, showAns
 			return calculatorSaved{entry: entry, format: format, history: history}, nil
 		}
 		entry.CreatedAt = time.Now().UTC()
+		for calculationIndex(history, entry.CreatedAt) >= 0 {
+			entry.CreatedAt = entry.CreatedAt.Add(time.Nanosecond)
+		}
 		history = append([]CalculationEntry{entry}, history...)
 	} else {
 		history[index] = entry

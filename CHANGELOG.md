@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.13
+## 0.2.14
 
 - Add Calculator with editable calculation history, linked answers, grouping and precision settings shared with Launcher.
 - Evaluate expressions in Launcher, copy answers or open them in Calculator.
