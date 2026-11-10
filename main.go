@@ -81,6 +81,8 @@ type System struct {
 	scanCancelMu    sync.Mutex
 	scanCancel      context.CancelFunc
 	launcher        *launcher
+	calculatorMu    sync.Mutex
+	openCalculator  func()
 }
 
 func (s *System) Initialize() Bootstrap {
@@ -107,7 +109,10 @@ func (s *System) HistorySince(after string) ([]metrics.Trend, error) {
 }
 func (s *System) Processes() metrics.ProcessList { return s.monitor.Processes() }
 func (s *System) Connections(ctx context.Context) (metrics.Connections, error) {
-	return metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second, time.Duration(s.config.ConnectionSampleIntervalSeconds)*time.Second)
+	before := s.monitor.Processes()
+	connections, err := metrics.ReadConnections(ctx, time.Duration(s.config.ConnectionTimeoutSeconds)*time.Second, time.Duration(s.config.ConnectionSampleIntervalSeconds)*time.Second)
+	connections.BindListeners(before)
+	return connections, err
 }
 
 func (s *System) OpenFullDiskAccessSettings() error {
@@ -208,6 +213,7 @@ func main() {
 			win.Focus()
 			go service.refresh(true)
 		}
+		service.openCalculator = openWindow
 		openSettings := func(*mygo.MenuItem, *mygo.Window) {
 			openWindow()
 			if err := SettingsOpened.Broadcast(true); err != nil {
@@ -325,9 +331,16 @@ func main() {
 			if !quitting {
 				e.PreventDefault()
 				win.Hide()
-				if service.Preferences().HideDockOnClose {
-					mygo.App.Dock.Hide()
-				}
+				// A tray refresh can hold the preferences lock while waiting for the UI thread.
+				go func() {
+					if service.Preferences().HideDockOnClose {
+						mygo.RunOnMain(func() {
+							if !win.IsVisible() {
+								mygo.App.Dock.Hide()
+							}
+						})
+					}
+				}()
 			}
 		})
 		mygo.App.OnActivate(func(visible bool) {

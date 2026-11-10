@@ -83,7 +83,7 @@ func TestLauncherWeChatRequiresSessionOptIn(t *testing.T) {
 	assertPrivateResults := func(want int) {
 		t.Helper()
 		waitLauncherIndex(t, l)
-		if got := l.query("private-report"); len(got) != want {
+		if got, _ := l.query("private-report"); len(got) != want {
 			t.Fatalf("private results: got %+v, want %d", got, want)
 		}
 	}
@@ -120,7 +120,7 @@ func TestLauncherWeChatRequiresSessionOptIn(t *testing.T) {
 		t.Fatal("persisted session opt-in")
 	}
 	restarted := makeLauncher()
-	if restarted.settings().WeChat || len(restarted.query("private-report")) != 0 {
+	if got, _ := restarted.query("private-report"); restarted.settings().WeChat || len(got) != 0 {
 		t.Fatal("restart resumed private indexing")
 	}
 	if err := l.setWeChat(false); err != nil {

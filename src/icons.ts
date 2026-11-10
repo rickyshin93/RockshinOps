@@ -1,7 +1,7 @@
 import {
   Bluetooth, Headphones, Volume2, Mouse,
   AppWindow, ArrowDownToLine, ArrowLeftRight, Battery, BrushCleaning,
-  Check, ChevronDown, ChevronRight, Cpu, Folder, Globe, Gpu, HardDrive,
+  Calculator, Delete, Pencil, Check, ChevronDown, ChevronRight, Cpu, Folder, Globe, Gpu, HardDrive,
   Gauge, PanelTop, Laptop, List, MemoryStick, Pause, Play, RefreshCw,
   Search, Settings, Thermometer, Fan, X, Zap, Star, Copy, EthernetPort, Power, ArrowLeft, File, FolderOpen, ScanSearch, Trash2, createElement, type IconNode,
 } from "lucide";
@@ -24,6 +24,9 @@ const icons: Record<string, IconNode> = {
   ports: EthernetPort,
   settings: Settings,
   launcher: Search,
+  calculator: Calculator,
+  backspace: Delete,
+  pencil: Pencil,
   menubar: PanelTop,
   down: ChevronDown,
   check: Check,

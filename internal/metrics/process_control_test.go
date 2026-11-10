@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"rockshinops/internal/localization"
 )
 
 func TestTerminationChild(t *testing.T) {
@@ -68,6 +70,12 @@ func TestTerminateProcess(t *testing.T) {
 			if err := syscall.Kill(cmd.Process.Pid, 0); err != nil {
 				t.Fatalf("stale request affected child: %v", err)
 			}
+			if mode == "quit-child" {
+				err := TerminatePortProcess(ctx, 3*time.Second, cmd.Process.Pid, identity, 3000)
+				if err == nil || err.Error() != localization.T("监听端口已变化，请刷新后重试。") {
+					t.Fatalf("unrelated port did not block termination: %v", err)
+				}
+			}
 			if err := TerminateProcess(cmd.Process.Pid, identity, false); err != nil {
 				t.Fatal(err)
 			}
@@ -104,5 +112,27 @@ func TestTerminateProcessRejectsUnsafeTargets(t *testing.T) {
 	}
 	if err := TerminateProcess(12345, "", false); err == nil {
 		t.Fatal("accepted missing identity")
+	}
+}
+
+func TestPortActionRequiresTheExactTCPListener(t *testing.T) {
+	items := []Connection{
+		{PID: 42, Protocol: "TCP", State: "LISTEN", Local: "[::1]:3000"},
+		{PID: 42, Protocol: "UDP", State: "LISTEN", Local: "*:4000"},
+		{PID: 42, Protocol: "TCP", State: "ESTABLISHED", Local: "*:5000"},
+		{PID: 43, Protocol: "TCP", State: "LISTEN", Local: "*:6000"},
+	}
+	connections := Connections{Items: items}
+	connections.BindListeners(ProcessList{Items: []Process{{PID: 42, Identity: "111"}, {PID: 43, Identity: "0"}}})
+	if items[0].ProcessIdentity != "111" || items[1].ProcessIdentity != "" || items[2].ProcessIdentity != "" || items[3].ProcessIdentity != "" {
+		t.Fatalf("listener ownership must use a valid preceding process sample: %+v", items)
+	}
+	if !ownsListeningPort(items, 42, 3000) {
+		t.Fatal("exact IPv6 listener was missed")
+	}
+	for _, port := range []int{300, 4000, 5000, 6000} {
+		if ownsListeningPort(items, 42, port) {
+			t.Errorf("wrong listener matched PID 42 on port %d", port)
+		}
 	}
 }

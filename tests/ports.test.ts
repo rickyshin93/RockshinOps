@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { addressScope, filterPorts, listeningPorts } from "../src/ports";
+import { addressScope, filterPorts, listeningPorts, portActionKey } from "../src/ports";
 import { portsView } from "../src/ports-view";
 import type { Connection, Process } from "../src/mygo";
 import type { ViewState } from "../src/views";
@@ -18,6 +18,16 @@ test("only TCP listeners enter the workbench; dual-stack bindings combine but di
   expect(rows.map(row => [row.port, row.pid])).toEqual([[80, 42], [3000, 42], [3000, 43]]);
   expect(rows[1]!.addresses).toEqual(["127.0.0.1:3000", "[::1]:3000"]);
   expect(rows[1]!.identity).toBe("");
+});
+
+test("a reused PID cannot make an old listener actionable and the key distinguishes ports", () => {
+  const bound = { ...listener, processIdentity: "111" };
+  const replacement = { pid: 42, identity: "222", name: "replacement" } as Process;
+  const [stale] = listeningPorts([bound], [replacement]);
+  expect(stale!.identity).toBe("");
+  expect(stale!.process).toBe("node");
+  const owned = listeningPorts([bound, { ...bound, local: "127.0.0.1:4000" }], [{ ...replacement, identity: "111" }]);
+  expect(owned.map(portActionKey)).toEqual(["3000:42:111", "4000:42:111"]);
 });
 
 test.each([
@@ -51,12 +61,12 @@ test("port view escapes native values and keeps favorite, empty, stale and failu
     expect(html).toContain(t("未发现监听"));
     expect(html).toContain(t("本机回环"));
     expect(html).toContain('class="icon-button port-close" disabled');
-    const owned = { ...state, processes: { items: [{ pid: 42, identity: "start-42", name: "node" } as Process] } } as ViewState;
-    expect(portsView(owned)).toContain('data-close-port="42"');
+    const owned = { ...state, connections: { ...state.connections, items: [{ ...listener, processIdentity: "111" }] }, processes: { items: [{ pid: 42, identity: "111", name: "node" } as Process] } } as ViewState;
+    expect(portsView(owned)).toContain('data-close-port="3000:42:111"');
     expect(portsView(owned)).toContain('app-icon process-system-icon');
-    const withApp = { ...owned, info: { machine: { platform: "darwin" } }, processes: { items: [{ pid: 42, identity: "start-42", name: "node", app: "/Applications/My App.app" } as Process] } } as ViewState;
+    const withApp = { ...owned, info: { machine: { platform: "darwin" } }, processes: { items: [{ pid: 42, identity: "111", name: "node", app: "/Applications/My App.app" } as Process] } } as ViewState;
     expect(portsView(withApp)).toContain('appicon://localhost/?path=%2FApplications%2FMy%20App.app');
-    expect(portsView({ ...owned, portAction: { pid: 42, busy: true } })).toContain('data-close-port="42" aria-label="Close port 3000" title="Close port 3000" disabled aria-busy="true"');
+    expect(portsView({ ...owned, portAction: { key: "3000:42:111", busy: true } })).toContain('data-close-port="3000:42:111" aria-label="Close port 3000" title="Close port 3000" disabled aria-busy="true"');
     expect(portsView({ ...state, connections: { items: [{ ...listener, local: "*:3000" }], warning: "" } })).toContain(t("所有接口"));
     expect(portsView({ ...state, query: "65535" })).toContain(t("没有匹配的监听端口"));
     expect(portsView({ ...state, query: "65535" })).toContain('data-action="clear-port-filters"');

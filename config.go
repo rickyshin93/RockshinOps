@@ -44,6 +44,7 @@ type Config struct {
 	PowerAssertionIntervalSeconds   int                             `json:"powerAssertionIntervalSeconds"`
 	ScanTargets                     map[string][]metrics.ScanTarget `json:"scanTargets"`
 	Launcher                        LauncherConfig                  `json:"launcher"`
+	CalculatorFormat                CalculatorFormat                `json:"calculatorFormat"`
 }
 
 func parseConfig(data []byte) (Config, error) {
@@ -53,6 +54,9 @@ func parseConfig(data []byte) (Config, error) {
 	}
 	if err := c.MenuBarManager.Validate(); err != nil {
 		return c, fmt.Errorf("rockshinops.json: %w", err)
+	}
+	if err := c.CalculatorFormat.validate(); err != nil {
+		return c, fmt.Errorf("rockshinops.json: calculatorFormat: %w", err)
 	}
 	if c.ConnectionSampleIntervalSeconds <= 0 || c.ConnectionSampleIntervalSeconds >= c.ConnectionTimeoutSeconds {
 		return c, fmt.Errorf("rockshinops.json: connectionSampleIntervalSeconds must be positive and less than connectionTimeoutSeconds")

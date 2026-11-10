@@ -20,15 +20,16 @@ type ConnectionMetrics struct {
 }
 
 type Connection struct {
-	Metrics  *ConnectionMetrics `json:"metrics,omitempty"`
-	PID      int                `json:"pid"`
-	Process  string             `json:"process"`
-	UserID   string             `json:"userId"`
-	Protocol string             `json:"protocol"`
-	Family   string             `json:"family"`
-	Local    string             `json:"local"`
-	Remote   string             `json:"remote"`
-	State    string             `json:"state"`
+	Metrics         *ConnectionMetrics `json:"metrics,omitempty"`
+	PID             int                `json:"pid"`
+	Process         string             `json:"process"`
+	ProcessIdentity string             `json:"processIdentity,omitempty"`
+	UserID          string             `json:"userId"`
+	Protocol        string             `json:"protocol"`
+	Family          string             `json:"family"`
+	Local           string             `json:"local"`
+	Remote          string             `json:"remote"`
+	State           string             `json:"state"`
 }
 
 type Connections struct {
@@ -39,6 +40,25 @@ type Connections struct {
 
 func ReadConnections(ctx context.Context, timeout, interval time.Duration) (Connections, error) {
 	return readConnections(ctx, timeout, interval)
+}
+
+// BindListeners uses process identities sampled before the socket enumeration.
+// The close action rechecks both the socket and the identity against the OS.
+func (c Connections) BindListeners(before ProcessList) {
+	if before.Error != "" {
+		return
+	}
+	identities := make(map[int]string, len(before.Items))
+	for _, process := range before.Items {
+		if process.Identity != "0" {
+			identities[process.PID] = process.Identity
+		}
+	}
+	for i := range c.Items {
+		if c.Items[i].Protocol == "TCP" && c.Items[i].State == "LISTEN" {
+			c.Items[i].ProcessIdentity = identities[c.Items[i].PID]
+		}
+	}
 }
 
 func parseConnections(data []byte) ([]Connection, error) {

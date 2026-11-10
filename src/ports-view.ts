@@ -2,7 +2,7 @@ import type { ViewState } from "./views";
 import { t } from "./i18n";
 import { escapeHTML as e } from "./format";
 import { icon, processAppIcon } from "./icons";
-import { filterPorts, listeningPorts, type ListeningPort } from "./ports";
+import { filterPorts, listeningPorts, portActionKey, type ListeningPort } from "./ports";
 
 function scopeBadge(row: ListeningPort): string {
   if (row.scopes.has("wildcard")) return `<span class="port-scope public" title="${e(t("绑定所有接口，局域网可能可达"))}">${t("所有接口")}</span>`;
@@ -25,8 +25,9 @@ export function portsView(state: ViewState): string {
     const label = t("关闭端口 {{port}}", { port: row.port });
     if (loading || error) return `<button class="icon-button port-close" disabled aria-label="${e(label)}" title="${e(t("连接数据暂不可用"))}">${icon("power")}</button>`;
     if (!row.identity || row.pid <= 1 || !row.process) return `<button class="icon-button port-close" disabled aria-label="${e(label)}" title="${e(t("进程信息不可用，无法结束"))}">${icon("power")}</button>`;
-    const busy = action?.pid === row.pid && action.busy;
-    return `<button class="icon-button port-close" data-close-port="${row.pid}" aria-label="${e(label)}" title="${e(label)}" ${busy || action?.busy ? "disabled" : ""} aria-busy="${busy}">${busy ? icon("refresh") : icon("power")}</button>`;
+    const key = portActionKey(row);
+    const busy = action?.key === key && action.busy;
+    return `<button class="icon-button port-close" data-close-port="${e(key)}" aria-label="${e(label)}" title="${e(label)}" ${busy || action?.busy ? "disabled" : ""} aria-busy="${busy}">${busy ? icon("refresh") : icon("power")}</button>`;
   };
   const portCount = new Set(all.map(row => row.port)).size;
   const loopbackCount = new Set(all.filter(row => row.scopes.has("loopback") && !row.scopes.has("wildcard") && !row.scopes.has("interface")).map(row => row.port)).size;

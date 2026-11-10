@@ -24,6 +24,10 @@
   "connectionSampleIntervalSeconds": 1,
   "machineInfoTimeoutSeconds": 5,
   "powerAssertionIntervalSeconds": 10,
+  "calculatorFormat": {
+    "grouping": "auto",
+    "decimalPlaces": 4
+  },
   "launcher": {
     "defaultEnabled": false,
     "defaultFiles": true,

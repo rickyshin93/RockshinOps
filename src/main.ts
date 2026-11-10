@@ -11,8 +11,9 @@ import { tableWindow } from "./table-window";
 import { singleFlight } from "./single-flight";
 import { installSortControl } from "./dropdown";
 import { nextConnectionSort, type ConnectionSortKey } from "./connections";
-import { listeningPorts } from "./ports";
+import { listeningPorts, portActionKey } from "./ports";
 import { menuBarChoices, preferencesDirty } from "./settings";
+import type { CalculatorDraft } from "./react-pages";
 import { actionControls, connectionSubtitle, processSubtitle, filterControls, metricPages, navigation, pages, renderBody, type Page, type ViewState } from "./views";
 
 const el = (id: string) => document.getElementById(id)!;
@@ -26,7 +27,15 @@ const state: ViewState = {
   launcher: null, launcherBusy: false, launcherError: "",
   preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
 };
-const reactPage = (page: Page) => ["settings", "menubar", "cleanup", "launcher"].includes(page);
+const calculatorDraft: CalculatorDraft = {
+  expression: "",
+  finishImport(request) {
+    if (calculatorDraft.incoming !== request) return;
+    calculatorDraft.incoming = undefined;
+    render();
+  },
+};
+const reactPage = (page: Page) => ["settings", "menubar", "cleanup", "launcher", "calculator"].includes(page);
 let reactPages: typeof import("./react-pages") | null = null;
 let reactPageError = "";
 const loadReactPages = singleFlight(async () => {
@@ -95,6 +104,7 @@ function renderNow(filters = false) {
   const title = t(page.title);
   let subtitle = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
   if (state.page === "settings" || state.page === "launcher") subtitle = t("更改会自动保存");
+  if (state.page === "calculator") subtitle = t("与启动器共享 · 保存在本机");
   if (state.page === "menubar") subtitle = t("管理系统菜单栏图标、分区与外观");
   if (state.page === "about" && state.info) subtitle = state.info.machine.name || state.info.machine.model;
   if (state.page === "connections") subtitle = connectionSubtitle(state);
@@ -121,7 +131,7 @@ function renderNow(filters = false) {
     renderedPage = null;
     renderedAppReview = "";
     if (reactPages) {
-      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings(), shortcut => { if (state.launcher) void setLauncher(state.launcher.enabled, state.launcher.files, shortcut); });
+      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings(), shortcut => { if (state.launcher) void setLauncher(state.launcher.enabled, state.launcher.files, shortcut); }, calculatorDraft);
     } else {
       el("page-body").textContent = reactPageError ? `${t("页面加载失败，请重试。")} ${reactPageError}` : t("正在加载页面…");
       void loadReactPages();
@@ -477,17 +487,17 @@ async function inspectPortProcess(pid: number) {
   if (state.page !== "processes" || state.query !== String(pid)) return;
   state.selectedProcess = pid; recordProcessSample(); render();
 }
-async function closePortProcess(pid: number) {
-  if (state.portAction?.busy || pid <= 1) return;
+async function closePortProcess(key: string) {
+  if (state.portAction?.busy) return;
   const rows = listeningPorts(state.connections?.items || [], state.processes?.items || []);
-  const row = rows.find(item => item.pid === pid && item.identity && item.process);
+  const row = rows.find(item => portActionKey(item) === key && item.pid > 1 && item.identity && item.process);
   if (!row) { state.portMessage = { text: t("进程信息不可用，无法结束。"), error: true }; render(); return; }
   const prompt = t("强制退出 {{name}}（PID {{pid}}）以关闭端口 {{port}}？未保存的数据可能丢失。", { name: row.process, pid: row.pid, port: row.port });
   if (!window.confirm(prompt)) return;
-  state.portAction = { pid, busy: true }; render();
+  state.portAction = { key, busy: true }; render();
   try {
-    await System.terminateProcess(row.pid, row.identity, true);
-    state.portMessage = { text: t("已结束 {{name}}，端口 {{port}} 即将释放。", { name: row.process, port: row.port }), error: false };
+    await System.terminatePortProcess(row.pid, row.identity, row.port);
+    state.portMessage = { text: t("已向 {{name}} 发送强制退出请求，等待端口 {{port}} 更新。", { name: row.process, port: row.port }), error: false };
     try { await System.refresh(); await loadProcesses(); await connections(true, true); }
     catch (reason) { state.portMessage = { text: `${state.portMessage.text} ${t("刷新失败：")}${String(reason)}`, error: true }; }
   } catch (reason) {
@@ -628,7 +638,7 @@ document.addEventListener("click", event => {
   if (button.dataset.favoritePort) { void toggleFavoritePort(Number(button.dataset.favoritePort)); return; }
   if (button.dataset.copyPort) { void copyPortAddress(button.dataset.copyPort); return; }
   if (button.dataset.portProcess) { void inspectPortProcess(Number(button.dataset.portProcess)); return; }
-  if (button.dataset.closePort) { void closePortProcess(Number(button.dataset.closePort)); return; }
+  if (button.dataset.closePort) { void closePortProcess(button.dataset.closePort); return; }
   if (button.dataset.portScope) { state.portScope = button.dataset.portScope as ViewState["portScope"]; render(); return; }
   if (button.dataset.portQuery) { state.query = `:${button.dataset.portQuery}`; state.portScope = "all"; render(true); return; }
   if (button.dataset.connectionSort) { state.connectionSort = nextConnectionSort(state.connectionSort, button.dataset.connectionSort as ConnectionSortKey); render(); return; }
@@ -722,7 +732,12 @@ if (isMyGo()) {
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });
   const offMenuBarSettings = events.menuBarSettingsOpened.on(() => { void navigate("menubar"); });
-  window.addEventListener("pagehide", () => { stopped = true; off(); offSettings(); offMenuBarSettings(); offLocale(); }, { once: true });
+  const offCalculator = events.calculatorOpened.on(expression => {
+    calculatorDraft.incoming = { expression };
+    if (state.page === "calculator" && !navigationTarget) render();
+    else void navigate("calculator");
+  });
+  window.addEventListener("pagehide", () => { stopped = true; off(); offSettings(); offMenuBarSettings(); offCalculator(); offLocale(); }, { once: true });
   void refresh();
 } else {
   el("machine-detail").textContent = t("浏览器预览");

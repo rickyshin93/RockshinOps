@@ -29,6 +29,7 @@ export const pages = [
   { id: "cleanup", title: "清理", group: "系统" },
   { id: "menubar", title: "菜单栏管理", group: "系统" },
   { id: "launcher", title: "启动器", group: "系统" },
+  { id: "calculator", title: "计算器", group: "系统" },
   { id: "about", title: "关于本机", group: "系统" },
   { id: "settings", title: "设置", group: "系统" },
 ] as const;
@@ -53,7 +54,7 @@ export interface ViewState extends SettingsState, DevicesViewState {
   portsSaving?: boolean;
   portsError?: string;
   portMessage?: { text: string; error: boolean };
-  portAction?: { pid: number; busy: boolean };
+  portAction?: { key: string; busy: boolean };
   selectedProcess: number | null;
   processHistory?: Trend[];
   processAction?: { pid: number; busy: boolean; error: boolean; message: string };
@@ -98,7 +99,7 @@ export function navigation(): string {
 }
 
 export function actionControls(state: ViewState): string {
-  if (state.page === "menubar" || state.page === "cleanup" || state.page === "launcher") return "";
+  if (state.page === "menubar" || state.page === "cleanup" || state.page === "launcher" || state.page === "calculator") return "";
   if (state.page === "settings") return `<span class="settings-shortcut">${isMac(state) ? "⌘," : "Ctrl+,"}</span>`;
   const ranges = [[60, t("1 分钟")], [300, t("5 分钟")], [900, t("15 分钟")], [3600, t("1 小时")]] as const;
   const history = metricPages.includes(state.page) ? `<div class="segmented" role="group" aria-label="${t("历史时间范围")}">${ranges.map(([seconds, label]) => `<button data-range="${seconds}" class="${state.range === seconds ? "selected" : ""}" aria-pressed="${state.range === seconds}">${label}</button>`).join("")}</div>` : "";
@@ -422,7 +423,7 @@ function aboutView(state: ViewState): string {
 }
 
 export function renderBody(state: ViewState): string {
-  if (state.page === "settings" || state.page === "menubar" || state.page === "cleanup" || state.page === "launcher") return "";
+  if (state.page === "settings" || state.page === "menubar" || state.page === "cleanup" || state.page === "launcher" || state.page === "calculator") return "";
   if (!state.snapshot || !state.info) return empty(t("等待本机数据"), t("点击右上角刷新重新连接采集服务。"));
   switch (state.page) {
     case "overview": return overview(state);

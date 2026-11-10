@@ -12,6 +12,10 @@ export interface ListeningPort {
   scopes: Set<PortScope | "interface">;
 }
 
+export function portActionKey(row: ListeningPort): string {
+  return `${row.port}:${row.pid}:${row.identity}`;
+}
+
 export function addressScope(host: string): PortScope | "interface" {
   if (host === "*" || host === "0.0.0.0" || host === "::") return "wildcard";
   if (host === "::1" || /^127\./.test(host) || /^::ffff:127\./i.test(host)) return "loopback";
@@ -30,8 +34,10 @@ export function listeningPorts(items: Connection[], processes: Process[]): Liste
     const key = `${port}:${connection.pid}`;
     let row = rows.get(key);
     if (!row) {
-      const process = byPID.get(connection.pid);
-      row = { port, pid: connection.pid, process: process?.name || connection.process, app: process?.app || "", identity: process?.identity || "", addresses: [], scopes: new Set() };
+      const sampled = byPID.get(connection.pid);
+      const identity = connection.processIdentity === sampled?.identity ? connection.processIdentity ?? "" : "";
+      const process = !connection.processIdentity || identity ? sampled : undefined;
+      row = { port, pid: connection.pid, process: process?.name || connection.process, app: process?.app || "", identity, addresses: [], scopes: new Set() };
       rows.set(key, row);
     }
     const address = host === "*" && connection.family === "IPv4" ? `0.0.0.0:${port}`

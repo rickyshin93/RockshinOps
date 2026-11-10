@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/transfer"
 	"rockshinops/internal/fileindex"
 	"rockshinops/internal/localization"
 )
@@ -43,11 +44,18 @@ type LauncherSettings struct {
 }
 
 type LauncherResult struct {
-	ID       string `json:"id"`
-	Kind     string `json:"kind"` // app, file or folder
-	Title    string `json:"title"`
-	Subtitle string `json:"subtitle"`
-	Path     string `json:"path"`
+	ID          string `json:"id"`
+	Kind        string `json:"kind"` // app, file, folder or calculation
+	Title       string `json:"title"`
+	Subtitle    string `json:"subtitle"`
+	Path        string `json:"path"`
+	Approximate bool   `json:"approximate,omitempty"`
+	Grouping    string `json:"grouping,omitempty"`
+}
+
+type LauncherSearch struct {
+	Items           []LauncherResult `json:"items"`
+	CalculatorError string           `json:"calculatorError,omitempty"`
 }
 
 type launcherPrefs struct {
@@ -81,6 +89,7 @@ type launcher struct {
 	weChatPaths []string
 	shownMu     sync.Mutex
 	shown       map[string]bool // files the last query returned, which open may act on
+	fileScope   atomic.Uint64
 }
 
 func readLauncherPrefs(path string, defaults launcherPrefs) (launcherPrefs, error) {
@@ -260,9 +269,8 @@ type scoredResult struct {
 	score int
 }
 
-// query ranks apps and, from two letters on, files together; apps win ties
-// by appBoost.
-func (l *launcher) query(q string) []LauncherResult {
+// query ranks apps and files together. Apps win ties by appBoost.
+func (l *launcher) query(q string) ([]LauncherResult, uint64) {
 	l.appsMu.Lock()
 	apps := l.apps
 	l.appsMu.Unlock()
@@ -270,26 +278,27 @@ func (l *launcher) query(q string) []LauncherResult {
 	for _, a := range rankApps(apps, q, launcherResults) {
 		found = append(found, scoredResult{LauncherResult{ID: "app:" + a.app.Path, Kind: "app", Title: a.app.Name, Subtitle: a.app.Path, Path: a.app.Path}, a.score + appBoost})
 	}
-	shown := map[string]bool{}
-	if ix := l.index.Load(); ix != nil && utf8.RuneCountInString(strings.TrimSpace(q)) >= 2 {
+	scope := l.fileScope.Load()
+	ix := l.index.Load()
+	if ix != nil && utf8.RuneCountInString(strings.TrimSpace(q)) >= 2 {
 		for _, m := range ix.Search(q, launcherResults) {
 			kind := "file"
 			if m.Dir {
 				kind = "folder"
 			}
-			shown[m.Path] = true
 			found = append(found, scoredResult{LauncherResult{ID: "file:" + m.Path, Kind: kind, Title: m.Name, Subtitle: l.shortPath(filepath.Dir(m.Path)), Path: m.Path}, m.Score})
 		}
 	}
-	l.shownMu.Lock()
-	l.shown = shown
-	l.shownMu.Unlock()
 	slices.SortStableFunc(found, func(a, b scoredResult) int { return cmp.Compare(b.score, a.score) })
 	results := make([]LauncherResult, 0, min(len(found), launcherResults))
 	for _, f := range found[:min(len(found), launcherResults)] {
 		results = append(results, f.LauncherResult)
 	}
-	return results
+	return results, scope
+}
+
+func launcherFileResult(item LauncherResult) bool {
+	return item.Kind == "file" || item.Kind == "folder"
 }
 
 // shortPath writes the home folder as ~.
@@ -302,8 +311,7 @@ func (l *launcher) shortPath(p string) string {
 	return p
 }
 
-// open acts on a result the launcher returned: open it, show it in the
-// file manager, or copy its path.
+// open acts on an app or file result: open it, reveal it, or copy its path.
 func (l *launcher) open(id, action string) error {
 	var app *mygo.InstalledApp
 	path, isApp := strings.CutPrefix(id, "app:")
@@ -327,24 +335,27 @@ func (l *launcher) open(id, action string) error {
 	if path == "" || isApp && app == nil {
 		return fmt.Errorf("unknown launcher item: %s", id)
 	}
-	// Hide first so the app the user was in keeps the keyboard until the opened one takes it.
-	if panel := l.panel.Load(); panel != nil {
-		panel.Hide()
-	}
+	var err error
 	switch action {
 	case "reveal":
 		mygo.Shell.ShowItemInFolder(path)
-		return nil
 	case "copy":
-		mygo.Clipboard.WriteText(path)
-		return nil
+		err = mygo.Clipboard.Write(transfer.TextData(path))
 	case "open":
 		if app != nil {
-			return mygo.Shell.LaunchApp(*app)
+			err = mygo.Shell.LaunchApp(*app)
+		} else {
+			err = mygo.Shell.OpenPath(path)
 		}
-		return mygo.Shell.OpenPath(path)
+	default:
+		return fmt.Errorf("unknown launcher action: %s", action)
 	}
-	return fmt.Errorf("unknown launcher action: %s", action)
+	if err == nil {
+		if panel := l.panel.Load(); panel != nil {
+			panel.Hide()
+		}
+	}
+	return err
 }
 
 type scoredApp struct {
@@ -389,10 +400,73 @@ func (s *System) SetLauncher(enabled, files bool, shortcut string) (LauncherSett
 	return s.launcher.settings(), nil
 }
 
-func (s *System) LauncherQuery(query string) []LauncherResult { return s.launcher.query(query) }
+func (s *System) LauncherQuery(query string) (search LauncherSearch) {
+	items, scope := s.launcher.query(query)
+	search.Items = items
+	defer func() {
+		s.launcher.shownMu.Lock()
+		defer s.launcher.shownMu.Unlock()
+		if scope != s.launcher.fileScope.Load() {
+			search.Items = slices.DeleteFunc(search.Items, launcherFileResult)
+			return
+		}
+		shown := make(map[string]bool)
+		for _, item := range search.Items {
+			if launcherFileResult(item) {
+				shown[item.Path] = true
+			}
+		}
+		s.launcher.shown = shown
+	}()
+	expression := strings.TrimSpace(query)
+	exact, err := parseCalculation(expression, true, nil)
+	if err != nil {
+		return search
+	}
+	s.calculatorMu.Lock()
+	format, err := s.readCalculatorFormat()
+	s.calculatorMu.Unlock()
+	if err != nil {
+		search.CalculatorError = err.Error()
+		return search
+	}
+	value := displayCalculationAt(exact, format.DecimalPlaces)
+	result := LauncherResult{ID: "calc:" + expression, Kind: "calculation", Title: value.Value, Subtitle: expression, Approximate: value.Approximate, Grouping: format.Grouping}
+	search.Items = append([]LauncherResult{result}, search.Items[:min(len(search.Items), launcherResults-1)]...)
+	return search
+}
 
-// LauncherOpen acts on a result: action is "open", "reveal" or "copy".
-func (s *System) LauncherOpen(id, action string) error { return s.launcher.open(id, action) }
+// LauncherOpen opens, reveals or copies an item, or opens the calculator.
+func (s *System) LauncherOpen(id, action string) error {
+	expression, calculation := strings.CutPrefix(id, "calc:")
+	if !calculation {
+		return s.launcher.open(id, action)
+	}
+	switch action {
+	case "copy":
+		entry, err := s.CalculatorCommit(expression)
+		if err != nil {
+			return err
+		}
+		notifyCalculatorHistory()
+		if err := copyCalculation(entry.Result.Value); err != nil {
+			return err
+		}
+		s.LauncherHide()
+		return nil
+	case "calculator":
+		if _, err := evaluateCalculation(expression, true); err != nil {
+			return err
+		}
+		mygo.RunOnMain(func() {
+			s.LauncherHide()
+			s.openCalculator()
+		})
+		return CalculatorOpened.Broadcast(expression)
+	default:
+		return fmt.Errorf("unknown calculation action: %s", action)
+	}
+}
 
 // LauncherResize fits the panel to the page's card, growing downwards.
 func (s *System) LauncherResize(height int) {

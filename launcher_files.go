@@ -25,7 +25,11 @@ func (l *launcher) stopIndexing() {
 		<-l.filesDone
 		l.stopFiles = nil
 	}
+	l.shownMu.Lock()
 	l.index.Store(nil)
+	l.fileScope.Add(1)
+	l.shown = nil
+	l.shownMu.Unlock()
 }
 
 func (l *launcher) startIndexing() {

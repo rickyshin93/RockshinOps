@@ -1,10 +1,13 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"rockshinops/internal/localization"
 )
@@ -12,11 +15,46 @@ import (
 // TerminateProcess addresses one sampled process, never a process group.
 // A successful return means the OS accepted the request, not that it exited.
 func TerminateProcess(pid int, identity string, force bool) error {
+	return terminateProcess(pid, identity, force, nil)
+}
+
+func TerminatePortProcess(ctx context.Context, timeout time.Duration, pid int, identity string, port int) error {
+	if port < 1 || port > 65535 {
+		return errors.New(localization.T("无效的监听端口。"))
+	}
+	return terminateProcess(pid, identity, true, func() error {
+		current, err := readConnections(ctx, timeout, 0)
+		if err != nil {
+			return err
+		}
+		if !ownsListeningPort(current.Items, pid, port) {
+			return errors.New(localization.T("监听端口已变化，请刷新后重试。"))
+		}
+		return nil
+	})
+}
+
+func ownsListeningPort(items []Connection, pid, port int) bool {
+	endpoint := ":" + strconv.Itoa(port)
+	for _, item := range items {
+		if item.PID == pid && item.Protocol == "TCP" && item.State == "LISTEN" && strings.HasSuffix(item.Local, endpoint) {
+			return true
+		}
+	}
+	return false
+}
+
+func terminateProcess(pid int, identity string, force bool, verifyListener func() error) error {
 	if pid <= 1 || pid == os.Getpid() {
 		return errors.New(localization.T("不能结束该系统进程或 RockshinOps 自身。"))
 	}
 	if identity == "" || identity == "0" {
 		return errors.New(localization.T("缺少进程身份，请刷新列表后重试。"))
+	}
+	if verifyListener != nil {
+		if err := verifyListener(); err != nil {
+			return err
+		}
 	}
 	items, _, err := readProcesses()
 	if err != nil {

@@ -28,13 +28,16 @@ body { padding: var(--margin) var(--margin) 20px; }
 .launcher-results { list-style: none; margin: 0; padding: 6px; border-top: 1px solid var(--line); }
 .launcher-results li { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 10px; border-radius: 8px; cursor: default; }
 .launcher-results li[aria-selected="true"] { background: var(--selected); color: #fff; }
+.launcher-results .launcher-calculation[aria-selected="true"] { background: #176ac6; }
 .launcher-results img { width: 32px; height: 32px; flex: none; }
+.launcher-calculator { width: 32px; height: 32px; flex: none; padding: 5px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .launcher-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .launcher-title, .launcher-subtitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .launcher-title { font-weight: 500; }
 .launcher-subtitle { font-size: 12px; color: var(--muted); }
-.launcher-hint { flex: none; font-size: 12px; color: var(--muted); }
+.launcher-hint { flex: none; font-size: 12px; color: var(--muted); white-space: pre; }
 [aria-selected="true"] .launcher-subtitle, [aria-selected="true"] .launcher-hint { color: rgb(255 255 255 / .85); }
+.launcher-calculation[aria-selected="true"] :is(.launcher-subtitle, .launcher-hint) { color: rgb(255 255 255 / .95); }
 .launcher-hint { visibility: hidden; }
 [aria-selected="true"] .launcher-hint { visibility: visible; }
 

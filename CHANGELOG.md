@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.13
+
+- Add Calculator with editable calculation history, linked answers, grouping and precision settings shared with Launcher.
+- Evaluate expressions in Launcher, copy answers or open them in Calculator.
+- Revalidate listener ownership and process identity before closing a developer port.
+
+### 中文
+
+- 新增计算器，支持编辑历史、引用结果，以及与启动器共享的数字分组和精度设置。
+- 在启动器中计算表达式、复制结果或打开计算器。
+- 关闭开发者端口前重新验证监听和进程身份。
+
 ## 0.2.12
 
 - Add a dedicated macOS Sensors page with CPU, GPU, SSD and battery temperature trends, color-coded readings and fan speeds. Keep battery, power and sleep information on Energy.

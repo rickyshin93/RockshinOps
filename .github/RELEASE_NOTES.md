@@ -1,15 +1,12 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.12
+### New in v0.2.13
 
-- A dedicated macOS Sensors page shows available CPU, GPU, SSD and battery temperature trends, color-coded readings and fan speeds. Energy keeps battery, power and sleep information.
-- A new macOS Devices page shows Wi-Fi information and requested scans, paired Bluetooth devices with connect/disconnect and available battery readings, plus audio output selection and volume.
-- Keep new volume edits intact when an earlier adjustment is still waiting for the device response.
-- English navigation is shorter: Space, MenuBar and About. Launcher now appears before About.
+- Calculator adds editable calculation history, linked answers, and grouping and precision settings shared with Launcher.
+- Evaluate expressions in Launcher, copy the answer or open it in Calculator.
+- Developer port closing rechecks listener ownership and process identity before signalling.
 
-**中文：**新增独立传感器页，展示可用的 CPU、GPU、SSD 和电池温度趋势、分段颜色及风扇转速，能耗页保留电池、功耗和睡眠信息。新增设备连接页，支持 Wi-Fi 信息和按需扫描、已配对蓝牙设备连接及可用电量、声音输出和音量控制。英文导航缩短为 Space、MenuBar、About，启动器移到关于本机之前。
-
-Sensors and Devices are macOS-only. Temperature channels depend on the hardware and do not identify individual physical cores. Wi-Fi names/scans and Bluetooth access depend on macOS permissions. Real permission recovery, Bluetooth/audio control writes, other Mac models and installed-app upgrades remain outside this release's local interactive acceptance.
+**中文：**新增计算器，支持编辑历史、引用结果，以及与启动器共享的数字分组和精度设置。启动器支持计算表达式、复制结果或打开计算器。关闭开发者端口前重新验证监听和进程身份。
 
 ### Upgrade notice / 升级说明
 
