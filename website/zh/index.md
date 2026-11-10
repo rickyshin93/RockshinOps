@@ -54,13 +54,13 @@ macOS、Windows 和 Linux 均免费。无需账户，无需订阅。
 
 RockshinOps v0.2.12 界面，使用演示数据。功能与读数因平台和硬件而异。
 
-版本 0.2.14
+版本 0.2.15
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.14/RockshinOps.0.2.14.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.14/RockshinOps.0.2.14.amd64.dmg)
-- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.14/RockshinOps.Setup.0.2.14.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.14/rockshinops_0.2.14_amd64.deb)
-- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.14/rockshinops-0.2.14-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.15/RockshinOps.0.2.15.arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.15/RockshinOps.0.2.15.amd64.dmg)
+- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.15/RockshinOps.Setup.0.2.15.amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.15/rockshinops_0.2.15_amd64.deb)
+- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.15/rockshinops-0.2.15-linux-amd64.tar.gz)
 
 采用临时签名，尚未公证。
 
