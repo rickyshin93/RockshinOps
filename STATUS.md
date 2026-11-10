@@ -2,6 +2,8 @@
 
 ## Doing
 
+- 2026-11-10: Preparing v0.2.15 release; signed four-target CI and published artifact verification pending.
+
 - 2026-11-04: Device connectivity implemented in the top sidebar group after Connections: macOS Wi-Fi facts/explicit scans, permission recovery, paired Bluetooth connect/disconnect with available HID battery readings, default audio output and volume with route-identity checks. Device overview has a shared card and a live Wi-Fi band label beside the network name; Wi-Fi uses a taller Apple-style three-layer icon with concentric arcs and a small bottom fan, using the same unboxed heading style as Bluetooth/audio; the permission notice has a single separator, and its title includes three/two/one-bar signal icons and plain-language grades inline; Technical details opens by default and preserves manual collapse through refresh. Nearby-network and sound labels are simplified. Go/web checks, focused race checks, typecheck, frontend/macOS arm64 packaging and Windows/Linux device-package compilation passed. Bilingual browser controls/permissions/widths and independent UI review passed. Isolated native instance verified actual Wi-Fi, paired devices/audio/volume, native tray text, close/reopen and background device sampling. Real permission prompts, scans after granting Location, Bluetooth/audio control writes, installed-package lifecycle and Intel/Windows/Linux interactions remain unverified; Devices is explicitly unsupported outside macOS. Release review fixed earlier audio responses overwriting newer slider edits; four synthetic-IPC browser regressions passed. Evidence: `work/device-connectivity/verification.md` and `work/release-0.2.12/verification.md`.
 
 - 2026-11-04: Sensors has its own sidebar page with mapped CPU/GPU/SSD/battery temperatures and sampled history, detailed fan speeds; current temperature values/trend lines use configurable numeric color bands, and advanced electrical readings are removed from the UI while native collection remains. Energy retains battery/power/sleep. Color/removal follow-up passed Go/web checks, typecheck, macOS arm64 packaging, bilingual browser color-boundary/live-update checks and isolated native temperature/tray/close-reopen acceptance. Temperature and fan cards now share an aligned bottom in wide layouts. Go/web/race checks, typecheck and final macOS arm64 packaging passed. EN/ZH browser range/pause/disclosure/availability/width/alignment checks and independent design review passed. Isolated native M4 Pro instance verified real readings/history, native tray text, equal card bottoms, close/reopen and background sampling. Installed-package lifecycle/upgrade and other Mac models/Intel/Windows/Linux interaction remain unverified; sensor collection is Mac-only. Evidence: `work/sensors-expanded/verification.md`.
@@ -32,6 +34,8 @@
 - Windows/Linux interactive desktop acceptance beyond CI native collector smoke tests.
 
 ## Done
+
+- 2026-11-10: Calculator now temporarily uses an enabled Apple English keyboard layout on macOS and restores the prior source on page exit, blur, hide and Quit. Expressions, answers and references share small 万/亿/兆 typography. Go/frontend checks, macOS arm64 packaging, native input/caret/tray/lifecycle acceptance and Windows/Linux compilation passed. Installed replacement and other-platform interaction remain unverified. See `work/calculator-input-source-20261110/verification.md`.
 
 - 2026-11-10: Published v0.2.14 with Calculator, Launcher calculations and developer-port identity checks. Four-target release CI, downloaded checksums and four update signatures passed. v0.2.13 CI exposed Windows timestamp collisions, fixed in v0.2.14. Website deployed; installed upgrade and Windows/Linux interactive acceptance remain open.
 
@@ -95,6 +99,8 @@
 - 2026-10-26: Expanded LocalOps 0.2 into a Pulse-style two-pane monitor with real hardware metrics/history, processes, connections, running Apps, read-only space analysis and machine information. Native navigation, search/sort, minimum-size scrolling, hidden-window sampling, reopen and quit verified; app rebuilt and left running. Automated checks and finish review passed. Verification boundaries remain below.
 
 ## Known issues
+
+- Calculator still blocks continuation input while history is saving, despite showing the answer early. A controlled delayed-write fixture reproduced dropped input; see `work/calculator-lag-20261110/diagnosis.md`.
 
 - Native smoke CI intermittently fails at CPU 100.00000000000001% due to its ≤100 assertion; [2026-11-04 rerun passed](https://github.com/rickyshin93/RockshinOps/actions/runs/41762407680). The v0.2.11 Intel release job also once reported `system_profiler: signal: killed`; its rerun passed. Both causes remain unresolved.
 

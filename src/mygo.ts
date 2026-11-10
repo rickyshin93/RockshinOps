@@ -767,6 +767,9 @@ export const System = {
   scanWiFi(): Promise<WiFiNetwork[]> {
     return call("System.ScanWiFi");
   },
+  setCalculatorInputActive(active: boolean): Promise<void> {
+    return call("System.SetCalculatorInputActive", active);
+  },
   setLauncher(enabled: boolean, files: boolean, shortcut: string): Promise<LauncherSettings> {
     return call("System.SetLauncher", enabled, files, shortcut);
   },

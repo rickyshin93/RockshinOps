@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.15
+
+- On macOS, temporarily use an enabled Apple English keyboard layout in Calculator and restore the previous input source on exit, while respecting manual changes.
+- Display Chinese grouping units consistently in expressions, answers and references.
+
+### 中文
+
+- macOS 计算器临时使用已启用的 Apple 英文键盘布局，离开时恢复原输入法，并尊重手动切换。
+- 统一算式、答案和引用中中文数字分组单位的显示。
+
 ## 0.2.14
 
 - Add Calculator with editable calculation history, linked answers, grouping and precision settings shared with Launcher.

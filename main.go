@@ -18,6 +18,7 @@ import (
 	"github.com/egoist/mygo/plugins/updater"
 	"rockshinops/internal/appicon"
 	"rockshinops/internal/devices"
+	"rockshinops/internal/inputsource"
 	"rockshinops/internal/localization"
 	"rockshinops/internal/menubar"
 	"rockshinops/internal/metrics"
@@ -82,6 +83,7 @@ type System struct {
 	scanCancel      context.CancelFunc
 	launcher        *launcher
 	calculatorMu    sync.Mutex
+	calculatorInput calculatorInput
 	openCalculator  func()
 }
 
@@ -202,6 +204,16 @@ func main() {
 			Vibrancy:             mygo.VibrancySidebar,
 		})
 		windowchrome.InstallTopDrag(win.NativeHandle())
+		service.calculatorInput.selectKeyboard = inputsource.UseSystemKeyboard
+		setCalculatorFocus := func(focused bool) {
+			service.calculatorInput.focused = focused
+			if err := service.calculatorInput.sync(); err != nil {
+				log.Printf("calculator input source: %v", err)
+			}
+		}
+		win.OnFocus(func() { setCalculatorFocus(true) })
+		win.OnBlur(func() { setCalculatorFocus(false) })
+		win.OnHide(func() { setCalculatorFocus(false) })
 		if !mygo.App.WasOpenedAtLogin() {
 			win.Show()
 		} else if preferences.HideDockOnClose {
@@ -323,6 +335,8 @@ func main() {
 		quitting := false
 		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 			quitting = true
+			service.calculatorInput.page = false
+			setCalculatorFocus(false)
 			service.devices.Stop()
 			cancel()
 			_, _ = menubar.Native("stop", nil)

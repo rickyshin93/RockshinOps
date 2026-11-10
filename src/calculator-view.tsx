@@ -4,6 +4,7 @@ import { Channel, isMyGo } from "mygo-runtime";
 import { System, events, type CalculationEntry, type CalculationValue, type CalculatorFormat, type CalculatorSheet } from "./mygo";
 import { icon } from "./icons";
 import { calculatorOperatorGlyph, formatCalculation, formatCalculatorToken, isCalculatorMathGlyph } from "./calculation-format";
+import { CalculationText } from "./calculation-text";
 import { CalculatorExpressionEditor, calculatorTokenPosition, type CalculatorCaretPosition, type CalculatorEditor, type LinkedOperand } from "./calculator-expression-editor";
 import { useCalculatorConnections, type CalculatorTrace } from "./calculator-connection";
 import { CalculatorSettings } from "./calculator-settings";
@@ -42,7 +43,7 @@ const Expression = memo(function Expression({ value, display, operand, editable 
   return calculatorExpressionItems(value).map(({ value: token, offset, kind }) => {
     const linkedValue = kind === "reference" ? operand?.(token) : undefined;
     const text = linkedValue?.text ?? display(token);
-    const content = isCalculatorMathGlyph(text) ? <span className="calculator-math-glyph" data-calculator-glyph={text}>{text}</span> : text;
+    const content = isCalculatorMathGlyph(text) ? <span className="calculator-math-glyph" data-calculator-glyph={text}>{text}</span> : <CalculationText text={text} />;
     return editable ? <button key={offset} type="button" className={linkedValue ? "calculator-reference" : undefined}
       data-calculation-item={kind} data-calculation-token={offset} data-calculation-link={linkedValue ? token : undefined}
       title={linkedValue?.title} aria-label={linkedValue ? `${linkedValue.text} · ${linkedValue.title}` : undefined}>{content}</button> : <span key={offset} className={linkedValue ? "calculator-reference" : undefined}
@@ -61,8 +62,7 @@ const ResultItems = memo(function ResultItems({ value, approximate, grouping, so
   const result = { value, approximate };
   const [equality, answer] = calculatorResultItems(result);
   const text = formatCalculation({ value: answer.value, approximate: false }, i18n.language, grouping);
-  const content = text.split(/([万亿兆])/).map((part, index) => index % 2 === 0 ? part :
-    <span className="calculator-result-group" key={index}>{part}</span>);
+  const content = <CalculationText text={text} />;
   if (source === undefined) return <><span data-calculation-item={equality.kind}>{equality.value}</span>
     <strong className="calculator-use-result" data-calculation-selected={selected === "answer" ? "" : undefined}>{content}</strong></>;
   const title = t("选中此结果，按运算符引用");

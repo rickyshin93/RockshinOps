@@ -368,6 +368,16 @@ async function refresh() {
   } catch (reason) { error(`${t("连接采集服务失败：")}${String(reason)}${t("。可再次点击刷新重试。")}`); }
   finally { state.busy = false; render(); preloadInspection(); }
 }
+let calculatorInputUpdate = Promise.resolve();
+function updateCalculatorInputSource(active: boolean) {
+  // Navigation may overtake a native call; keep source selection and restoration ordered.
+  calculatorInputUpdate = calculatorInputUpdate.then(() => System.setCalculatorInputActive(active)).catch(reason => {
+    console.error(reason);
+    error(`${t("无法切换计算器输入法：")}${String(reason)}`);
+  });
+  return calculatorInputUpdate;
+}
+
 async function navigate(page: Page, query = "") {
   const current = navigationTarget || state;
   if (page === current.page && query === current.query) return;
@@ -377,6 +387,10 @@ async function navigate(page: Page, query = "") {
   // Paint the selected item before constructing a potentially large table.
   await new Promise<void>(resolve => requestAnimationFrame(() => { setTimeout(resolve, 0); }));
   if (epoch !== navigationEpoch) return;
+  if (isMyGo()) {
+    await updateCalculatorInputSource(page === "calculator");
+    if (epoch !== navigationEpoch) return;
+  }
   navigationTarget = null;
   state.page = page; state.query = query; state.selectedProcess = null;
   if (!metricPages.includes(page)) state.paused = false;
@@ -706,6 +720,8 @@ el("navigation").setAttribute("aria-label", t("监控页面"));
 el("machine-detail").textContent = t("正在连接本机…");
 render(true);
 if (isMyGo()) {
+  // A WebView reload starts on Overview even if the native window was in Calculator.
+  void updateCalculatorInputSource(false);
   const offLocale = onLocaleChange(language => {
     void i18n.changeLanguage(language);
     document.documentElement.lang = language;

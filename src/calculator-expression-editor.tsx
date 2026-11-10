@@ -1,6 +1,7 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
 import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput } from "./calculator-input";
 import { calculatorOperatorGlyph, isCalculatorMathGlyph } from "./calculation-format";
+import { paintCalculationText } from "./calculation-text";
 import { calculatorExpressionItems, calculatorItemAt, calculatorItemDeletion } from "./calculator-items";
 
 export type LinkedOperand = { text: string; title: string; value?: string };
@@ -172,16 +173,7 @@ function paint(field: HTMLElement, value: string, operand: (token: string) => Li
         contents.dataset.calculatorGlyph = formatted;
         part.append(contents);
       }
-      for (const piece of formatted.split(/([,万亿兆])/)) {
-        if (/^[,万亿兆]$/.test(piece)) {
-          // A visual grouping mark occupies space without entering the expression or its caret offsets.
-          const mark = document.createElement("span");
-          mark.dataset.calculationGrouping = piece;
-          mark.contentEditable = "false";
-          mark.setAttribute("aria-hidden", "true");
-          contents.append(mark);
-        } else if (piece) contents.append(piece);
-      }
+      paintCalculationText(contents, formatted, true);
     }
     nodes.push(part);
     start = index + token.length;
@@ -194,7 +186,7 @@ function paint(field: HTMLElement, value: string, operand: (token: string) => Li
 function updateLinks(field: HTMLElement, operand: (token: string) => LinkedOperand) {
   for (const chip of field.querySelectorAll<HTMLElement>("[data-calculation-link]")) {
     const { text, title } = operand(chip.dataset.calculationLink!);
-    if (chip.textContent !== text) chip.textContent = text;
+    if (chip.textContent !== text) paintCalculationText(chip, text);
     if (chip.title !== title) chip.title = title;
     const label = `${text} · ${title}`;
     if (chip.getAttribute("aria-label") !== label) chip.setAttribute("aria-label", label);
@@ -293,7 +285,7 @@ export function CalculatorExpressionEditor({
         if (!groupingMarks.includes(text.charAt(index))) digits++;
         index++;
       }
-      placeCaret(token.firstChild, index);
+      placeCaret(...textPosition(token, index));
     } else {
       placeCaret(...textPosition(token, Math.min(position.offset, raw(token).length), position.preferNext));
     }

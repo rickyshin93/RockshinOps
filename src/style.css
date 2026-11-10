@@ -404,7 +404,7 @@ button.space-row-main:hover { @apply bg-fill; }
 .calculator-line-result { display: inline-flex; align-items: baseline; gap: var(--calculator-sign-gap); min-width: 0; max-width: 100%; padding: 4px calc(var(--calculator-sign-gap) - var(--calculator-token-padding)); margin-inline-end: 8px; }
 .calculator-line-result > [data-calculation-item="equality"] { color: var(--color-muted); border-radius: 4px; padding-inline: var(--calculator-token-padding); margin-inline: calc(-1 * var(--calculator-token-padding)); }
 .calculator-line-result strong { color: var(--calculator-ink); font-weight: 600; overflow-wrap: anywhere; }
-.calculator-result-group { font-size: .6em; line-height: 1; vertical-align: -.08em; }
+.calculation-group-unit { font-size: .6em; line-height: 1; vertical-align: -.08em; }
 .calculator-record, .calculator-expression-input { min-width: 0; max-width: 100%; border-radius: var(--radius-sm); padding: 4px 5px; text-align: left; overflow-wrap: anywhere; }
 .calculator-record, .calculator-expression-input { padding-inline-end: 0; }
 .calculator-line [data-calculation-token] { display: inline-block; max-width: 100%; padding-inline: var(--calculator-token-padding); border-radius: 4px; text-align: left; overflow-wrap: anywhere; }
