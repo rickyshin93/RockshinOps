@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.16
+
+- Soften the Launcher window shadow.
+
+### 中文
+
+- 柔化启动器窗口的阴影。
+
 ## 0.2.15
 
 - On macOS, temporarily use an enabled Apple English keyboard layout in Calculator and restore the previous input source on exit, while respecting manual changes.

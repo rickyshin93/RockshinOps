@@ -1,11 +1,10 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.15
+### New in v0.2.16
 
-- On macOS, Calculator temporarily selects an enabled Apple English keyboard layout and restores the previous input source when you leave. Manual input-source changes take precedence.
-- Chinese grouping units have consistent typography in expressions, answers and references.
+- Soften the Launcher window shadow.
 
-**中文：**macOS 计算器临时使用已启用的 Apple 英文键盘布局，离开时恢复原输入法，并尊重手动切换。算式、答案和引用中的中文数字分组单位显示一致。
+**中文：**柔化启动器窗口的阴影。
 
 **Known issue / 已知问题：** Calculator can drop continuation input while saving history. / 计算器保存历史期间可能丢失连续输入。
 
