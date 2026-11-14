@@ -33,6 +33,8 @@
 
 ## Done
 
+- 2026-11-14: Launcher uses one shorter, softer shadow. Go/frontend tests, typecheck and macOS arm64 packaging passed. An isolated macOS instance verified the shadow with nine results, tray text and close/reopen. Installed-package and Windows/Linux interaction remain unverified. See `work/launcher-border-20261114/native.log`.
+
 - 2026-11-10: Published [v0.2.15](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.15) with macOS Calculator input-source handling and consistent grouping typography. Four-target release CI passed; all 12 published checksums and four update signatures verified. Installed upgrade and Windows/Linux interactive acceptance remain open.
 
 - 2026-11-10: Calculator now temporarily uses an enabled Apple English keyboard layout on macOS and restores the prior source on page exit, blur, hide and Quit. Expressions, answers and references share small 万/亿/兆 typography. Go/frontend checks, macOS arm64 packaging, native input/caret/tray/lifecycle acceptance and Windows/Linux compilation passed. Installed replacement and other-platform interaction remain unverified. See `work/calculator-input-source-20261110/verification.md`.
