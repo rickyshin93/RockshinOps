@@ -1,10 +1,10 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.16
+### New in v0.2.17
 
-- Soften the Launcher window shadow.
+- Align the Calculator title, description and settings button on one line.
 
-**中文：**柔化启动器窗口的阴影。
+**中文：**将计算器标题、说明和设置按钮对齐在同一行。
 
 **Known issue / 已知问题：** Calculator can drop continuation input while saving history. / 计算器保存历史期间可能丢失连续输入。
 

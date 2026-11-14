@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.17
+
+- Align the Calculator title, description and settings button on one line.
+
+### 中文
+
+- 将计算器标题、说明和设置按钮对齐在同一行。
+
 ## 0.2.16
 
 - Soften the Launcher window shadow.

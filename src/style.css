@@ -349,6 +349,10 @@ button.space-row-main:hover { @apply bg-fill; }
 
 #content-scroll[data-page="calculator"] { display: flex; flex-direction: column; overflow: hidden; }
 #content-scroll[data-page="calculator"] > :is(.page-heading, .notice) { flex-shrink: 0; }
+#content-scroll[data-page="calculator"] .page-heading { flex-wrap: nowrap; }
+#content-scroll[data-page="calculator"] .page-title { display: flex; align-items: baseline; gap: 12px; overflow: hidden; }
+#content-scroll[data-page="calculator"] .page-title h1 { flex-shrink: 0; }
+#content-scroll[data-page="calculator"] .page-title p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #content-scroll[data-page="calculator"] #page-body { display: flex; flex: 1; min-height: 0; container-type: inline-size; }
 .calculator-page {
   --calculator-ink: #8e440a;
