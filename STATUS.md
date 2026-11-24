@@ -2,11 +2,7 @@
 
 ## Doing
 
-- 2026-11-24: Prepare v0.3.0 from the integrated Launcher, Clipboard, Keep Awake, Calculator and MyGo changes. Signed public release and installed upgrade verification are pending.
-
-- 2026-11-23: macOS adds menu-bar Keep Awake (30/60/120 minutes) and automatic clipboard history. Text and PNG/JPEG/TIFF originals persist in `~/Library/Application Support/RockshinOps/clipboard/`, capped at 100 items and 256 MiB. Sidebar, tray and Launcher ⌘4 share thumbnails, copy and Clear History. The sidebar uses an orange Clipboard icon and labelled icons for copy and clear. Opening an image preview focuses its content, with the close button showing its focus ring on Tab. Launcher aligns action keycaps and hides before asynchronous app launch, restoring the panel on failure. Six native fixture runs per version measured median Return-to-hide at 72.4 → 4.3 ms and target readiness at 89.1 → 90.2 ms. Apple Silicon native checks verified tray readings, close/reopen, wake assertion lifecycle, default recording, thumbnail/preview, byte-identical PNG restoration and clear across restarts in both embedded and Dev WebViews with isolated pasteboards. Frontend checks, macOS arm64 packaging and Windows/Linux amd64 compilation passed. Two machine-profile tests time out on the working tree and HEAD. System clipboard permission prompts, installed upgrade and other desktops remain unverified. Evidence: `work/mac-utilities-20261123/`, `work/launcher-sidebar-20261123/`, `work/clipboard-storage-20261123/` `work/clipboard-icons-20261123/` and `work/clipboard-preview-focus-20261123/`.
-
-- 2026-11-14: Upgraded MyGo Go module, CLI and runtime to 0.9.0; adapted Windows installer collection to the new filename. Go/web tests, generated bindings, typecheck, frontend build and macOS arm64 packaging passed. Native tray and close/reopen, signed updates, and Windows/Linux desktop acceptance remain unverified; an existing Dev instance was left undisturbed.
+- v0.3.0 follow-up remains open for system clipboard permission prompts, installed upgrades, and interactive Windows/Linux desktop checks.
 
 - 2026-11-14: Calculator header title and subtitle share one line with the settings button aligned; header-only change published in [v0.2.17](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.17), with four-target signed release CI passed. Keypad aligns right below the paper, centering only at content widths ≤400px; wide layouts retain the right-side keypad, still unreleased. Go tests, frontend typecheck/build and macOS arm64 package passed. Header rendering, native desktop layout, tray text and close/reopen acceptance remain unverified; Windows/Linux interaction remains unverified. 2026-11-23: Long calculator rows keep their number in the left column and align continuations with short rows. The equals sign and answer move together. Native Dev verified the reported expression, three window widths, edit/cancel, reference paths, tray reading and close/reopen. Evidence: `work/calculator-wrap-20261123/`.
 
@@ -45,6 +41,8 @@
 - Windows/Linux interactive desktop acceptance beyond CI native collector smoke tests.
 
 ## Done
+
+- 2026-11-24: Published [v0.3.0](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.0) with macOS Clipboard history, pins and snippets, timed Keep Awake, sidebar preferences, Launcher and Calculator improvements, and MyGo 0.9.0. Apple Silicon verified clipboard persistence, tray and close/reopen and native sleep assertions. Four-target signed CI passed. All 12 public SHA-256 checksums and four update signatures were verified.
 
 - 2026-11-24: Published [v0.2.18](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.18) as a Launcher-only patch with spring hover, row reuse and shared filename scoring. Four-target signed release, 12 public checksums and four update signatures verified. The published patch was prepared from v0.2.17 separately from the working tree. Evidence: `work/release-0.2.18/`.
 

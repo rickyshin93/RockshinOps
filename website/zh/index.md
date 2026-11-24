@@ -56,11 +56,11 @@ RockshinOps v0.2.12 界面，使用演示数据。功能与读数因平台和硬
 
 版本 0.2.16
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.18/RockshinOps.0.2.18.arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.18/RockshinOps.0.2.18.amd64.dmg)
-- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.18/RockshinOps.Setup.0.2.18.amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.18/rockshinops_0.2.18_amd64.deb)
-- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.2.18/rockshinops-0.2.18-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.0/rockshinops-0.3.0-arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.0/rockshinops-0.3.0-amd64.dmg)
+- [安装程序 .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.0/rockshinops-setup-0.3.0-amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.0/rockshinops_0.3.0_amd64.deb)
+- [压缩包 .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.0/rockshinops-0.3.0-linux-amd64.tar.gz)
 
 采用临时签名，尚未公证。
 
