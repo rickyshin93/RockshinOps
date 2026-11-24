@@ -42,9 +42,7 @@
 
 ## Done
 
-- 2026-11-24: Clipboard history and snippets render each record as a full-width card. Apple Silicon WebKit verified both lists, 900 and 1250 px windows, thumbnail bounds, preview, keyboard focus, tray text and close/reopen. Go/web checks and arm64 packaging passed. Intel and installed upgrades remain unverified. Evidence: `work/clipboard-item-cards-20261124/`.
-
-- 2026-11-24: Fixed tall clipboard thumbnails overflowing their list rows in macOS WebKit. The thumbnail now fits a 36 px square and opens the full preview. Apple Silicon native checks covered tall, wide and square images, two window widths, preview, tray text and close/reopen. Go/web checks and arm64 packaging passed. Intel and installed upgrades remain unverified. Evidence: `work/clipboard-thumbnail-boundary-20261124/`.
+- 2026-11-24: Published [v0.3.2](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.2) with independent full-width cards for clipboard history and snippets, and bounded thumbnails for tall and wide images. Apple Silicon verified both tabs, preview, tray text and close/reopen. Four-target signed CI passed and all 12 public asset digests matched the published checksums. Intel desktop interaction and installed upgrades remain unverified. Evidence: `work/clipboard-item-cards-20261124/`, `work/clipboard-thumbnail-boundary-20261124/`, and `work/release-0.3.2/`.
 
 - 2026-11-24: Published [v0.3.1](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.1). macOS Keep Awake offers 30 min and an Hours submenu with 1–9 hours, then 10–12 and 24 hours, a live countdown in `1h 30min 30s` format, local end time, indefinite mode, a 15-minute extension, and per-session display wake. Upgraded the MyGo Go module, CLI and runtime to 0.10.0 and regenerated bindings. Go and web checks and Apple Silicon packaging passed. Native verification covered bilingual submenu grouping, the 12- and 24-hour starts, WebView IPC, close/reopen, expiry and quit. Four-target signed release CI passed; native interaction on Intel macOS, Windows and Linux and installed upgrades remain unverified. Evidence: `work/keep-awake-hours-20261124/` and `work/release-0.3.1/`.
 
