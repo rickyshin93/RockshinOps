@@ -14,7 +14,7 @@ let calculatorOwner: Root | null = null;
 let menuProps: { isMacOS: boolean; refreshSeconds: number } | null = null;
 export type CalculatorDraft = { expression: string; rowIDs?: readonly string[]; incoming?: CalculatorImport; finishImport: (request: CalculatorImport) => void };
 
-export function renderReactPage(container: HTMLElement, state: ViewState, onLanguage: (language: Language) => void, openDiskAccess: () => void, onLauncherShortcut: (shortcut: string) => void, calculatorDraft: CalculatorDraft): void {
+export function renderReactPage(container: HTMLElement, state: ViewState, onLanguage: (language: Language) => void, openDiskAccess: () => void, onLauncherShortcut: (shortcut: string) => void, calculatorDraft: CalculatorDraft, hasClipboardHistory: boolean): void {
   if (!root) { container.replaceChildren(); root = createRoot(container); }
   const isMacOS = state.info?.machine.platform === "darwin";
   if (state.page === "menubar") {
@@ -47,7 +47,7 @@ export function renderReactPage(container: HTMLElement, state: ViewState, onLang
     })));
   } else {
     menuProps = null;
-    root.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, version: state.info?.version ?? "", isMacOS, onLanguage })));
+    root.render(createElement(I18nextProvider, { i18n }, createElement(SettingsView, { state, version: state.info?.version ?? "", isMacOS, onLanguage, hasClipboardHistory })));
   }
 }
 

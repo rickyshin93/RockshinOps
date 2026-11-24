@@ -14,17 +14,25 @@ describe("language selection", () => {
   ] as const)("resolves preferred languages %j", (languages, expected) => {
     expect(resolveLanguage(languages)).toBe(expected);
   });
-  test("changing only language makes settings saveable", () => {
-    const state: SettingsState = { startup: { enabled: true, available: true, error: "" }, startupBusy: false, startupError: "", preferences: { language: "system", menuBarItems: ["disk"], hideDockOnClose: false, updateUseSystemProxy: false }, languageDraft: "system", menuBarDraft: ["disk"], hideDockDraft: false, trayPreview: null, updateProxyDraft: false, preferencesBusy: false, preferencesError: "" };
+  test("changing an individual preference makes settings saveable", () => {
+    const sidebarTools = { calculator: true, clipboard: true };
+    const preferences = { language: "system", menuBarItems: ["disk"], hideDockOnClose: false, updateUseSystemProxy: false, sidebarTools };
+    const state: SettingsState = { startup: { enabled: true, available: true, error: "" }, startupBusy: false, startupError: "", launcher: null, launcherBusy: false, launcherError: "", preferences, languageDraft: "system", menuBarDraft: ["disk"], hideDockDraft: false, trayPreview: null, updateProxyDraft: false, sidebarToolsDraft: { ...sidebarTools }, preferencesBusy: false, preferencesError: "" };
     expect(preferencesDirty(state)).toBe(false);
     state.languageDraft = "en";
     expect(preferencesDirty(state)).toBe(true);
-    state.preferences = { language: "en", menuBarItems: ["disk"], hideDockOnClose: false, updateUseSystemProxy: false };
+    state.preferences = { ...preferences, language: "en" };
     expect(preferencesDirty(state)).toBe(false);
     state.hideDockDraft = true;
     expect(preferencesDirty(state)).toBe(true);
     state.hideDockDraft = false;
     state.updateProxyDraft = true;
+    expect(preferencesDirty(state)).toBe(true);
+    state.updateProxyDraft = false;
+    state.sidebarToolsDraft.calculator = false;
+    expect(preferencesDirty(state)).toBe(true);
+    state.sidebarToolsDraft.calculator = true;
+    state.sidebarToolsDraft.clipboard = false;
     expect(preferencesDirty(state)).toBe(true);
   });
   test("switches existing translations without reinitializing the app", async () => {

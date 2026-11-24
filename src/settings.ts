@@ -23,10 +23,19 @@ export interface SettingsState {
   languageDraft: Language;
   updateProxyDraft: boolean;
   hideDockDraft: boolean;
+  sidebarToolsDraft: Preferences["sidebarTools"];
   preferencesBusy: boolean;
   preferencesError: string;
 }
 
 export function preferencesDirty(state: SettingsState): boolean {
-  return !!state.preferences && (state.hideDockDraft !== state.preferences.hideDockOnClose || state.updateProxyDraft !== state.preferences.updateUseSystemProxy || state.languageDraft !== state.preferences.language || JSON.stringify(state.menuBarDraft) !== JSON.stringify(state.preferences.menuBarItems));
+  const saved = state.preferences;
+  return !!saved && (
+    state.hideDockDraft !== saved.hideDockOnClose ||
+    state.updateProxyDraft !== saved.updateUseSystemProxy ||
+    state.languageDraft !== saved.language ||
+    JSON.stringify(state.menuBarDraft) !== JSON.stringify(saved.menuBarItems) ||
+    state.sidebarToolsDraft.calculator !== saved.sidebarTools.calculator ||
+    state.sidebarToolsDraft.clipboard !== saved.sidebarTools.clipboard
+  );
 }

@@ -2,7 +2,7 @@ import { t, i18n, resolveLanguage, type Language } from "./i18n";
 import { toggleAllAppFiles, reconcileAppFiles } from "./app-selection";
 import { isMyGo, locale, onLocaleChange } from "mygo-runtime";
 import { System, events, type Preferences, type Snapshot } from "./mygo";
-import { formatCapacity, formatRate, percent, timeLabel } from "./format";
+import { formatBytes, formatCapacity, formatMemory, formatRate, percent, timeLabel } from "./format";
 import { icon } from "./icons";
 import { mergeHistory } from "./history";
 import { updateLiveContent } from "./live-content";
@@ -14,9 +14,11 @@ import { nextConnectionSort, type ConnectionSortKey } from "./connections";
 import { listeningPorts, portActionKey } from "./ports";
 import { menuBarChoices, preferencesDirty } from "./settings";
 import type { CalculatorDraft } from "./react-pages";
+import { showClipboardPreview, showClipboardSnippetDialog } from "./clipboard-view";
 import { actionControls, connectionSubtitle, processSubtitle, filterControls, metricPages, navigation, pages, renderBody, type Page, type ViewState } from "./views";
 
 const el = (id: string) => document.getElementById(id)!;
+const hasClipboardHistory = isMyGo() && navigator.userAgent.includes("Mac");
 const state: ViewState = {
   page: "overview", info: null, snapshot: null, history: [], range: 60, paused: false,
   processes: null, connections: null, connectionSort: null, connectionMode: "all", portScope: "all", favoritePorts: [], portsLoaded: false, selectedProcess: null, processOrder: { key: "cpu", descending: true }, query: "", sort: "cpu", onlyMine: false,
@@ -26,6 +28,7 @@ const state: ViewState = {
   startup: null, startupBusy: false, startupError: "",
   launcher: null, launcherBusy: false, launcherError: "",
   preferences: null, hideDockDraft: false, updateProxyDraft: false, menuBarDraft: [], trayPreview: null, languageDraft: "system", preferencesBusy: false, preferencesError: "",
+  sidebarToolsDraft: { calculator: false, clipboard: false },
 };
 const calculatorDraft: CalculatorDraft = {
   expression: "",
@@ -68,7 +71,8 @@ let renderFrame = 0;
 let renderFilters = false;
 const pageContent = new PageContent(el("page-body"));
 let errorKind: "data" | "action" = "data";
-el("navigation").innerHTML = navigation();
+el("navigation").innerHTML = navigation(hasClipboardHistory);
+renderSidebarTools();
 renderNavigation(state.page);
 el("device-mark").innerHTML = icon("about");
 
@@ -100,11 +104,18 @@ function renderNow(filters = false) {
   const activityPosition = activityScroll ? [activityScroll.scrollLeft, activityScroll.scrollTop] : null;
   const focused = document.activeElement as HTMLElement | null;
   const focusArea = focused?.closest("#page-actions, #page-filters, #page-body");
-  const focusKey = focusArea ? focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.selectProcess || focused?.dataset.metric || focused?.dataset.connectionSort || focused?.dataset.processSort || focused?.dataset.processScope || focused?.dataset.connectionMode || focused?.dataset.favoritePort || focused?.dataset.copyPort || focused?.dataset.portProcess || focused?.dataset.closePort || focused?.dataset.portScope || focused?.dataset.portQuery : undefined;
+  const focusKey = focusArea ? focused?.dataset.focusKey || focused?.dataset.action || focused?.dataset.range || focused?.dataset.page || focused?.dataset.app || focused?.dataset.appFile || focused?.dataset.appSelectAll || focused?.dataset.process || focused?.dataset.selectProcess || focused?.dataset.metric || focused?.dataset.connectionSort || focused?.dataset.processSort || focused?.dataset.processScope || focused?.dataset.connectionMode || focused?.dataset.favoritePort || focused?.dataset.copyPort || focused?.dataset.portProcess || focused?.dataset.closePort || focused?.dataset.portScope || focused?.dataset.portQuery || focused?.dataset.clipboardId : undefined;
   const title = t(page.title);
   let subtitle = state.snapshot ? `${!el("connection-error").hidden && errorKind === "data" ? t("更新中断 · 上次数据") : state.paused ? t("视图已暂停") : t("本机实时数据")} · ${timeLabel(state.snapshot.updatedAt)}` : t("等待本机数据");
   if (state.page === "settings" || state.page === "launcher") subtitle = t("更改会自动保存");
   if (state.page === "calculator") subtitle = t("与启动器共享 · 保存在本机");
+  if (state.page === "clipboard") {
+    const history = state.clipboardHistory;
+    const bytes = history?.clipboardBytes ?? 0;
+    subtitle = state.clipboardMode !== "snippets" && history?.clipboardLimit
+      ? t("已用 {{used}} / {{limit}} · 保存在本机", { used: bytes < 1024 ** 2 ? formatBytes(bytes) : formatMemory(bytes), limit: formatMemory(history.clipboardLimit) })
+      : t("保存在本机");
+  }
   if (state.page === "menubar") subtitle = t("管理系统菜单栏图标、分区与外观");
   if (state.page === "about" && state.info) subtitle = state.info.machine.name || state.info.machine.model;
   if (state.page === "connections") subtitle = connectionSubtitle(state);
@@ -131,7 +142,7 @@ function renderNow(filters = false) {
     renderedPage = null;
     renderedAppReview = "";
     if (reactPages) {
-      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings(), shortcut => { if (state.launcher) void setLauncher(state.launcher.enabled, state.launcher.files, shortcut); }, calculatorDraft);
+      reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings(), shortcut => { if (state.launcher) void setLauncher(state.launcher.enabled, state.launcher.files, shortcut); }, calculatorDraft, hasClipboardHistory);
     } else {
       el("page-body").textContent = reactPageError ? `${t("页面加载失败，请重试。")} ${reactPageError}` : t("正在加载页面…");
       void loadReactPages();
@@ -152,7 +163,7 @@ function renderNow(filters = false) {
         });
       } else el("page-body").innerHTML = body;
     } else if (!unchangedReview && body !== renderedBody) {
-      const live = metricPages.includes(state.page) || ["processes", "connections", "devices"].includes(state.page) || (state.page === "apps" && !state.appMode);
+      const live = metricPages.includes(state.page) || ["processes", "connections", "devices", "clipboard"].includes(state.page) || (state.page === "apps" && !state.appMode);
       if (live && renderedPage === state.page) updateLiveContent(el("page-body"), body);
       else el("page-body").innerHTML = body;
     }
@@ -175,7 +186,7 @@ function renderNow(filters = false) {
   const bodyBusy = String(state.busy);
   if (el("page-body").getAttribute("aria-busy") !== bodyBusy) el("page-body").setAttribute("aria-busy", bodyBusy);
   if (focusKey && document.activeElement !== focused) for (const button of focusArea!.querySelectorAll<HTMLElement>("button, input")) {
-    if ([button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.selectProcess, button.dataset.metric, button.dataset.connectionSort, button.dataset.processSort, button.dataset.processScope, button.dataset.connectionMode, button.dataset.favoritePort, button.dataset.copyPort, button.dataset.portProcess, button.dataset.closePort, button.dataset.portScope, button.dataset.portQuery].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
+    if ([button.dataset.focusKey, button.dataset.action, button.dataset.range, button.dataset.page, button.dataset.app, button.dataset.appFile, button.dataset.appSelectAll, button.dataset.process, button.dataset.selectProcess, button.dataset.metric, button.dataset.connectionSort, button.dataset.processSort, button.dataset.processScope, button.dataset.connectionMode, button.dataset.favoritePort, button.dataset.copyPort, button.dataset.portProcess, button.dataset.closePort, button.dataset.portScope, button.dataset.portQuery, button.dataset.clipboardId].includes(focusKey)) { button.focus({ preventScroll: true }); break; }
   }
   const s = state.snapshot;
   if (s) {
@@ -198,6 +209,14 @@ function renderNavigation(selected: Page) {
   for (const button of el("navigation").querySelectorAll<HTMLButtonElement>("button")) {
     if (button.dataset.page === selected) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
+  }
+}
+function renderSidebarTools() {
+  const nav = el("navigation");
+  const showUntilLoaded = !isMyGo() || !!state.preferencesError;
+  for (const tool of ["calculator", "clipboard"] as const) {
+    const button = nav.querySelector<HTMLButtonElement>(`[data-page="${tool}"]`);
+    if (button) button.hidden = !(state.preferences ? state.sidebarToolsDraft[tool] : showUntilLoaded);
   }
 }
 function recordProcessSample() {
@@ -392,6 +411,7 @@ async function navigate(page: Page, query = "") {
     if (epoch !== navigationEpoch) return;
   }
   navigationTarget = null;
+  if (state.page === "clipboard") clearClipboardView();
   state.page = page; state.query = query; state.selectedProcess = null;
   if (!metricPages.includes(page)) state.paused = false;
   if (page === "apps" && !["cpu", "memory", "name"].includes(state.sort)) state.sort = "cpu";
@@ -401,6 +421,7 @@ async function navigate(page: Page, query = "") {
     await loadStartupSettings();
   }
   if (page === "launcher") await loadLauncherSettings();
+  if (page === "clipboard") await loadClipboard();
   if (!isMyGo() || !state.info) return;
   if (page === "devices") await loadDevices();
   if (page === "connections") {
@@ -518,13 +539,14 @@ async function closePortProcess(key: string) {
     state.portMessage = { text: `${t("关闭端口失败：")}${String(reason)}`, error: true };
   } finally { state.portAction = undefined; render(); }
 }
-async function loadSettings() {
+const loadSettings = singleFlight(async () => {
   try {
     state.preferences = await System.preferences();
     resetSettingsDrafts(state.preferences); state.preferencesError = "";
   } catch (reason) { state.preferencesError = `${t("无法读取设置：")}${String(reason)}`; }
+  renderSidebarTools();
   if (state.page === "settings") { render(); void refreshTrayPreview(); }
-}
+});
 let startupRequest = 0;
 async function loadStartupSettings() {
   if (state.startupBusy) return;
@@ -552,6 +574,76 @@ async function loadLauncherSettings() {
     state.launcherError = `${t("无法读取设置：")}${String(reason)}`;
   }
   if (state.page === "launcher") render();
+}
+let clipboardRequest = 0;
+let clipboardCopyFeedbackTimer: number | undefined;
+function setClipboardCopyFeedback(id?: string) {
+  window.clearTimeout(clipboardCopyFeedbackTimer);
+  state.clipboardCopiedId = id;
+  clipboardCopyFeedbackTimer = id ? window.setTimeout(() => {
+    setClipboardCopyFeedback();
+    render();
+  }, 1000) : undefined;
+}
+function clearClipboardView() {
+  clipboardRequest++;
+  state.clipboardHistory = null;
+  state.clipboardReadError = false;
+  state.clipboardError = undefined;
+  setClipboardCopyFeedback();
+  document.querySelector<HTMLDialogElement>(".clipboard-preview-dialog[open], .clipboard-snippet-dialog[open]")?.close();
+}
+async function loadClipboard() {
+  if (state.page !== "clipboard" || document.hidden || state.clipboardBusy) return;
+  const request = ++clipboardRequest;
+  try {
+    const history = await System.clipboardHistory(state.query);
+    if (request !== clipboardRequest) return;
+    state.clipboardHistory = history;
+    state.clipboardReadError = false;
+  } catch (reason) {
+    if (request !== clipboardRequest) return;
+    console.error(reason);
+    state.clipboardReadError = true;
+  }
+  render();
+}
+async function runClipboardAction(action: "copy" | "clear" | "pin", id = "", pinned = false) {
+  const status = state.clipboardHistory?.clipboardStatus;
+  if (state.page !== "clipboard" || !status || state.clipboardBusy) return;
+  clipboardRequest++;
+  state.clipboardBusy = true;
+  state.clipboardError = undefined;
+  if (action === "clear") setClipboardCopyFeedback();
+  render();
+  try {
+    if (action === "copy") {
+      await System.copyClipboardHistory(id);
+      if (state.page === "clipboard" && !document.hidden) setClipboardCopyFeedback(id);
+    } else if (action === "pin") {
+      await System.setClipboardPinned(id, pinned);
+    } else {
+      await System.clearClipboardHistory();
+    }
+  } catch (reason) {
+    console.error(reason);
+    if (state.page === "clipboard" && !document.hidden) {
+      setClipboardCopyFeedback();
+      state.clipboardError = { copy: "无法复制这条记录，请重新搜索。", clear: "无法清空剪贴板历史。", pin: "无法更新置顶状态。" }[action];
+    }
+  } finally {
+    state.clipboardBusy = false;
+    void loadClipboard();
+    render();
+  }
+}
+function setClipboardMode(mode: "history" | "snippets") {
+  if ((state.clipboardMode ?? "history") === mode) return;
+  state.clipboardMode = mode;
+  state.clipboardError = undefined;
+  setClipboardCopyFeedback();
+  el("content-scroll").scrollTop = 0;
+  render(true);
 }
 async function setLauncher(enabled: boolean, files: boolean, shortcut: string) {
   if (state.launcherBusy) return;
@@ -586,13 +678,33 @@ async function refreshTrayPreview() {
 function resetSettingsDrafts(saved: Preferences) {
   state.hideDockDraft = saved.hideDockOnClose;
   state.updateProxyDraft = saved.updateUseSystemProxy; state.menuBarDraft = [...saved.menuBarItems]; state.languageDraft = saved.language as Language;
+  state.sidebarToolsDraft = { ...saved.sidebarTools };
+}
+function toggleSidebarTool(tool: keyof Preferences["sidebarTools"]) {
+  state.sidebarToolsDraft[tool] = !state.sidebarToolsDraft[tool];
+  renderSidebarTools();
+  render();
+  void saveSettings();
 }
 // Settings save on every change; changes made while a save is in flight are picked up by the loop.
 async function saveSettings() {
   if (state.preferencesBusy || !preferencesDirty(state)) return;
   state.preferencesBusy = true; state.preferencesError = "";
-  try { while (preferencesDirty(state)) state.preferences = await System.savePreferences({ hideDockOnClose: state.hideDockDraft, menuBarItems: [...state.menuBarDraft], language: state.languageDraft, updateUseSystemProxy: state.updateProxyDraft }); }
-  catch (reason) { if (state.preferences) resetSettingsDrafts(state.preferences); state.preferencesError = `${t("保存失败，设置已恢复：")}${String(reason)}${t("。请重试。")}`; }
+  try {
+    while (preferencesDirty(state)) {
+      state.preferences = await System.savePreferences({
+        hideDockOnClose: state.hideDockDraft,
+        menuBarItems: [...state.menuBarDraft],
+        language: state.languageDraft,
+        updateUseSystemProxy: state.updateProxyDraft,
+        sidebarTools: { ...state.sidebarToolsDraft },
+      });
+    }
+  } catch (reason) {
+    if (state.preferences) resetSettingsDrafts(state.preferences);
+    renderSidebarTools();
+    state.preferencesError = `${t("保存失败，设置已恢复：")}${String(reason)}${t("。请重试。")}`;
+  }
   finally { state.preferencesBusy = false; render(); void refreshTrayPreview(); }
 }
 async function terminateSelectedProcess(force: boolean) {
@@ -629,6 +741,17 @@ document.addEventListener("click", event => {
   if (!button || button.disabled) return;
   if (button.dataset.deviceAction) { void deviceAction(button.dataset.deviceAction, button.dataset.deviceId || ""); return; }
   if (button.dataset.deviceSettings) { void openDeviceSettings(button.dataset.deviceSettings); return; }
+  if (button.dataset.clipboardId) { void runClipboardAction("copy", button.dataset.clipboardId); return; }
+  if (button.dataset.clipboardPin) { void runClipboardAction("pin", button.dataset.clipboardPin, button.getAttribute("aria-pressed") !== "true"); return; }
+  if (button.dataset.clipboardSnippet) {
+    const id = button.dataset.clipboardSnippet;
+    if (!state.clipboardBusy) showClipboardSnippetDialog(async name => {
+      await System.saveClipboardSnippet(id, name);
+      await loadClipboard();
+    });
+    return;
+  }
+  if (button.dataset.clipboardPreview) { showClipboardPreview(button.dataset.clipboardPreview); return; }
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
   if (button.dataset.action === "toggle-startup") { void toggleStartup(); return; }
   if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
@@ -658,6 +781,8 @@ document.addEventListener("click", event => {
   if (button.dataset.connectionSort) { state.connectionSort = nextConnectionSort(state.connectionSort, button.dataset.connectionSort as ConnectionSortKey); render(); return; }
   if (button.dataset.range) { state.range = Number(button.dataset.range); render(); return; }
   switch (button.dataset.action) {
+    case "toggle-sidebar-calculator": toggleSidebarTool("calculator"); break;
+    case "toggle-sidebar-clipboard": toggleSidebarTool("clipboard"); break;
     case "load-port-favorites": void loadPortFavorites(); break;
     case "clear-port-filters": state.query = ""; state.portScope = "all"; render(true); break;
     case "quit-process": void terminateSelectedProcess(false); break;
@@ -675,13 +800,25 @@ document.addEventListener("click", event => {
     case "stop-app-search": void stopAppSearch(); break;
     case "hide": void hide(); break;
     case "load-launcher": void loadLauncherSettings(); break;
+    case "load-clipboard": void loadClipboard(); break;
+    case "clear-clipboard": void runClipboardAction("clear"); break;
+    case "clipboard-show-history": setClipboardMode("history"); break;
+    case "clipboard-show-snippets": setClipboardMode("snippets"); break;
     case "load-settings": void loadSettings(); break;
     case "check-updates": void System.checkForUpdates().catch(reason => error(`${t("无法打开更新窗口：")}${String(reason)}`, "action")); break;
   }
 });
 el("page-filters").addEventListener("input", event => {
   const input = event.target as HTMLInputElement;
-  if (input.id === "search") { state.query = input.value; render(); }
+  if (input.id === "search") {
+    state.query = input.value;
+    if (state.page === "clipboard") {
+      state.clipboardError = undefined;
+      setClipboardCopyFeedback();
+      render();
+      void loadClipboard();
+    } else render();
+  }
 });
 el("page-filters").addEventListener("change", event => {
   const input = event.target as HTMLInputElement;
@@ -725,7 +862,8 @@ if (isMyGo()) {
   const offLocale = onLocaleChange(language => {
     void i18n.changeLanguage(language);
     document.documentElement.lang = language;
-    el("navigation").innerHTML = navigation();
+    el("navigation").innerHTML = navigation(hasClipboardHistory);
+    renderSidebarTools();
     renderNavigation(navigationTarget?.page ?? state.page);
     el("machine-name").textContent = t("本机");
     document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
@@ -736,6 +874,13 @@ if (isMyGo()) {
     error(""); render(true); void refresh();
   });
   document.addEventListener("visibilitychange", () => {
+    if (state.page === "clipboard") {
+      if (document.hidden) {
+        clearClipboardView();
+        el("page-body").replaceChildren();
+        renderedBody = "";
+      } else void loadClipboard();
+    }
     if (!document.hidden && queuedSnapshot && !state.paused) void receive(queuedSnapshot);
     if (!document.hidden && state.page === "settings") void loadStartupSettings();
     if (!document.hidden && state.page === "launcher") void loadLauncherSettings();
@@ -748,12 +893,14 @@ if (isMyGo()) {
   const off = events.metricsChanged.on(snapshot => { void receive(snapshot); });
   const offSettings = events.settingsOpened.on(() => { void navigate("settings"); });
   const offMenuBarSettings = events.menuBarSettingsOpened.on(() => { void navigate("menubar"); });
+  const offClipboard = events.clipboardHistoryChanged.on(() => { void loadClipboard(); });
   const offCalculator = events.calculatorOpened.on(expression => {
     calculatorDraft.incoming = { expression };
     if (state.page === "calculator" && !navigationTarget) render();
     else void navigate("calculator");
   });
-  window.addEventListener("pagehide", () => { stopped = true; off(); offSettings(); offMenuBarSettings(); offCalculator(); offLocale(); }, { once: true });
+  window.addEventListener("pagehide", () => { stopped = true; off(); offSettings(); offMenuBarSettings(); offClipboard(); offCalculator(); offLocale(); }, { once: true });
+  void loadSettings();
   void refresh();
 } else {
   el("machine-detail").textContent = t("浏览器预览");

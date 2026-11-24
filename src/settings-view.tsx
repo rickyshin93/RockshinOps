@@ -4,7 +4,7 @@ import { menuBarChoices, type SettingsState } from "./settings";
 import type { Language } from "./i18n";
 import { Group, Row, Switch } from "./settings-controls";
 
-export function SettingsView({ state, version, onLanguage, isMacOS }: { state: SettingsState; version: string; onLanguage: (language: Language) => void; isMacOS: boolean }) {
+export function SettingsView({ state, version, onLanguage, isMacOS, hasClipboardHistory }: { state: SettingsState; version: string; onLanguage: (language: Language) => void; isMacOS: boolean; hasClipboardHistory: boolean }) {
   const { t } = useTranslation();
   if (!state.preferences) return <div className="empty-state"><h2>{t("读取设置")}</h2><p>{state.preferencesError || t("正在读取本机偏好…")}</p>{state.preferencesError && <button className="secondary-button" data-action="load-settings">{t("重试")}</button>}</div>;
   const languages = [["system", t("跟随系统")], ["zh", "中文"], ["en", "English"]] as const;
@@ -14,6 +14,10 @@ export function SettingsView({ state, version, onLanguage, isMacOS }: { state: S
     <Group id="menu-bar-title" title={t("菜单栏")} note={`${t("关闭窗口后菜单栏仍会持续更新。")}${t("全部关闭时仅保留 RockshinOps 图标。显示项目越多，占用的菜单栏空间越宽。")}`}>
       <div className="tray-preview" aria-hidden="true">{state.menuBarDraft.length && state.trayPreview?.image ? <img src={state.trayPreview.image} alt="" /> : <><span className="tray-icon" dangerouslySetInnerHTML={{ __html: icon("disk") }} />{state.menuBarDraft.length ? <span className="tray-text">{state.trayPreview?.text}</span> : <span className="tray-empty">{t("只显示图标")}</span>}</>}</div>
       {menuBarChoices.map(([id, title, description]) => <Row key={id} id={`setting-label-${id}`} label={t(title)} description={t(description)} lead={<span className={`content-icon ${id === "battery" ? "energy" : id}`} dangerouslySetInnerHTML={{ __html: icon(id) }} />}><Switch on={state.menuBarDraft.includes(id)} labelledBy={`setting-label-${id}`} metric={id} /></Row>)}
+    </Group>
+    <Group id="sidebar-tools-title" title={t("在侧栏显示")}>
+      <Row id="sidebar-calculator-label" label={t("计算器")} lead={<span className="content-icon calculator" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("calculator") }} />}><Switch on={state.sidebarToolsDraft.calculator} labelledBy="sidebar-calculator-label" action="toggle-sidebar-calculator" /></Row>
+      {hasClipboardHistory && <Row id="sidebar-clipboard-label" label={t("剪贴板")} lead={<span className="content-icon clipboard" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("clipboard") }} />}><Switch on={state.sidebarToolsDraft.clipboard} labelledBy="sidebar-clipboard-label" action="toggle-sidebar-clipboard" /></Row>}
     </Group>
     </div>
     <div className="settings-column">

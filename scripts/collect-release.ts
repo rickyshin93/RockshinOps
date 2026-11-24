@@ -25,7 +25,7 @@ export function verifyUpdate(manifest: UpdateManifest, archive: Uint8Array, publ
 
 export function collectRelease(target: string, signed: boolean, directory = join("build", target.replace("/", "-")), destination = "release-files") {
   if (!suffixes[target]) throw new Error(`Unsupported release target: ${target}`);
-  const files = readdirSync(directory).filter(file => suffixes[target]!.some(suffix => file.endsWith(suffix)) && (target !== "windows/amd64" || file.includes(" Setup ")));
+  const files = readdirSync(directory).filter(file => suffixes[target]!.some(suffix => file.endsWith(suffix)) && (target !== "windows/amd64" || file.includes("-setup-")));
   for (const suffix of suffixes[target]!) {
     if (!files.some(file => file.endsWith(suffix))) throw new Error(`Missing ${suffix} package in ${directory}`);
   }

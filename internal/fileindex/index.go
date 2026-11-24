@@ -38,9 +38,10 @@ type Match struct {
 const (
 	flagDir uint8 = 1 << iota
 	flagDeleted
-	flagHidden  // a folder leading to an included place: kept for paths, never a result
-	flagFolded  // the lower-case name follows the original name in Index.names
-	flagSpelled // the name has Chinese characters, spelled out in Index.spelled
+	flagHidden     // a folder leading to an included place: kept for paths, never a result
+	flagFolded     // the lower-case name follows the original name in Index.names
+	flagSpelled    // the name has Chinese characters, spelled out in Index.spelled
+	flagSharedName // the name shares its arena offset with an earlier entry
 )
 
 // entry is one file or folder; names live in shared byte arenas so a
@@ -163,6 +164,7 @@ func (ix *Index) compactNames() {
 		name := ix.nameOf(int32(i))
 		if offset, ok := seen[string(name)]; ok {
 			e.name = offset
+			e.flags |= flagSharedName
 			continue
 		}
 		key := string(name) // Own the key before packing can overwrite its bytes.
@@ -465,12 +467,27 @@ func (ix *Index) Search(query string, limit int) []Match {
 	for p := range parts {
 		wg.Go(func() {
 			var top []candidate
+			// Compacted entries can share a name. Its score depends only on
+			// that name and the query. Path and recency still rank each entry.
+			var scores [2048]struct {
+				offset uint32
+				score  uint16 // one above the actual score, with zero marking an empty slot
+			}
 			for i := int32(p * n / parts); i < int32((p+1)*n/parts); i++ {
 				e := &ix.entries[i]
 				if e.flags&(flagDeleted|flagHidden) != 0 {
 					continue
 				}
-				s := ix.score(i, q)
+				var s int
+				if e.flags&flagSharedName == 0 {
+					s = ix.score(i, q)
+				} else {
+					cached := &scores[e.name%uint32(len(scores))]
+					if cached.score == 0 || cached.offset != e.name {
+						cached.offset, cached.score = e.name, uint16(ix.score(i, q)+1)
+					}
+					s = int(cached.score) - 1
+				}
 				if s == 0 {
 					continue
 				}

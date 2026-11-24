@@ -13,9 +13,9 @@ import (
 
 func TestPreferencesPersistAndKeepExplicitEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "RockshinOps", "preferences.json")
-	defaults := []string{"disk"}
-	got, err := readPreferences(path, defaults, "system", false, false)
-	if err != nil || !reflect.DeepEqual(got.MenuBarItems, defaults) {
+	defaults := Preferences{Language: "system", MenuBarItems: []string{"disk"}}
+	got, err := readPreferences(path, defaults)
+	if err != nil || !reflect.DeepEqual(got.MenuBarItems, defaults.MenuBarItems) {
 		t.Fatalf("first run: %+v %v", got, err)
 	}
 	for _, items := range [][]string{{"cpu", "memory"}, {}} {
@@ -23,7 +23,7 @@ func TestPreferencesPersistAndKeepExplicitEmpty(t *testing.T) {
 		if err := writePreferences(path, p); err != nil {
 			t.Fatal(err)
 		}
-		got, err = readPreferences(path, defaults, "system", false, false)
+		got, err = readPreferences(path, defaults)
 		if err != nil || !reflect.DeepEqual(got, p) {
 			t.Fatalf("reload: %+v %v", got, err)
 		}
@@ -31,7 +31,7 @@ func TestPreferencesPersistAndKeepExplicitEmpty(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"menuBarItems":["bogus"]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPreferences(path, defaults, "system", false, false); err == nil {
+	if _, err := readPreferences(path, defaults); err == nil {
 		t.Fatal("invalid persisted value silently accepted")
 	}
 }
@@ -103,7 +103,7 @@ func TestInvalidPreferencesDoNotOverwriteSavedValues(t *testing.T) {
 			t.Fatalf("accepted %v", items)
 		}
 	}
-	got, err := readPreferences(path, nil, "system", false, false)
+	got, err := readPreferences(path, Preferences{Language: "system"})
 	if err != nil || !reflect.DeepEqual(got, valid) {
 		t.Fatalf("saved state changed: %+v %v", got, err)
 	}
@@ -136,14 +136,15 @@ func TestMenuBarSelectedMetricsAndUnavailableValues(t *testing.T) {
 
 func TestLanguageDefaultMigrationAndPersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "preferences.json")
-	got, err := readPreferences(path, []string{"disk"}, "system", false, false)
+	defaults := Preferences{Language: "system", MenuBarItems: []string{"disk"}}
+	got, err := readPreferences(path, defaults)
 	if err != nil || got.Language != "system" {
 		t.Fatalf("first-run language: %+v %v", got, err)
 	}
 	if err := os.WriteFile(path, []byte(`{"menuBarItems":["cpu"]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	got, err = readPreferences(path, nil, "system", false, false)
+	got, err = readPreferences(path, defaults)
 	if err != nil || got.Language != "system" || !reflect.DeepEqual(got.MenuBarItems, []string{"cpu"}) {
 		t.Fatalf("legacy preferences: %+v %v", got, err)
 	}
@@ -152,7 +153,7 @@ func TestLanguageDefaultMigrationAndPersistence(t *testing.T) {
 		if err := writePreferences(path, want); err != nil {
 			t.Fatal(err)
 		}
-		got, err = readPreferences(path, nil, "system", false, false)
+		got, err = readPreferences(path, defaults)
 		if err != nil || !reflect.DeepEqual(got, want) {
 			t.Fatalf("language reload: %+v %v", got, err)
 		}
@@ -162,7 +163,7 @@ func TestLanguageDefaultMigrationAndPersistence(t *testing.T) {
 			t.Fatalf("accepted invalid language %q", language)
 		}
 	}
-	got, err = readPreferences(path, nil, "system", false, false)
+	got, err = readPreferences(path, defaults)
 	if err != nil || got.Language != "system" || !reflect.DeepEqual(got.MenuBarItems, []string{"memory"}) {
 		t.Fatalf("failed save altered preferences: %+v %v", got, err)
 	}
@@ -208,8 +209,10 @@ func TestMenuBarReadingsPairSymbolsWithBareValues(t *testing.T) {
 
 func TestHideDockPreferenceDefaultAndPersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "preferences.json")
+	defaults := Preferences{Language: "system", MenuBarItems: []string{"disk"}}
 	for _, enabled := range []bool{false, true} {
-		got, err := readPreferences(path, []string{"disk"}, "system", false, enabled)
+		defaults.HideDockOnClose = enabled
+		got, err := readPreferences(path, defaults)
 		if err != nil || got.HideDockOnClose != enabled {
 			t.Fatalf("first-run Dock preference: %+v %v", got, err)
 		}
@@ -217,7 +220,8 @@ func TestHideDockPreferenceDefaultAndPersistence(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"menuBarItems":["disk"]}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	got, err := readPreferences(path, nil, "system", false, false)
+	defaults.HideDockOnClose = false
+	got, err := readPreferences(path, defaults)
 	if err != nil || got.HideDockOnClose {
 		t.Fatalf("legacy Dock preference: %+v %v", got, err)
 	}
@@ -226,9 +230,39 @@ func TestHideDockPreferenceDefaultAndPersistence(t *testing.T) {
 		if err := writePreferences(path, got); err != nil {
 			t.Fatal(err)
 		}
-		restored, err := readPreferences(path, nil, "system", false, !enabled)
+		defaults.HideDockOnClose = !enabled
+		restored, err := readPreferences(path, defaults)
 		if err != nil || restored.HideDockOnClose != enabled {
 			t.Fatalf("restored Dock preference: %+v %v", restored, err)
 		}
+	}
+}
+
+func TestSidebarToolsDefaultMigrationAndPersistence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "preferences.json")
+	cfg, err := parseConfig(configJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaults := cfg.defaultPreferences()
+	visible := SidebarTools{Calculator: true, Clipboard: true}
+	got, err := readPreferences(path, defaults)
+	if err != nil || got.SidebarTools != visible {
+		t.Fatalf("first-run sidebar tools: %+v %v", got, err)
+	}
+	if err := os.WriteFile(path, []byte(`{"menuBarItems":["cpu"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err = readPreferences(path, defaults)
+	if err != nil || got.SidebarTools != visible {
+		t.Fatalf("legacy sidebar tools: %+v %v", got, err)
+	}
+	got.SidebarTools.Calculator = false
+	if err := writePreferences(path, got); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := readPreferences(path, defaults)
+	if err != nil || !reflect.DeepEqual(restored, got) {
+		t.Fatalf("restored sidebar tools: %+v %v", restored, err)
 	}
 }

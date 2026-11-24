@@ -1,6 +1,7 @@
 import { portsView } from "./ports-view";
 import { devicesView, type DevicesViewState } from "./devices-view";
 import { sensorsView } from "./sensors-view";
+import { clipboardControls, clipboardFilters, clipboardView, type ClipboardViewState } from "./clipboard-view";
 import { listeningPorts, filterPorts, type PortScope } from "./ports";
 import { windowRows, type TableWindow } from "./table-window";
 import { trendTime } from "./history";
@@ -29,6 +30,7 @@ export const pages = [
   { id: "cleanup", title: "清理", group: "系统" },
   { id: "menubar", title: "菜单栏管理", group: "系统" },
   { id: "launcher", title: "启动器", group: "系统" },
+  { id: "clipboard", title: "剪贴板", group: "系统" },
   { id: "calculator", title: "计算器", group: "系统" },
   { id: "about", title: "关于本机", group: "系统" },
   { id: "settings", title: "设置", group: "系统" },
@@ -36,7 +38,7 @@ export const pages = [
 export type Page = (typeof pages)[number]["id"];
 export const metricPages: Page[] = ["overview", "cpu", "memory", "gpu", "disk", "network", "energy", "sensors"];
 
-export interface ViewState extends SettingsState, DevicesViewState {
+export interface ViewState extends SettingsState, DevicesViewState, ClipboardViewState {
   page: Page;
   tableWindow?: TableWindow;
   info: AppInfo | null;
@@ -89,9 +91,10 @@ function chart(state: ViewState, key: TrendKey, title: string, max = 100, second
   return lineChart(state.history, key, new Date(state.snapshot!.updatedAt).getTime(), state.range, title, max, secondary, state.info?.refreshSeconds || 2);
 }
 
-export function navigation(): string {
+export function navigation(showClipboard = false): string {
   let previous = "";
   return pages.map(page => {
+    if (page.id === "clipboard" && !showClipboard) return "";
     const heading = page.group && page.group !== previous ? `<p class="nav-group">${t(page.group)}</p>` : "";
     previous = page.group;
     return `${heading}<button type="button" class="nav-item" data-page="${page.id}" ${page.id === "overview" ? 'aria-current="page"' : ""}><span class="nav-icon">${icon(page.id === "energy" ? "battery" : page.id)}</span><span>${t(page.title)}</span><small id="nav-${page.id}"></small></button>`;
@@ -99,6 +102,7 @@ export function navigation(): string {
 }
 
 export function actionControls(state: ViewState): string {
+  if (state.page === "clipboard") return clipboardControls(state);
   if (state.page === "menubar" || state.page === "cleanup" || state.page === "launcher" || state.page === "calculator") return "";
   if (state.page === "settings") return `<span class="settings-shortcut">${isMac(state) ? "⌘," : "Ctrl+,"}</span>`;
   const ranges = [[60, t("1 分钟")], [300, t("5 分钟")], [900, t("15 分钟")], [3600, t("1 小时")]] as const;
@@ -109,6 +113,7 @@ export function actionControls(state: ViewState): string {
 }
 
 export function filterControls(state: ViewState): string {
+  if (state.page === "clipboard") return clipboardFilters(state, state.query);
   if (!["processes", "connections", "apps"].includes(state.page) || (state.page === "apps" && !!state.appReview)) return "";
   const sorting = ["processes", "connections"].includes(state.page) || (state.page === "apps" && state.appMode) ? "" : sortControl(state.sort, state.page === "processes");
   const modes = state.page === "connections" ? `<div class="segmented connection-modes" role="group" aria-label="${t("连接视图")}"><button data-connection-mode="all" aria-pressed="${state.connectionMode !== "ports"}" class="${state.connectionMode !== "ports" ? "selected" : ""}">${t("全部连接")}</button><button data-connection-mode="ports" aria-pressed="${state.connectionMode === "ports"}" class="${state.connectionMode === "ports" ? "selected" : ""}">${t("开发端口")}</button></div>` : "";
@@ -423,6 +428,7 @@ function aboutView(state: ViewState): string {
 }
 
 export function renderBody(state: ViewState): string {
+  if (state.page === "clipboard") return clipboardView(state, state.query);
   if (state.page === "settings" || state.page === "menubar" || state.page === "cleanup" || state.page === "launcher" || state.page === "calculator") return "";
   if (!state.snapshot || !state.info) return empty(t("等待本机数据"), t("点击右上角刷新重新连接采集服务。"));
   switch (state.page) {

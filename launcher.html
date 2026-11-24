@@ -12,9 +12,16 @@
       <div class="launcher-search">
         <svg class="launcher-glass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <input id="launcher-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="launcher-results" aria-autocomplete="list" />
+        <button id="launcher-mode" class="launcher-button" type="button" aria-keyshortcuts="Meta+4" hidden></button>
       </div>
-      <ul id="launcher-results" class="launcher-results" role="listbox" hidden></ul>
-      <p id="launcher-empty" class="launcher-empty" hidden></p>
+      <div id="launcher-results-scroll" class="launcher-results-scroll" hidden>
+        <div id="launcher-highlight" class="launcher-highlight" aria-hidden="true"></div>
+        <ul id="launcher-results" class="launcher-results" role="listbox"></ul>
+      </div>
+      <p id="launcher-empty" class="launcher-empty" aria-live="polite" hidden></p>
+      <div id="launcher-clipboard-controls" class="launcher-clipboard-controls" hidden>
+        <button id="launcher-clear" class="launcher-button" type="button"></button>
+      </div>
     </div>
     <script type="module" src="/src/launcher.ts"></script>
   </body>
