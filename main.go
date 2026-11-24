@@ -277,7 +277,7 @@ func main() {
 		trayItems := []*mygo.MenuItem{capacityItem, activityItem, updatedItem, mygo.Separator()}
 		var awake *keepAwake
 		if runtime.GOOS == "darwin" {
-			awake = newKeepAwake(cfg.KeepAwakeMinutes)
+			awake = newKeepAwake(cfg.KeepAwakeMinutes, cfg.KeepAwakeExtendMinutes)
 			trayItems = append(trayItems, awake.menu, &mygo.MenuItem{Label: "剪贴板历史", Click: func(*mygo.MenuItem, *mygo.Window) {
 				service.launcher.show(true)
 			}}, mygo.Separator())
@@ -306,9 +306,6 @@ func main() {
 			selectedTitle := menuBarTitle(service.preferences, s)
 			selectedItems := append([]string{}, service.preferences.MenuBarItems...)
 			mygo.RunOnMain(func() {
-				if awake != nil {
-					awake.refresh()
-				}
 				title := "—"
 				if s.Disk.CapacityError == "" {
 					title = storage.FormatCapacity(s.Disk.Volume.Available)
@@ -398,7 +395,26 @@ func main() {
 				openWindow()
 			}
 		})
-		mygo.Power.OnResume(func() { go service.refresh(true) })
+		mygo.Power.OnResume(func() {
+			if awake != nil {
+				awake.refresh()
+			}
+			go service.refresh(true)
+		})
+		if awake != nil {
+			go func() {
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						mygo.RunOnMain(awake.refresh)
+					}
+				}
+			}()
+		}
 		go func() {
 			service.refresh(true)
 			ticker := time.NewTicker(time.Duration(cfg.MetricsIntervalSeconds) * time.Second)

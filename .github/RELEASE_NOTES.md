@@ -1,18 +1,14 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.3.0
+### New in v0.3.1
 
-- On macOS, record and search local clipboard history for text and images. Pin records, save text as reusable snippets, and access history from the sidebar, menu bar, or Launcher with `⌘4`.
-- Add timed Keep Awake to the macOS menu bar and sidebar visibility settings for Calculator and Clipboard.
-- Improve Launcher app activation, thumbnail reuse and keyboard navigation. Refine Calculator wrapping, leading-zero handling and layout.
-- Upgrade to MyGo 0.9.0 and calculate total CPU usage directly from busy ticks.
+- On macOS, Keep Awake shows a live countdown and local end time. Choose 30 minutes, 1–12 hours, 24 hours, or an indefinite session. Extend a timed session by 15 minutes or keep the display awake for the current session.
+- Upgrade the desktop framework to MyGo 0.10.0.
 
 ### 中文
 
-- macOS 新增本地剪贴板历史，可搜索文本和图片、置顶记录、将文本另存为片段，并从侧栏、菜单栏或启动器 `⌘4` 打开历史。
-- macOS 菜单栏新增定时保持唤醒。设置中可显示或隐藏侧栏的计算器和剪贴板入口。
-- 优化启动器打开应用、缩略图复用和键盘切换，改进计算器长算式换行、前导零和布局。
-- 升级 MyGo 0.9.0，并直接使用忙碌计数计算总 CPU 使用率。
+- macOS 保持唤醒显示逐秒倒计时和本地结束时间。可选 30 分钟、1 至 12 小时、24 小时或无限期。定时会话可续时 15 分钟，也可为当前会话打开「保持屏幕亮起」。
+- 将桌面框架升级到 MyGo 0.10.0。
 
 **Known issue / 已知问题：** Calculator can drop continuation input while saving history. / 计算器保存历史期间可能丢失连续输入。
 
@@ -28,7 +24,7 @@ macOS builds remain ad-hoc signed and not notarized; Accessibility or Screen Rec
 
 - **macOS Apple Silicon:** the `arm64.dmg` file.
 - **macOS Intel:** the `amd64.dmg` file.
-- **Windows x86_64:** the `rockshinops-setup-0.3.0-amd64.exe` installer.
+- **Windows x86_64:** the `rockshinops-setup-0.3.1-amd64.exe` installer.
 - **Linux x86_64:** the `.deb` package or `.tar.gz` archive (extract and run `./rockshinops`; no install script is included).
 - `SHA256SUMS.txt` contains checksums for all packages. `update-*.json` and the macOS/Windows `.tar.gz` files are consumed by the updater; choose the installers above for manual installation.
 

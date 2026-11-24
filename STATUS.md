@@ -42,6 +42,8 @@
 
 ## Done
 
+- 2026-11-24: macOS Keep Awake offers 30 min and an Hours submenu with 1–9 hours, then 10–12 and 24 hours, a live countdown in `1h 30min 30s` format, local end time, indefinite mode, a 15-minute extension, and per-session display wake. Upgraded the MyGo Go module, CLI and runtime to 0.10.0 and regenerated bindings. Go and web checks and Apple Silicon packaging passed. Native verification covered bilingual submenu grouping, the 12- and 24-hour starts, WebView IPC, close/reopen, expiry and quit. Intel macOS, Windows and Linux compiled; desktop interaction there and installed upgrades remain unverified. Evidence: `work/keep-awake-hours-20261124/` and `work/keep-awake-mygo-20261124/`.
+
 - 2026-11-24: Published [v0.3.0](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.0) with macOS Clipboard history, pins and snippets, timed Keep Awake, sidebar preferences, Launcher and Calculator improvements, and MyGo 0.9.0. Apple Silicon verified clipboard persistence, tray and close/reopen and native sleep assertions. Four-target signed CI passed. All 12 public SHA-256 checksums and four update signatures were verified.
 
 - 2026-11-24: Published [v0.2.18](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.18) as a Launcher-only patch with spring hover, row reuse and shared filename scoring. Four-target signed release, 12 public checksums and four update signatures verified. The published patch was prepared from v0.2.17 separately from the working tree. Evidence: `work/release-0.2.18/`.

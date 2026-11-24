@@ -28,7 +28,8 @@
   "connectionSampleIntervalSeconds": 1,
   "machineInfoTimeoutSeconds": 5,
   "powerAssertionIntervalSeconds": 10,
-  "keepAwakeMinutes": [30, 60, 120],
+  "keepAwakeMinutes": [30, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 1440],
+  "keepAwakeExtendMinutes": 15,
   "clipboardHistory": {
     "pollMilliseconds": 350,
     "maxEntries": 100,

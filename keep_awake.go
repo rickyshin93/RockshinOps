@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -9,38 +10,79 @@ import (
 	"rockshinops/internal/localization"
 )
 
-// The menu, deadline and assertion are owned by the main thread.
+// The menu and session are owned by the main thread. An active session with
+// a zero deadline is indefinite.
 type keepAwake struct {
-	menu       *mygo.MenuItem
-	stopItem   *mygo.MenuItem
-	durations  []int
-	assertion  uint32
-	deadline   time.Time
-	lastStatus string
+	menu          *mygo.MenuItem
+	extendItem    *mygo.MenuItem
+	displayItem   *mygo.MenuItem
+	stopItem      *mygo.MenuItem
+	separator     *mygo.MenuItem
+	presets       []*mygo.MenuItem
+	durations     []int
+	extendMinutes int
+	assertion     uint32
+	deadline      time.Time
+	displayAwake  bool
+	lastStatus    string
 }
 
-func newKeepAwake(minutes []int) *keepAwake {
-	a := &keepAwake{menu: &mygo.MenuItem{Label: "保持唤醒"}, durations: minutes}
-	for _, minutes := range minutes {
-		a.menu.Submenu = append(a.menu.Submenu, &mygo.MenuItem{Click: func(*mygo.MenuItem, *mygo.Window) {
-			if err := a.start(time.Duration(minutes) * time.Minute); err != nil {
-				go mygo.Dialog.Error(localization.T("无法保持唤醒"), err.Error())
-			}
-		}})
+func newKeepAwake(minutes []int, extendMinutes int) *keepAwake {
+	a := &keepAwake{
+		menu: &mygo.MenuItem{Label: "保持唤醒"}, durations: minutes, extendMinutes: extendMinutes,
+		separator: mygo.Separator(),
 	}
-	a.stopItem = &mygo.MenuItem{Label: "结束保持唤醒", Disabled: true, Click: func(*mygo.MenuItem, *mygo.Window) {
-		if err := a.stop(); err != nil {
-			go mygo.Dialog.Error(localization.T("无法结束保持唤醒"), err.Error())
-		}
+	a.separator.Hidden = true
+	a.extendItem = &mygo.MenuItem{Hidden: true, Click: func(*mygo.MenuItem, *mygo.Window) {
+		awakeMenuError("无法延长唤醒会话", a.extend())
 	}}
-	a.menu.Submenu = append(a.menu.Submenu, mygo.Separator(), a.stopItem)
+	a.displayItem = &mygo.MenuItem{Label: "保持屏幕亮起", Type: mygo.MenuItemCheckbox, Hidden: true, Click: func(*mygo.MenuItem, *mygo.Window) {
+		awakeMenuError("无法更改屏幕唤醒状态", a.toggleDisplay())
+	}}
+	a.stopItem = &mygo.MenuItem{Label: "结束保持唤醒", Hidden: true, Click: func(*mygo.MenuItem, *mygo.Window) {
+		awakeMenuError("无法结束保持唤醒", a.stop())
+	}}
+	a.menu.Submenu = []*mygo.MenuItem{a.extendItem, a.displayItem, a.stopItem, a.separator}
+	startItem := func(label string, duration time.Duration) *mygo.MenuItem {
+		return &mygo.MenuItem{Label: label, Click: func(*mygo.MenuItem, *mygo.Window) {
+			awakeMenuError("无法保持唤醒", a.start(duration))
+		}}
+	}
+	var hours, longHours []*mygo.MenuItem
+	for _, minutes := range minutes {
+		item := startItem("", time.Duration(minutes)*time.Minute)
+		a.presets = append(a.presets, item)
+		switch {
+		case minutes%60 != 0:
+			a.menu.Submenu = append(a.menu.Submenu, item)
+		case minutes < 10*60:
+			hours = append(hours, item)
+		default:
+			longHours = append(longHours, item)
+		}
+	}
+	if len(hours) > 0 && len(longHours) > 0 {
+		hours = append(hours, mygo.Separator())
+	}
+	hours = append(hours, longHours...)
+	if len(hours) > 0 {
+		a.menu.Submenu = append(a.menu.Submenu, &mygo.MenuItem{Label: "唤醒小时菜单", Submenu: hours})
+	}
+	a.menu.Submenu = append(a.menu.Submenu, startItem("无限期", 0))
 	return a
+}
+
+func awakeMenuError(message string, err error) {
+	if err != nil {
+		go mygo.Dialog.Error(localization.T(message), err.Error())
+	}
 }
 
 func (a *keepAwake) localize() {
 	for i, minutes := range a.durations {
-		a.menu.Submenu[i].SetLabel(awakeDurationLabel(minutes))
+		a.presets[i].SetLabel(awakeDurationLabel(minutes))
 	}
+	a.extendItem.SetLabel(fmt.Sprintf(localization.T("延长 %d 分钟"), a.extendMinutes))
 	a.refresh()
 }
 
@@ -56,20 +98,53 @@ func awakeDurationLabel(minutes int) string {
 }
 
 func (a *keepAwake) start(duration time.Duration) error {
-	id, err := takeIdleSleepAssertion(duration)
+	var deadline time.Time
+	if duration > 0 {
+		deadline = time.Now().Round(0).Add(duration)
+	}
+	return a.replace(deadline, false)
+}
+
+func (a *keepAwake) extend() error {
+	a.refresh()
+	if a.assertion == 0 || a.deadline.IsZero() {
+		return nil
+	}
+	return a.replace(a.deadline.Add(time.Duration(a.extendMinutes)*time.Minute), a.displayAwake)
+}
+
+func (a *keepAwake) toggleDisplay() error {
+	a.refresh()
+	if a.assertion == 0 {
+		return nil
+	}
+	err := a.replace(a.deadline, !a.displayAwake)
+	if err != nil {
+		// MyGo toggles the menu check before calling this handler.
+		a.displayItem.SetChecked(a.displayAwake)
+	}
+	return err
+}
+
+func (a *keepAwake) replace(deadline time.Time, displayAwake bool) error {
+	var remaining time.Duration
+	if !deadline.IsZero() {
+		remaining = time.Until(deadline)
+		if remaining <= 0 {
+			return a.stop()
+		}
+	}
+	id, err := takeIdleSleepAssertion(remaining, displayAwake)
 	if err != nil {
 		return err
 	}
 	if a.assertion != 0 {
 		if err := releaseIdleSleepAssertion(a.assertion); err != nil {
-			if cleanupErr := releaseIdleSleepAssertion(id); cleanupErr != nil {
-				log.Printf("release replacement idle sleep assertion: %v", cleanupErr)
-			}
-			return err
+			return errors.Join(err, releaseIdleSleepAssertion(id))
 		}
 	}
-	a.assertion, a.deadline = id, time.Now().Round(0).Add(duration)
-	a.stopItem.SetEnabled(true)
+	a.assertion, a.deadline, a.displayAwake = id, deadline, displayAwake
+	a.syncActions()
 	a.refresh()
 	return nil
 }
@@ -81,29 +156,61 @@ func (a *keepAwake) stop() error {
 	if err := releaseIdleSleepAssertion(a.assertion); err != nil {
 		return err
 	}
-	a.assertion = 0
-	a.stopItem.SetEnabled(false)
-	a.setStatus("")
+	a.clearSession()
 	return nil
+}
+
+func (a *keepAwake) clearSession() {
+	a.assertion, a.deadline, a.displayAwake = 0, time.Time{}, false
+	a.syncActions()
+	a.setStatus("")
+}
+
+func (a *keepAwake) syncActions() {
+	active := a.assertion != 0
+	a.extendItem.SetVisible(active && !a.deadline.IsZero())
+	a.displayItem.SetVisible(active)
+	a.displayItem.SetChecked(a.displayAwake)
+	a.stopItem.SetVisible(active)
+	a.separator.SetVisible(active)
 }
 
 func (a *keepAwake) refresh() {
 	if a.assertion == 0 {
 		return
 	}
-	remaining := time.Until(a.deadline)
-	if remaining <= 0 {
+	if a.deadline.IsZero() {
+		a.setStatus(localization.T("保持唤醒中 · 无限期"))
+		return
+	}
+	now := time.Now()
+	if !now.Before(a.deadline) {
 		if err := a.stop(); err != nil {
-			// The system timeout has already turned the assertion off.
+			// The native timeout has already turned off the assertion.
 			log.Printf("release expired idle sleep assertion: %v", err)
-			a.assertion = 0
-			a.stopItem.SetEnabled(false)
-			a.setStatus("")
+			a.clearSession()
 		}
 		return
 	}
-	seconds := int((remaining + time.Second - 1) / time.Second)
-	a.setStatus(fmt.Sprintf(localization.T("剩余 %s"), fmt.Sprintf("%02d:%02d", seconds/60, seconds%60)))
+	a.setStatus(awakeCountdownLabel(now, a.deadline))
+}
+
+func awakeCountdownLabel(now, deadline time.Time) string {
+	totalSeconds := int((deadline.Sub(now) + time.Second - 1) / time.Second)
+	hours, minutes, seconds := totalSeconds/3600, totalSeconds/60%60, totalSeconds%60
+	countdown := fmt.Sprintf("%ds", seconds)
+	if minutes > 0 || hours > 0 {
+		countdown = fmt.Sprintf("%dmin %s", minutes, countdown)
+	}
+	if hours > 0 {
+		countdown = fmt.Sprintf("%dh %s", hours, countdown)
+	}
+	now, deadline = now.Local(), deadline.Local()
+	end := deadline.Format("15:04")
+	if now.Year() != deadline.Year() || now.YearDay() != deadline.YearDay() {
+		end = deadline.Format(localization.T("唤醒结束日期格式"))
+	}
+	return fmt.Sprintf(localization.T("剩余 %s · %s 结束"), countdown, end)
 }
 
 func (a *keepAwake) setStatus(status string) {

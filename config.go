@@ -44,6 +44,7 @@ type Config struct {
 	MachineInfoTimeoutSeconds       int                             `json:"machineInfoTimeoutSeconds"`
 	PowerAssertionIntervalSeconds   int                             `json:"powerAssertionIntervalSeconds"`
 	KeepAwakeMinutes                []int                           `json:"keepAwakeMinutes"`
+	KeepAwakeExtendMinutes          int                             `json:"keepAwakeExtendMinutes"`
 	ClipboardHistory                clipboardHistoryConfig          `json:"clipboardHistory"`
 	ScanTargets                     map[string][]metrics.ScanTarget `json:"scanTargets"`
 	Launcher                        LauncherConfig                  `json:"launcher"`
@@ -101,6 +102,9 @@ func parseConfig(data []byte) (Config, error) {
 			return c, fmt.Errorf("rockshinops.json: keepAwakeMinutes must be increasing positive durations up to 24 hours")
 		}
 		previous = minutes
+	}
+	if c.KeepAwakeExtendMinutes <= 0 || c.KeepAwakeExtendMinutes > 24*60 {
+		return c, fmt.Errorf("rockshinops.json: keepAwakeExtendMinutes must be positive and at most 24 hours")
 	}
 	clipboard := c.ClipboardHistory
 	if clipboard.PollMilliseconds <= 0 || clipboard.MaxEntries <= 0 || clipboard.MaxSnippets <= 0 || clipboard.MaxItemBytes <= 0 || clipboard.MaxImageBytes <= 0 ||

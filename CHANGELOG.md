@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1
+
+- On macOS, Keep Awake shows a live countdown and local end time. Choose 30 minutes, 1–12 hours, 24 hours, or an indefinite session. Extend a timed session by 15 minutes or keep the display awake for the current session.
+- Upgrade the desktop framework to MyGo 0.10.0.
+
+### 中文
+
+- macOS 保持唤醒显示逐秒倒计时和本地结束时间。可选 30 分钟、1 至 12 小时、24 小时或无限期。定时会话可续时 15 分钟，也可为当前会话打开「保持屏幕亮起」。
+- 将桌面框架升级到 MyGo 0.10.0。
+
 ## 0.3.0
 
 - On macOS, record and search local clipboard history for text and images. Pin records, save text as reusable snippets, and access history from the sidebar, menu bar, or Launcher with `⌘4`.

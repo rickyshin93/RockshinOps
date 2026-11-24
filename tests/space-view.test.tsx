@@ -22,7 +22,7 @@ const previous = { mygo: (globalThis as any).mygo, document: globalThis.document
 
 beforeAll(async () => {
   globalThis.document = { createElementNS: () => ({ setAttribute() {}, appendChild() {}, outerHTML: "<svg></svg>" }) } as unknown as Document;
-  (globalThis as any).mygo = { call: async (method: string, ...args: unknown[]) => {
+  (globalThis as any).mygo = { callWith: async (method: string, args: unknown[]) => {
     calls.push(method);
     switch (method) {
       case "System.ScanSpace": return pending ? new Promise((_, reject) => { pending = { reject }; }) : summary;

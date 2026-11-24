@@ -2,10 +2,13 @@ package main
 
 /*
 #cgo LDFLAGS: -framework CoreFoundation -framework IOKit
+#include <stdbool.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
 
-static IOReturn take_idle_sleep_assertion(double seconds, IOPMAssertionID *id) {
-	return IOPMAssertionCreateWithDescription(kIOPMAssertionTypePreventUserIdleSystemSleep,
+static IOReturn take_idle_sleep_assertion(double seconds, bool display, IOPMAssertionID *id) {
+	// Keeping the display awake also prevents idle system sleep.
+	CFStringRef type = display ? kIOPMAssertPreventUserIdleDisplaySleep : kIOPMAssertPreventUserIdleSystemSleep;
+	return IOPMAssertionCreateWithDescription(type,
 		CFSTR("RockshinOps: Keep Awake"), NULL, NULL, NULL, seconds,
 		kIOPMAssertionTimeoutActionTurnOff, id);
 }
@@ -17,9 +20,9 @@ import (
 	"time"
 )
 
-func takeIdleSleepAssertion(duration time.Duration) (uint32, error) {
+func takeIdleSleepAssertion(duration time.Duration, display bool) (uint32, error) {
 	var id C.IOPMAssertionID
-	status := C.take_idle_sleep_assertion(C.double(duration.Seconds()), &id)
+	status := C.take_idle_sleep_assertion(C.double(duration.Seconds()), C.bool(display), &id)
 	if status != C.kIOReturnSuccess {
 		return 0, fmt.Errorf("IOPMAssertionCreateWithDescription: 0x%08x", uint32(status))
 	}
