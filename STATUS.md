@@ -2,7 +2,6 @@
 
 ## Doing
 
-- 2026-11-24: v0.2.18 Launcher patch prepares pointer-following spring motion, row reuse and shared filename scoring. Four-target signed release, public assets and desktop acceptance are tracked through the release workflow.
 
 - 2026-11-14: Calculator header title and subtitle share one line with the settings button aligned. Native rendering, tray text, close/reopen and Windows/Linux interaction remain unverified.
 
@@ -36,6 +35,8 @@
 - Windows/Linux interactive desktop acceptance beyond CI native collector smoke tests.
 
 ## Done
+
+- 2026-11-24: Published [v0.2.18](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.2.18) with Launcher spring motion, result row reuse and shared filename scoring. The four-target signed release passed after retrying the Intel CPU smoke test. All 12 public file checksums and four update signatures were verified. Apple Silicon verified the launcher, tray and close/reopen. Installed upgrade and other desktop platforms remain unverified.
 
 - 2026-11-14: Launcher uses one shorter, softer shadow. Go/frontend tests, typecheck and macOS arm64 packaging passed. An isolated macOS instance verified the shadow with nine results, tray text and close/reopen. Installed-package and Windows/Linux interaction remain unverified. See `work/launcher-border-20261114/native.log`.
 
