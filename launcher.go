@@ -24,6 +24,7 @@ import (
 
 // LauncherShown tells the launcher page that the panel was summoned.
 var LauncherShown = mygo.NewEvent[bool]("launcherShown")
+var LauncherHidden = mygo.NewEvent[bool]("launcherHidden")
 
 const (
 	launcherWidth     = 680
@@ -230,6 +231,11 @@ func (l *launcher) ensurePanel() {
 			}
 		})
 		panel.OnBlur(panel.Hide)
+		panel.OnHide(func() {
+			if err := LauncherHidden.Broadcast(true); err != nil {
+				log.Printf("launcher hidden: %v", err)
+			}
+		})
 		l.panel.Store(panel)
 	})
 }

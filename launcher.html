@@ -13,7 +13,10 @@
         <svg class="launcher-glass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <input id="launcher-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="launcher-results" aria-autocomplete="list" />
       </div>
-      <ul id="launcher-results" class="launcher-results" role="listbox" hidden></ul>
+      <div id="launcher-results-scroll" class="launcher-results-scroll" hidden>
+        <div id="launcher-highlight" class="launcher-highlight" aria-hidden="true"></div>
+        <ul id="launcher-results" class="launcher-results" role="listbox"></ul>
+      </div>
       <p id="launcher-empty" class="launcher-empty" hidden></p>
     </div>
     <script type="module" src="/src/launcher.ts"></script>

@@ -1,6 +1,6 @@
 {
   "name": "rockshinops",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
   "dependencies": {
     "i18next": "26.5.11",
     "lucide": "1.61.0",
+    "motion": "14.14.0",
     "mygo-runtime": "0.6.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",

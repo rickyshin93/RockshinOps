@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.18
+
+- Use a damped spring for the Launcher highlight as the pointer moves across results. Keyboard selection and Reduce Motion place the highlight immediately.
+- Reuse matching result rows on reopen, and reuse filename scores for duplicate names in file search.
+
+### 中文
+
+- 鼠标划过启动器结果时，高亮使用阻尼弹簧连续滑动。键盘选择和「减少动态效果」时直接定位。
+- 重开启动器时复用匹配的结果行，文件搜索复用同名文件的名称评分。
+
 ## 0.2.17
 
 - Align the Calculator title, description and settings button on one line.

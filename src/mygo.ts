@@ -808,6 +808,7 @@ export const events = {
   calculatorHistoryChanged: event<boolean>("calculatorHistoryChanged"),
   /** LauncherShown tells the launcher page that the panel was summoned. */
   launcherShown: event<boolean>("launcherShown"),
+  launcherHidden: event<boolean>("launcherHidden"),
   metricsChanged: event<Snapshot>("metricsChanged"),
   settingsOpened: event<boolean>("settingsOpened"),
   menuBarSettingsOpened: event<boolean>("menuBarSettingsOpened"),
