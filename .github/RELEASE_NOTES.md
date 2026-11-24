@@ -1,14 +1,14 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.3.1
+### New in v0.3.2
 
-- On macOS, Keep Awake shows a live countdown and local end time. Choose 30 minutes, 1–12 hours, 24 hours, or an indefinite session. Extend a timed session by 15 minutes or keep the display awake for the current session.
-- Upgrade the desktop framework to MyGo 0.10.0.
+- On macOS, each Clipboard history item and saved snippet appears in a separate full-width card.
+- Fit tall and wide clipboard thumbnails inside a square without distorting the image or overlapping nearby cards.
 
 ### 中文
 
-- macOS 保持唤醒显示逐秒倒计时和本地结束时间。可选 30 分钟、1 至 12 小时、24 小时或无限期。定时会话可续时 15 分钟，也可为当前会话打开「保持屏幕亮起」。
-- 将桌面框架升级到 MyGo 0.10.0。
+- macOS 剪贴板历史和片段的每条记录均显示为独立的全宽卡片。
+- 修复剪贴板缩略图越界。长图和宽图会在方框内等比缩放，避免盖住相邻记录。
 
 **Known issue / 已知问题：** Calculator can drop continuation input while saving history. / 计算器保存历史期间可能丢失连续输入。
 
@@ -24,7 +24,7 @@ macOS builds remain ad-hoc signed and not notarized; Accessibility or Screen Rec
 
 - **macOS Apple Silicon:** the `arm64.dmg` file.
 - **macOS Intel:** the `amd64.dmg` file.
-- **Windows x86_64:** the `rockshinops-setup-0.3.1-amd64.exe` installer.
+- **Windows x86_64:** the `rockshinops-setup-0.3.2-amd64.exe` installer.
 - **Linux x86_64:** the `.deb` package or `.tar.gz` archive (extract and run `./rockshinops`; no install script is included).
 - `SHA256SUMS.txt` contains checksums for all packages. `update-*.json` and the macOS/Windows `.tar.gz` files are consumed by the updater; choose the installers above for manual installation.
 

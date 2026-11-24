@@ -705,13 +705,13 @@ button.app-row:hover { @apply bg-fill;  }
 
 .cleanup-action { @apply shrink-0 text-accent py-1 px-2 rounded-sm;  }
 .cleanup-action:hover:not(:disabled) { @apply bg-fill;  }
-.clipboard-history-list { @apply m-0 list-none p-0 bg-surface rounded-md shadow-card; }
-.clipboard-history-list li { @apply flex items-center gap-3 px-4 py-2.5; }
-.clipboard-history-list li + li { @apply border-t border-line; }
-.clipboard-history-icon, .clipboard-history-thumbnail { @apply grid place-items-center size-9 shrink-0 text-muted; }
+.clipboard-history-list { @apply m-0 flex list-none flex-col gap-2 p-0; }
+.clipboard-history-list > li { @apply flex items-center gap-3 rounded-lg bg-surface px-4 py-2.5 shadow-card; }
+.clipboard-history-icon, .clipboard-history-thumbnail { @apply size-9 shrink-0 text-muted; }
+.clipboard-history-icon { @apply grid place-items-center; }
 .clipboard-history-icon svg { @apply size-5; }
-.clipboard-history-thumbnail { @apply rounded-sm bg-fill; }
-.clipboard-history-thumbnail img { @apply size-full rounded-sm object-contain; }
+.clipboard-history-thumbnail { @apply block overflow-hidden rounded-sm bg-fill; }
+.clipboard-history-thumbnail img { @apply size-full object-contain; }
 .clipboard-preview-dialog { @apply m-auto max-w-[min(90vw,900px)] rounded-md bg-surface p-3 text-text shadow-pop; }
 .clipboard-preview-dialog::backdrop { background: rgb(0 0 0 / .45); }
 .clipboard-preview-content > .icon-button { @apply flex mb-2 ml-auto; }

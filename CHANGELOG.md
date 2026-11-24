@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.2
+
+- On macOS, each Clipboard history item and saved snippet appears in a separate full-width card.
+- Fit tall and wide clipboard thumbnails inside a square without distorting the image or overlapping nearby cards.
+
+### 中文
+
+- macOS 剪贴板历史和片段的每条记录均显示为独立的全宽卡片。
+- 修复剪贴板缩略图越界。长图和宽图会在方框内等比缩放，避免盖住相邻记录。
+
 ## 0.3.1
 
 - On macOS, Keep Awake shows a live countdown and local end time. Choose 30 minutes, 1–12 hours, 24 hours, or an indefinite session. Extend a timed session by 15 minutes or keep the display awake for the current session.
