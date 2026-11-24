@@ -82,6 +82,7 @@ type System struct {
 	scanCancelMu    sync.Mutex
 	scanCancel      context.CancelFunc
 	launcher        *launcher
+	clipboard       *clipboardHistory
 	calculatorMu    sync.Mutex
 	calculatorInput calculatorInput
 	openCalculator  func()
@@ -155,7 +156,7 @@ func main() {
 		log.Fatal(err)
 	}
 	preferencesPath := filepath.Join(configDir, "preferences.json")
-	preferences, err := readPreferences(preferencesPath, cfg.DefaultMenuBarItems, cfg.DefaultLanguage, cfg.DefaultUpdateUseSystemProxy, cfg.DefaultHideDockOnClose)
+	preferences, err := readPreferences(preferencesPath, cfg.defaultPreferences())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -184,6 +185,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if runtime.GOOS == "darwin" {
+		store := clipboardStore{dir: filepath.Join(configDir, "clipboard"), config: cfg.ClipboardHistory}
+		service.clipboard = &clipboardHistory{store: store}
+		if err := mygo.Protocol.Handle(clipboardPreviewScheme, store); err != nil {
+			log.Fatal(err)
+		}
+	}
 	mygo.Bind(service)
 	if err := mygo.Protocol.Handle(appicon.Scheme, appicon.Handler()); err != nil {
 		log.Fatal(err)
@@ -195,6 +203,9 @@ func main() {
 		applyLanguage(preferences.Language)
 		localization.SetLanguage(mygo.App.Locale())
 		service.startup.initialize(cfg.DefaultOpenAtLogin)
+		if service.clipboard != nil {
+			service.clipboard.setRecording(true)
+		}
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title: "RockshinOps", URL: "/", Width: 1250, Height: 820,
 			MinWidth: 900, MinHeight: 600, StateKey: "main", Hidden: true,
@@ -263,20 +274,31 @@ func main() {
 		capacityItem := &mygo.MenuItem{Label: "正在读取磁盘容量…", Disabled: true}
 		updatedItem := &mygo.MenuItem{Label: "RockshinOps · 本机监控", Disabled: true}
 		activityItem := &mygo.MenuItem{Label: "正在采样…", Disabled: true}
+		trayItems := []*mygo.MenuItem{capacityItem, activityItem, updatedItem, mygo.Separator()}
+		var awake *keepAwake
+		if runtime.GOOS == "darwin" {
+			awake = newKeepAwake(cfg.KeepAwakeMinutes)
+			trayItems = append(trayItems, awake.menu, &mygo.MenuItem{Label: "剪贴板历史", Click: func(*mygo.MenuItem, *mygo.Window) {
+				service.launcher.show(true)
+			}}, mygo.Separator())
+		}
+		trayItems = append(trayItems,
+			&mygo.MenuItem{Label: "打开 RockshinOps", Click: func(*mygo.MenuItem, *mygo.Window) { openWindow() }},
+			&mygo.MenuItem{Label: "设置…", Click: openSettings},
+			&mygo.MenuItem{Label: "检查更新…", Click: func(*mygo.MenuItem, *mygo.Window) { updater.CheckForUpdates() }},
+			&mygo.MenuItem{Label: "立即刷新", Click: func(*mygo.MenuItem, *mygo.Window) { go service.refresh(true) }},
+			mygo.Separator(), &mygo.MenuItem{Role: mygo.RoleQuit, Label: "退出 RockshinOps"},
+		)
 		tray, err := mygo.NewTray(mygo.TrayOptions{
 			ID: "rockshinops.storage", Icon: diskIcon(), IconIsTemplate: true,
 			Title: "—", ToolTip: localization.T("RockshinOps · 剩余可写空间"),
-			Menu: localizedMenu([]*mygo.MenuItem{
-				capacityItem, activityItem, updatedItem, mygo.Separator(),
-				{Label: "打开 RockshinOps", Click: func(*mygo.MenuItem, *mygo.Window) { openWindow() }},
-				{Label: "设置…", Click: openSettings},
-				{Label: "检查更新…", Click: func(*mygo.MenuItem, *mygo.Window) { updater.CheckForUpdates() }},
-				{Label: "立即刷新", Click: func(*mygo.MenuItem, *mygo.Window) { go service.refresh(true) }},
-				mygo.Separator(), {Role: mygo.RoleQuit, Label: "退出 RockshinOps"},
-			}),
+			Menu: localizedMenu(trayItems),
 		})
 		if err != nil {
 			log.Fatalf("create RockshinOps tray: %v", err)
+		}
+		if awake != nil {
+			awake.localize()
 		}
 		lastTitle := "—"
 		var lastImage []byte
@@ -284,6 +306,9 @@ func main() {
 			selectedTitle := menuBarTitle(service.preferences, s)
 			selectedItems := append([]string{}, service.preferences.MenuBarItems...)
 			mygo.RunOnMain(func() {
+				if awake != nil {
+					awake.refresh()
+				}
 				title := "—"
 				if s.Disk.CapacityError == "" {
 					title = storage.FormatCapacity(s.Disk.Volume.Available)
@@ -329,6 +354,9 @@ func main() {
 		}
 		mygo.App.OnLocaleChanged(func(language string) {
 			localization.SetLanguage(language)
+			if awake != nil {
+				awake.localize()
+			}
 			go service.refresh(true)
 		})
 		ctx, cancel := context.WithCancel(context.Background())
@@ -338,6 +366,14 @@ func main() {
 			service.calculatorInput.page = false
 			setCalculatorFocus(false)
 			service.devices.Stop()
+			if service.clipboard != nil {
+				service.clipboard.setRecording(false)
+			}
+			if awake != nil {
+				if err := awake.stop(); err != nil {
+					log.Printf("stop keeping awake on quit: %v", err)
+				}
+			}
 			cancel()
 			_, _ = menubar.Native("stop", nil)
 		})

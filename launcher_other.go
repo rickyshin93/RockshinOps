@@ -2,7 +2,19 @@
 
 package main
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/egoist/mygo"
+)
+
+func (l *launcher) launchApp(app mygo.InstalledApp) error {
+	if err := mygo.Shell.LaunchApp(app); err != nil {
+		return err
+	}
+	l.hide()
+	return nil
+}
 
 func spotlightHoldsShortcut(string) bool { return false }
 

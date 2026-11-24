@@ -7,6 +7,10 @@
   "defaultMenuBarItems": [
     "disk"
   ],
+  "defaultSidebarTools": {
+    "calculator": true,
+    "clipboard": true
+  },
   "sampleIntervalSeconds": 30,
   "metricsIntervalSeconds": 2,
   "deviceRefreshSeconds": 5,
@@ -24,6 +28,15 @@
   "connectionSampleIntervalSeconds": 1,
   "machineInfoTimeoutSeconds": 5,
   "powerAssertionIntervalSeconds": 10,
+  "keepAwakeMinutes": [30, 60, 120],
+  "clipboardHistory": {
+    "pollMilliseconds": 350,
+    "maxEntries": 100,
+    "maxSnippets": 100,
+    "maxItemBytes": 65536,
+    "maxImageBytes": 67108864,
+    "maxHistoryBytes": 268435456
+  },
   "calculatorFormat": {
     "grouping": "auto",
     "decimalPlaces": 4

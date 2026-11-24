@@ -1,9 +1,9 @@
 import {
   Bluetooth, Headphones, Volume2, Mouse,
   AppWindow, ArrowDownToLine, ArrowLeftRight, Battery, BrushCleaning,
-  Calculator, Delete, Pencil, Check, ChevronDown, ChevronRight, Cpu, Folder, Globe, Gpu, HardDrive,
+  Calculator, ClipboardList, Delete, Pencil, Check, ChevronDown, ChevronRight, Cpu, Folder, Globe, Gpu, HardDrive,
   Gauge, PanelTop, Laptop, List, MemoryStick, Pause, Play, RefreshCw,
-  Search, Settings, Thermometer, Fan, X, Zap, Star, Copy, EthernetPort, Power, ArrowLeft, File, FolderOpen, ScanSearch, Trash2, createElement, type IconNode,
+  Search, Settings, Thermometer, Fan, X, Zap, Star, Copy, EthernetPort, Power, ArrowLeft, File, FileText, FilePlus, FolderOpen, Pin, ScanSearch, Trash2, createElement, type IconNode,
 } from "lucide";
 
 const wifi: IconNode = [
@@ -20,11 +20,15 @@ const icons: Record<string, IconNode> = {
   speaker: Volume2,
   mouse: Mouse,
   star: Star,
+  pin: Pin,
+  snippet: FileText,
+  "save-snippet": FilePlus,
   copy: Copy,
   ports: EthernetPort,
   settings: Settings,
   launcher: Search,
   calculator: Calculator,
+  clipboard: ClipboardList,
   backspace: Delete,
   pencil: Pencil,
   menubar: PanelTop,

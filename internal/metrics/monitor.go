@@ -111,7 +111,7 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 			s.CPU.Ready = true
 			s.CPU.User = float64(user) / float64(total) * 100
 			s.CPU.System = float64(system) / float64(total) * 100
-			s.CPU.Usage = s.CPU.User + s.CPU.System
+			s.CPU.Usage = float64(user+system) / float64(total) * 100
 		}
 	}
 	s.Disk = Disk{Volume: m.snapshot.Disk.Volume, CapacityError: m.snapshot.Disk.CapacityError, Error: raw.diskError}

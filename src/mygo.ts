@@ -245,18 +245,27 @@ export interface Item {
 
 export interface LauncherResult {
   id: string;
-  /** app, file, folder or calculation */
+  /** app, file, folder, calculation or clipboard */
   kind: string;
   title: string;
   subtitle: string;
   path: string;
   approximate?: boolean;
   grouping?: string;
+  clipboardImage?: boolean;
+  clipboardPinned?: boolean;
 }
 
 export interface LauncherSearch {
   items: LauncherResult[];
   calculatorError?: string;
+  clipboardStatus?: string;
+  clipboardWarning?: string;
+  clipboardCount?: number;
+  clipboardPinnedCount?: number;
+  clipboardSnippets?: LauncherResult[];
+  clipboardBytes?: number;
+  clipboardLimit?: number;
 }
 
 export interface LauncherSettings {
@@ -359,6 +368,7 @@ export interface Preferences {
   updateUseSystemProxy: boolean;
   language: string;
   menuBarItems: string[];
+  sidebarTools: SidebarTools;
 }
 
 export interface Process {
@@ -431,6 +441,11 @@ export interface Settings {
   searchHotkey: string;
   panelHotkey: string;
   menusHotkey: string;
+}
+
+export interface SidebarTools {
+  calculator: boolean;
+  clipboard: boolean;
 }
 
 export interface Snapshot {
@@ -647,8 +662,17 @@ export const System = {
   checkForUpdates(): Promise<void> {
     return call("System.CheckForUpdates");
   },
+  clearClipboardHistory(): Promise<void> {
+    return call("System.ClearClipboardHistory");
+  },
+  clipboardHistory(query: string): Promise<LauncherSearch> {
+    return call("System.ClipboardHistory", query);
+  },
   connections(): Promise<Connections> {
     return call("System.Connections");
+  },
+  copyClipboardHistory(id: string): Promise<void> {
+    return call("System.CopyClipboardHistory", id);
   },
   copyPortAddress(address: string): Promise<void> {
     return call("System.CopyPortAddress", address);
@@ -681,10 +705,13 @@ export const System = {
   installedApps(): Promise<InstalledApp[]> {
     return call("System.InstalledApps");
   },
+  launcherClipboardQuery(query: string): Promise<LauncherSearch> {
+    return call("System.LauncherClipboardQuery", query);
+  },
   launcherHide(): Promise<void> {
     return call("System.LauncherHide");
   },
-  /** LauncherOpen opens, reveals or copies an item, or opens the calculator. */
+  /** LauncherOpen opens, reveals or copies a result, or opens the calculator. */
   launcherOpen(id: string, action: string): Promise<void> {
     return call("System.LauncherOpen", id, action);
   },
@@ -697,6 +724,9 @@ export const System = {
   },
   launcherSettings(): Promise<LauncherSettings> {
     return call("System.LauncherSettings");
+  },
+  launcherShowingClipboard(): Promise<boolean> {
+    return call("System.LauncherShowingClipboard");
   },
   menuBarAction(action: string): Promise<State> {
     return call("System.MenuBarAction", action);
@@ -748,6 +778,9 @@ export const System = {
   saveCalculatorFormat(format: CalculatorFormat): Promise<void> {
     return call("System.SaveCalculatorFormat", format);
   },
+  saveClipboardSnippet(id: string, name: string): Promise<void> {
+    return call("System.SaveClipboardSnippet", id, name);
+  },
   saveFavoritePorts(ports: number[]): Promise<number[]> {
     return call("System.SaveFavoritePorts", ports);
   },
@@ -769,6 +802,9 @@ export const System = {
   },
   setCalculatorInputActive(active: boolean): Promise<void> {
     return call("System.SetCalculatorInputActive", active);
+  },
+  setClipboardPinned(id: string, pinned: boolean): Promise<void> {
+    return call("System.SetClipboardPinned", id, pinned);
   },
   setLauncher(enabled: boolean, files: boolean, shortcut: string): Promise<LauncherSettings> {
     return call("System.SetLauncher", enabled, files, shortcut);
@@ -806,7 +842,8 @@ export const System = {
 export const events = {
   calculatorOpened: event<string>("calculatorOpened"),
   calculatorHistoryChanged: event<boolean>("calculatorHistoryChanged"),
-  /** LauncherShown tells the launcher page that the panel was summoned. */
+  clipboardHistoryChanged: event<boolean>("clipboardHistoryChanged"),
+  /** LauncherShown tells the page the panel was summoned and whether to show clipboard history. */
   launcherShown: event<boolean>("launcherShown"),
   launcherHidden: event<boolean>("launcherHidden"),
   metricsChanged: event<Snapshot>("metricsChanged"),

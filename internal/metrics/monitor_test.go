@@ -37,6 +37,22 @@ func TestCounterDeltasBaselineResetAndSleep(t *testing.T) {
 	}
 }
 
+func TestTotalCPUUsageAtFullUtilization(t *testing.T) {
+	m := NewMonitor(Options{Interval: time.Second})
+	raw := rawSample{cpu: []cpuTicks{{user: 100, system: 100}}}
+	m.read = func() rawSample { return raw }
+	m.readVolume = func() (storage.Volume, error) { return storage.Volume{}, nil }
+	m.readProcesses = func() ([]rawProcess, int, error) { return nil, 0, nil }
+	m.readSensors = func() Sensors { return Sensors{} }
+	now := time.Now()
+	m.refreshAt(now, false)
+	raw.cpu = []cpuTicks{{user: 134, system: 113}}
+	cpu := m.refreshAt(now.Add(time.Second), false).CPU
+	if !cpu.Ready || cpu.Usage != 100 {
+		t.Fatalf("fully busy CPU should report exactly 100%%: %+v", cpu)
+	}
+}
+
 func TestProcessPIDReuseAndFailuresClearCurrentValues(t *testing.T) {
 	m := NewMonitor(Options{Interval: 2 * time.Second, DiskInterval: time.Second, ProcessInterval: 5 * time.Second, HistorySeconds: 60})
 	raw := rawSample{cpuError: "no cpu"}

@@ -5,6 +5,7 @@ import en from "../internal/localization/en.json";
 import zh from "../internal/localization/zh.json";
 import { resolveLanguage } from "./i18n-language";
 import { formatCalculation } from "./calculation-format";
+import { clipboardImageURL, clipboardWarningKey } from "./clipboard-ui";
 
 // The panel stays light: plain DOM and the shared catalogs, no React or i18next.
 const catalogs: Record<"en" | "zh", Record<string, string>> = { en, zh };
@@ -24,6 +25,9 @@ highlightOffset.on("change", offset => {
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const empty = document.getElementById("launcher-empty") as HTMLParagraphElement;
 const card = document.getElementById("launcher") as HTMLDivElement;
+const modeButton = document.getElementById("launcher-mode") as HTMLButtonElement;
+const clipboardControls = document.getElementById("launcher-clipboard-controls") as HTMLDivElement;
+const clearButton = document.getElementById("launcher-clear") as HTMLButtonElement;
 
 let results: LauncherResult[] = [];
 let selected = 0;
@@ -31,7 +35,15 @@ let request = Promise.resolve();
 let operation = request;
 let displayed: Promise<void>;
 let feedback = "";
-let opening = false;
+let opening: { appLaunch: boolean } | null = null;
+let clipboardMode = false;
+let clipboardStatus: string | undefined;
+let clipboardCount = 0;
+let clipboardPinnedCount = 0;
+let clipboardWarning = "";
+let clipboardBusy = false;
+let visible = true;
+let presentation = 0;
 let resultRows = new Map<string, { item: LauncherResult; element: HTMLLIElement }>();
 let resizeFrame = 0;
 let lastHeight = 0;
@@ -39,12 +51,10 @@ let waitingForPointer = false;
 
 function applyLanguage(tag: string) {
   const next = resolveLanguage([tag]);
-  if (document.documentElement.lang === next && input.placeholder) return;
+  if (language === next) return;
   resultRows.clear();
   language = next;
   document.documentElement.lang = language;
-  input.placeholder = t("搜索应用和文件");
-  input.setAttribute("aria-label", input.placeholder);
   render();
 }
 
@@ -58,12 +68,21 @@ function iconURL(r: LauncherResult): string {
 }
 
 function resultIcon(r: LauncherResult) {
-  if (r.kind === "calculation") {
+  if (r.clipboardImage) {
+    const image = document.createElement("img");
+    image.className = "launcher-image";
+    image.alt = "";
+    image.src = clipboardImageURL(r.id);
+    return image;
+  }
+  if (r.kind === "calculation" || r.kind === "clipboard") {
     const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     icon.setAttribute("class", "launcher-result-icon");
     icon.setAttribute("viewBox", "0 0 24 24");
     icon.setAttribute("aria-hidden", "true");
-    icon.innerHTML = '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 7h8M9 12h1m4 0h1m-6 4h1m4 0h1"/>';
+    icon.innerHTML = r.kind === "clipboard"
+      ? '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2m0 7h8m-8 5h8"/>'
+      : '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 7h8M9 12h1m4 0h1m-6 4h1m4 0h1"/>';
     return icon;
   }
   const img = document.createElement("img");
@@ -96,6 +115,7 @@ function actionHint(label: string, modified = false): HTMLElement {
 function row(r: LauncherResult): HTMLLIElement {
   const li = document.createElement("li");
   if (r.kind === "calculation") li.className = "launcher-calculation";
+  if (r.kind === "clipboard") li.className = "launcher-clipboard";
   li.setAttribute("role", "option");
   const copy = document.createElement("div");
   copy.className = "launcher-copy";
@@ -110,6 +130,8 @@ function row(r: LauncherResult): HTMLLIElement {
   hint.className = "launcher-hint";
   if (r.kind === "calculation") {
     hint.append(actionHint("复制结果"), actionHint("在计算器中打开", true));
+  } else if (r.kind === "clipboard") {
+    hint.append(actionHint("复制"));
   } else {
     hint.append(actionHint("打开"));
     if (r.kind !== "app") hint.append(actionHint(isMac ? "在访达中显示" : "在文件夹中显示", true));
@@ -200,11 +222,30 @@ function renderRows() {
 }
 
 function render() {
+  card.dataset.clipboard = String(clipboardMode);
+  input.placeholder = t(clipboardMode ? "搜索剪贴板历史" : "搜索应用和文件");
+  input.setAttribute("aria-label", input.placeholder);
+  modeButton.hidden = !isMac;
+  modeButton.textContent = t(clipboardMode ? "应用和文件" : "剪贴板");
+  modeButton.title = `${t(clipboardMode ? "搜索应用和文件" : "剪贴板历史")} (⌘4)`;
+  clipboardControls.hidden = !clipboardMode || !clipboardStatus;
+  clearButton.textContent = t(clipboardPinnedCount ? "清空未置顶历史" : "清空历史");
+  clearButton.disabled = clipboardBusy || clipboardCount <= clipboardPinnedCount;
   renderRows();
   resultsScroll.hidden = results.length === 0;
   positionHighlight();
-  empty.hidden = !feedback && !(results.length === 0 && input.value.trim() !== "");
-  empty.textContent = t(feedback || "没有找到匹配的结果");
+  let message = feedback;
+  if (!message && clipboardMode) {
+    if (clipboardStatus === "permission") message = "请在 macOS 系统设置中始终允许 RockshinOps 访问剪贴板。";
+    else if (clipboardWarning) message = clipboardWarning;
+    else if (clipboardStatus && results.length === 0) {
+      message = input.value.trim() ? "没有找到匹配的结果" : "复制文本或图片，即可在这里找回。";
+    }
+  } else if (!message && results.length === 0 && input.value.trim()) {
+    message = "没有找到匹配的结果";
+  }
+  empty.hidden = !message;
+  empty.textContent = message ? t(message) : "";
   input.setAttribute("aria-expanded", String(results.length > 0));
   updateActiveDescendant();
   if (resizeFrame) return;
@@ -218,19 +259,25 @@ function render() {
   });
 }
 
-function search() {
+function search(preserveSelection = false) {
   feedback = "";
   const query = input.value;
+  const clipboard = clipboardMode;
   const next = operation.then(async () => {
     if (next !== request) return;
-    const found = await System.launcherQuery(query);
+    const found = await (clipboard ? System.launcherClipboardQuery(query) : System.launcherQuery(query));
     if (next !== request) return;
+    const selectedId = preserveSelection ? results[selected]?.id : undefined;
     results = found.items;
+    clipboardStatus = found.clipboardStatus;
+    clipboardCount = found.clipboardCount ?? 0;
+    clipboardPinnedCount = found.clipboardPinnedCount ?? 0;
+    clipboardWarning = clipboardWarningKey(found.clipboardWarning);
     if (found.calculatorError) {
       console.error(found.calculatorError);
       feedback = "无法读取计算器设置，应用和文件仍可搜索。";
     }
-    selected = 0;
+    selected = Math.max(0, selectedId ? results.findIndex(item => item.id === selectedId) : 0);
     waitForPointer();
     displayed = next;
     render();
@@ -248,24 +295,73 @@ function search() {
 async function open(action: "open" | "reveal" | "copy") {
   if (opening || displayed !== request) return;
   const r = results[selected];
-  if (!r) return;
+  if (!r || (r.kind === "clipboard" && clipboardBusy)) return;
   const current = request;
   let resultAction: string = action;
   if (r.kind === "calculation") resultAction = action === "reveal" ? "calculator" : "copy";
-  opening = true;
+  if (r.kind === "clipboard") resultAction = "copy";
+  const pending = { appLaunch: isMac && r.kind === "app" && resultAction === "open" };
+  opening = pending;
   const actionPromise = System.launcherOpen(r.id, resultAction);
-  operation = actionPromise.catch(() => {});
+  if (!pending.appLaunch) operation = actionPromise.catch(() => {});
   try { await actionPromise; }
   catch (reason) {
     console.error(reason);
-    if (current === request) {
-      feedback = r.kind === "calculation" ? "计算器操作失败，请重试。" : "无法打开启动器结果，请重试。";
+    if (opening === pending && current === request) {
+      feedback = r.kind === "calculation" ? "计算器操作失败，请重试。" : r.kind === "clipboard" ? "无法复制这条记录，请重新搜索。" : "无法打开启动器结果，请重试。";
       render();
     }
-  } finally { opening = false; }
+  } finally { if (opening === pending) opening = null; }
 }
 
-input.addEventListener("input", search);
+function resetClipboardView() {
+  request = Promise.resolve();
+  results = [];
+  selected = 0;
+  feedback = "";
+  clipboardStatus = undefined;
+  clipboardCount = 0;
+  clipboardPinnedCount = 0;
+  clipboardWarning = "";
+  input.value = "";
+}
+
+function setMode(clipboard: boolean) {
+  if (clipboard !== clipboardMode) {
+    resetClipboardView();
+    clipboardMode = clipboard;
+    render();
+  }
+  input.focus();
+  input.select();
+  search();
+}
+
+modeButton.addEventListener("click", () => setMode(!clipboardMode));
+async function clearClipboard() {
+  if (clipboardBusy) return;
+  clipboardBusy = true;
+  render();
+  const shown = presentation;
+  const change = operation.then(() => System.clearClipboardHistory());
+  operation = change.catch(() => {});
+  try {
+    await change;
+    if (shown === presentation && clipboardMode) { resetClipboardView(); input.focus(); search(); render(); }
+  } catch (reason) {
+    console.error(reason);
+    if (shown === presentation && clipboardMode) feedback = "无法清空剪贴板历史。";
+  } finally { clipboardBusy = false; render(); }
+}
+clearButton.addEventListener("click", () => { void clearClipboard(); });
+
+input.addEventListener("input", () => search());
+document.addEventListener("keydown", event => {
+  if (isMac && !event.isComposing && event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey && event.key === "4") {
+    event.preventDefault();
+    setMode(!clipboardMode);
+  }
+});
 input.addEventListener("keydown", event => {
   if (event.isComposing) return;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -290,15 +386,36 @@ input.addEventListener("keydown", event => {
   }
 });
 
-events.launcherShown.on(() => {
+async function show(clipboard?: boolean) {
+  const shown = ++presentation;
+  visible = true;
+  if (opening?.appLaunch) opening = null;
+  if (clipboard !== undefined || !isMac) {
+    setMode(clipboard ?? false);
+    return;
+  }
   input.focus();
-  input.select();
-  search();
+  try {
+    const clipboard = await System.launcherShowingClipboard();
+    if (shown === presentation) setMode(clipboard);
+  } catch (reason) {
+    console.error(reason);
+    if (shown === presentation) setMode(false);
+  }
+}
+
+events.launcherShown.on(clipboard => { void show(clipboard); });
+events.launcherHidden.on(() => {
+  presentation++;
+  visible = false;
+  positionHighlight();
+  if (clipboardMode) { resetClipboardView(); render(); }
 });
-events.launcherHidden.on(() => positionHighlight());
+events.clipboardHistoryChanged.on(() => {
+  if (visible && clipboardMode && !clipboardBusy) search(true);
+});
 onLocaleChange(applyLanguage);
 reduceMotion.addEventListener("change", () => positionHighlight());
 applyLanguage(locale());
 // The first invocation creates this page; its shown event may precede loading.
-input.focus();
-search();
+void show();

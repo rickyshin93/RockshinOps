@@ -1,16 +1,18 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### New in v0.2.18
+### New in v0.3.0
 
-- The Launcher highlight follows the pointer with a damped spring, including rapid reversals and moves across several rows.
-- Keyboard selection and Reduce Motion place the highlight immediately.
-- Launcher reuses matching rows when reopened and avoids scoring the same filename repeatedly during file search.
+- On macOS, record and search local clipboard history for text and images. Pin records, save text as reusable snippets, and access history from the sidebar, menu bar, or Launcher with `⌘4`.
+- Add timed Keep Awake to the macOS menu bar and sidebar visibility settings for Calculator and Clipboard.
+- Improve Launcher app activation, thumbnail reuse and keyboard navigation. Refine Calculator wrapping, leading-zero handling and layout.
+- Upgrade to MyGo 0.9.0 and calculate total CPU usage directly from busy ticks.
 
-**中文**
+### 中文
 
-- 鼠标划过启动器结果时，高亮连续滑动，快速反向和跨行也能平滑衔接。
-- 键盘选择和「减少动态效果」时直接定位。
-- 重开启动器时复用匹配的结果行，文件搜索复用同名文件的名称评分。
+- macOS 新增本地剪贴板历史，可搜索文本和图片、置顶记录、将文本另存为片段，并从侧栏、菜单栏或启动器 `⌘4` 打开历史。
+- macOS 菜单栏新增定时保持唤醒。设置中可显示或隐藏侧栏的计算器和剪贴板入口。
+- 优化启动器打开应用、缩略图复用和键盘切换，改进计算器长算式换行、前导零和布局。
+- 升级 MyGo 0.9.0，并直接使用忙碌计数计算总 CPU 使用率。
 
 **Known issue / 已知问题：** Calculator can drop continuation input while saving history. / 计算器保存历史期间可能丢失连续输入。
 
@@ -26,7 +28,7 @@ macOS builds remain ad-hoc signed and not notarized; Accessibility or Screen Rec
 
 - **macOS Apple Silicon:** the `arm64.dmg` file.
 - **macOS Intel:** the `amd64.dmg` file.
-- **Windows x86_64:** the `Setup … amd64.exe` installer.
+- **Windows x86_64:** the `rockshinops-setup-0.3.0-amd64.exe` installer.
 - **Linux x86_64:** the `.deb` package or `.tar.gz` archive (extract and run `./rockshinops`; no install script is included).
 - `SHA256SUMS.txt` contains checksums for all packages. `update-*.json` and the macOS/Windows `.tar.gz` files are consumed by the updater; choose the installers above for manual installation.
 

@@ -1,5 +1,5 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
-import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput } from "./calculator-input";
+import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros } from "./calculator-input";
 import { calculatorOperatorGlyph, isCalculatorMathGlyph } from "./calculation-format";
 import { paintCalculationText } from "./calculation-text";
 import { calculatorExpressionItems, calculatorItemAt, calculatorItemDeletion } from "./calculator-items";
@@ -328,6 +328,7 @@ export function CalculatorExpressionEditor({
       caret++;
     }
     if (!isCalculatorDraft(next)) return false;
+    ({ value: next, caret } = normalizeCalculatorZeros(next, caret));
     applyExpression(node, next, caret);
     return true;
   }
@@ -397,9 +398,10 @@ export function CalculatorExpressionEditor({
     const end = selectionOffsets(node)[1];
     const typedReference = hasTypedReference(node);
     if (!typedReference && isCalculatorDraft(next)) {
-      renderValue(node, next);
-      restoreCaret(node, next, Math.min(end, next.length));
-      if (next !== value) onChange(next);
+      const normalized = normalizeCalculatorZeros(next, end);
+      renderValue(node, normalized.value);
+      restoreCaret(node, normalized.value, normalized.caret);
+      if (normalized.value !== value) onChange(normalized.value);
       return;
     }
     const offset = end - Math.max(0, next.length - value.length);

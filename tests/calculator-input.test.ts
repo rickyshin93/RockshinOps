@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput } from "../src/calculator-input";
+import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros } from "../src/calculator-input";
 import { calculatorExpressionItems, calculatorItemDeletion, calculatorResultItems, remapCalculatorReferences } from "../src/calculator-items";
 
 test("calculator items keep expression offsets and separate the sign from the answer", () => {
@@ -55,4 +55,12 @@ test("calculator draft rejects non-arithmetic text and adjacent operands", () =>
   for (const value of ["1+hi", "foo", "2&3", "1=1", "2📱", "1..2", "1+×", "1 2", "2+()", "1(#2)", "1#2", "#1#2", "#1 5", "1(2)", ".+", "1)", "2 + 3", " 2", "2\u3000+3", "2\n+3"]) {
     expect(isCalculatorDraft(value), value).toBe(false);
   }
+});
+
+test("leading zeroes are removed from integer operands without changing decimal places or references", () => {
+  for (const [value, expected, caret] of [
+    ["99-00009", "99-9", 4], ["00", "0", 1], ["000.0050", "0.0050", 6],
+    ["#100+0002", "#100+2", 6], ["10+0.00", "10+0.00", 7],
+  ] as const) expect(normalizeCalculatorZeros(value, value.length)).toEqual({ value: expected, caret });
+  expect(normalizeCalculatorZeros("0009", 2)).toEqual({ value: "9", caret: 0 });
 });

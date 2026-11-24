@@ -9,7 +9,7 @@ function render(files: boolean, weChat = false, isMacOS = true, busy = false) {
     launcher: { enabled: true, files, weChat, shortcut: "Alt+Space", spotlightConflict: false, indexing: false, fileCount: 2, error: "" },
     launcherBusy: busy, launcherError: "", startup: null, startupBusy: false, startupError: "",
     preferences: null, menuBarDraft: [], trayPreview: null, languageDraft: "en", updateProxyDraft: false,
-    hideDockDraft: false, preferencesBusy: false, preferencesError: "",
+    hideDockDraft: false, sidebarToolsDraft: { calculator: true, clipboard: true }, preferencesBusy: false, preferencesError: "",
   };
   return renderToStaticMarkup(<LauncherSettingsView state={state} isMacOS={isMacOS} onLauncherShortcut={() => {}} />);
 }

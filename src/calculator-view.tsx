@@ -8,7 +8,7 @@ import { CalculationText } from "./calculation-text";
 import { CalculatorExpressionEditor, calculatorTokenPosition, type CalculatorCaretPosition, type CalculatorEditor, type LinkedOperand } from "./calculator-expression-editor";
 import { useCalculatorConnections, type CalculatorTrace } from "./calculator-connection";
 import { CalculatorSettings } from "./calculator-settings";
-import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput } from "./calculator-input";
+import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros } from "./calculator-input";
 import { calculatorExpressionItems, calculatorItemAt, calculatorReferenceBindings, calculatorResultItems, remapCalculatorReferences } from "./calculator-items";
 
 const keys = ["AC", "(", ")", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "0", ".", "Backspace", "="];
@@ -493,7 +493,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
     if (backspace) return true;
     const value = normalizeCalculatorInput(text);
     if (!isCalculatorDraft(value)) return false;
-    edit(value);
+    edit(normalizeCalculatorZeros(value, value.length).value);
     return true;
   }
 
@@ -575,32 +575,34 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   const feedback = savingAnswer ? t("正在保存计算记录…") : message ? t(message.key) : previewError ? t("计算预览失败，请重试。") : "";
   const editor = (row: number) => <div className="calculator-line calculator-editor">
     <span className="calculator-row-number" data-calculation-source={editing && !editedResult && !savedError ? row : undefined} aria-hidden="true">{row}</span>
-    <CalculatorExpressionEditor ref={input} label={t("算式")} value={expression} operand={linkedOperand} display={displayToken} busy={busy}
-      onChange={edit} onReject={rejectInput} onKeyDown={event => {
-        if (event.nativeEvent.isComposing) return;
-        if (busy || pendingDeletion.current) {
-          if (event.key === "Escape" || event.key === "Enter" || event.key === "=" || event.key === "＝" || event.key === "Delete" || event.key === "Backspace") event.preventDefault();
-          return;
-        }
-        if (event.key === "Delete" && !event.altKey && !event.metaKey && !event.ctrlKey && removeItem()) { event.preventDefault(); return; }
-        const chip = calculatorItemAt(event.target);
-        if (chip?.dataset.calculationItem === "reference" && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault(); traceChip(chip); return;
-        }
-        if (!event.metaKey && !event.ctrlKey && !event.altKey && continueResult(event.key)) {
-          event.preventDefault(); return;
-        }
-        if (event.key === "Enter" || event.key === "=" || event.key === "＝") { event.preventDefault(); commit(); }
-        if (event.key === "Escape") { event.preventDefault(); if (selectedResult) setSelectedResult(null); else if (editing) changeEditing(); else if (trace) setTrace(null); else edit(""); }
-        if (event.key === "Backspace" && !busy && !event.altKey && !event.metaKey && !event.ctrlKey) {
-          event.preventDefault();
-          press("Backspace");
-        }
-      }} placeholder={t("输入算式…")} />
-    {displayedResult ? <output className="calculator-line-result" htmlFor="calculator-expression" aria-label={t("计算结果")}>
-      <ResultItems value={displayedResult.value} approximate={displayedResult.approximate} grouping={grouping}
-        source={editing && !savingAnswer ? row : undefined} selected={savingAnswer ? "answer" : undefined} />
-    </output> : savedError && <span className="calculator-row-error" data-calculation-source={row}>{t(calculationErrors[savedError] ?? "引用的结果不可用。")}</span>}
+    <div className="calculator-line-content">
+      <CalculatorExpressionEditor ref={input} label={t("算式")} value={expression} operand={linkedOperand} display={displayToken} busy={busy}
+        onChange={edit} onReject={rejectInput} onKeyDown={event => {
+          if (event.nativeEvent.isComposing) return;
+          if (busy || pendingDeletion.current) {
+            if (event.key === "Escape" || event.key === "Enter" || event.key === "=" || event.key === "＝" || event.key === "Delete" || event.key === "Backspace") event.preventDefault();
+            return;
+          }
+          if (event.key === "Delete" && !event.altKey && !event.metaKey && !event.ctrlKey && removeItem()) { event.preventDefault(); return; }
+          const chip = calculatorItemAt(event.target);
+          if (chip?.dataset.calculationItem === "reference" && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault(); traceChip(chip); return;
+          }
+          if (!event.metaKey && !event.ctrlKey && !event.altKey && continueResult(event.key)) {
+            event.preventDefault(); return;
+          }
+          if (event.key === "Enter" || event.key === "=" || event.key === "＝") { event.preventDefault(); commit(); }
+          if (event.key === "Escape") { event.preventDefault(); if (selectedResult) setSelectedResult(null); else if (editing) changeEditing(); else if (trace) setTrace(null); else edit(""); }
+          if (event.key === "Backspace" && !busy && !event.altKey && !event.metaKey && !event.ctrlKey) {
+            event.preventDefault();
+            press("Backspace");
+          }
+        }} placeholder={t("输入算式…")} />
+      {displayedResult ? <output className="calculator-line-result" htmlFor="calculator-expression" aria-label={t("计算结果")}>
+        <ResultItems value={displayedResult.value} approximate={displayedResult.approximate} grouping={grouping}
+          source={editing && !savingAnswer ? row : undefined} selected={savingAnswer ? "answer" : undefined} />
+      </output> : savedError && <span className="calculator-row-error" data-calculation-source={row}>{t(calculationErrors[savedError] ?? "引用的结果不可用。")}</span>}
+    </div>
     {editing && <button type="button" className="icon-button calculator-line-action" disabled={busy} aria-label={t("取消编辑")} title={t("取消编辑")} onClick={() => changeEditing()}><Icon name="close" /></button>}
   </div>;
 
@@ -653,13 +655,13 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
             {historyRows.map((entry, index) => <li key={entry.createdAt} data-calculation-row={entry.createdAt}>
               {editing?.id === entry.createdAt ? editor(index + 1) : <div className="calculator-line">
                 <span className="calculator-row-number" data-calculation-source={entry.pending ? index + 1 : undefined} aria-hidden="true">{index + 1}</span>
-                <div className="calculator-record">
+                <div className="calculator-line-content">
                   <Expression value={compactExpression(entry.expression)} display={displayToken} operand={entry.expression.includes("#") ? linkedOperand : undefined} editable />
+                  {entry.pending ? null : entry.error ? <span className="calculator-row-error" data-calculation-source={index + 1}>{t(calculationErrors[entry.error] ?? "引用的结果不可用。")}</span> : <div className="calculator-line-result">
+                    <ResultItems value={entry.result.value} approximate={entry.result.approximate} grouping={grouping} source={index + 1}
+                      selected={selectedResult?.id === entry.createdAt ? selectedResult.item : undefined} />
+                  </div>}
                 </div>
-                {entry.pending ? null : entry.error ? <span className="calculator-row-error" data-calculation-source={index + 1}>{t(calculationErrors[entry.error] ?? "引用的结果不可用。")}</span> : <div className="calculator-line-result">
-                  <ResultItems value={entry.result.value} approximate={entry.result.approximate} grouping={grouping} source={index + 1}
-                    selected={selectedResult?.id === entry.createdAt ? selectedResult.item : undefined} />
-                </div>}
                 {!entry.pending && !entry.error && <button type="button" className="icon-button calculator-line-action calculator-history-actions calculator-copy-result"
                   disabled={entry.result.value !== savedRows[index]?.result.value} aria-label={t("复制结果")} title={t("复制结果")} onClick={() => copy(entry.result.value)}><Icon name="copy" /></button>}
               </div>}
@@ -667,10 +669,12 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
             {draftOpen && <li className="calculator-draft" data-calculation-row="draft">
               {editing ? <div className="calculator-line">
                 <span className="calculator-row-number" aria-hidden="true">{historyRows.length + 1}</span>
-                <button type="button" className="calculator-expression-input calculator-draft-entry" data-empty={!draft} data-placeholder={t("输入算式…")}
-                  aria-label={t("返回新算式")} disabled={busy}>
-                  <Expression value={draft} display={displayToken} operand={token => linkedOperand(token, savedRows)} />
-                </button>
+                <div className="calculator-line-content">
+                  <button type="button" className="calculator-expression-input calculator-draft-entry" data-empty={!draft} data-placeholder={t("输入算式…")}
+                    aria-label={t("返回新算式")} disabled={busy}>
+                    <Expression value={draft} display={displayToken} operand={token => linkedOperand(token, savedRows)} />
+                  </button>
+                </div>
               </div> : editor(historyRows.length + 1)}
             </li>}
           </ol>

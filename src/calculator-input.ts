@@ -4,6 +4,22 @@ export function normalizeCalculatorInput(value: string): string {
   return value.replace(/[。０-９．＋－＊／（）]/g, char => char === "。" ? "." : String.fromCharCode(char.charCodeAt(0) - 0xfee0));
 }
 
+// Normalize integer operands without touching fractional digits or reference IDs.
+export function normalizeCalculatorZeros(value: string, caret: number): { value: string; caret: number } {
+  let removed = 0;
+  let removedBeforeCaret = 0;
+  for (const item of calculatorExpressionItems(value)) {
+    if (item.kind !== "number") continue;
+    const count = item.value.match(/^0+(?=\d)/)?.[0].length ?? 0;
+    if (!count) continue;
+    const start = item.offset - removed;
+    value = value.slice(0, start) + value.slice(start + count);
+    removedBeforeCaret += Math.max(0, Math.min(count, caret - item.offset));
+    removed += count;
+  }
+  return { value, caret: caret - removedBeforeCaret };
+}
+
 export function calculatorInputKey(key: string, code: string): string {
   return key === "Decimal" || (code === "NumpadDecimal" && key === ",") ? "." : normalizeCalculatorInput(key);
 }

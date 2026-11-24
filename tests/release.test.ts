@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectRelease, verifyUpdate } from "../scripts/collect-release";
 import config from "../mygo.config";
@@ -49,4 +49,14 @@ test("a signed release cannot silently omit a platform manifest", () => {
   const directory = mkdtempSync(join("work", "release-test-"));
   writeFileSync(join(directory, "RockshinOps 0.2.1 arm64.dmg"), "installer");
   expect(() => collectRelease("darwin/arm64", true, directory, join(directory, "out"))).toThrow("update-darwin-arm64.json");
+});
+
+test("collects the MyGo 0.9 Windows installer rather than the executable", () => {
+  mkdirSync("work", { recursive: true });
+  const directory = mkdtempSync(join("work", "release-test-"));
+  writeFileSync(join(directory, "rockshinops-setup-0.2.16-amd64.exe"), "installer");
+  writeFileSync(join(directory, "RockshinOps.exe"), "application");
+  collectRelease("windows/amd64", false, directory, join(directory, "out"));
+  expect(existsSync(join(directory, "out", "rockshinops-setup-0.2.16-amd64.exe"))).toBe(true);
+  expect(existsSync(join(directory, "out", "RockshinOps.exe"))).toBe(false);
 });

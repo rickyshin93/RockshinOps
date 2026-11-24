@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+- On macOS, record and search local clipboard history for text and images. Pin records, save text as reusable snippets, and access history from the sidebar, menu bar, or Launcher with `⌘4`.
+- Add timed Keep Awake to the macOS menu bar and sidebar visibility settings for Calculator and Clipboard.
+- Improve Launcher app activation, thumbnail reuse and keyboard navigation. Refine Calculator wrapping, leading-zero handling and layout.
+- Upgrade to MyGo 0.9.0 and calculate total CPU usage directly from busy ticks.
+
+### 中文
+
+- macOS 新增本地剪贴板历史，可搜索文本和图片、置顶记录、将文本另存为片段，并从侧栏、菜单栏或启动器 `⌘4` 打开历史。
+- macOS 菜单栏新增定时保持唤醒。设置中可显示或隐藏侧栏的计算器和剪贴板入口。
+- 优化启动器打开应用、缩略图复用和键盘切换，改进计算器长算式换行、前导零和布局。
+- 升级 MyGo 0.9.0，并直接使用忙碌计数计算总 CPU 使用率。
+
 ## 0.2.18
 
 - Use a damped spring for the Launcher highlight as the pointer moves across results. Keyboard selection and Reduce Motion place the highlight immediately.

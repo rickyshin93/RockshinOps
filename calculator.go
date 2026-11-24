@@ -88,7 +88,7 @@ func (s *System) SaveCalculatorFormat(format CalculatorFormat) error {
 		return err
 	}
 	defer unlock()
-	return writeCalculatorJSON(s.calculatorFormatPath(), format)
+	return writeLocalJSON(s.calculatorFormatPath(), format)
 }
 
 func (s *System) readCalculatorInputs() (CalculatorFormat, []CalculationEntry, error) {
@@ -238,7 +238,7 @@ func (s *System) readCalculatorHistory() ([]CalculationEntry, error) {
 	return history, nil
 }
 
-func writeCalculatorJSON(path string, value any) error {
+func writeLocalJSON(path string, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -344,7 +344,7 @@ func (s *System) calculatorDeleteResult(createdAt time.Time, keepAnswer bool, di
 	entry.Result = CalculationValue{}
 	entry.Error = ""
 	recalculateCalculatorRows(history[:index], append(prior, nil), calculationPlaces)
-	if err := writeCalculatorJSON(s.calculatorPath(), history); err != nil {
+	if err := writeLocalJSON(s.calculatorPath(), history); err != nil {
 		return CalculatorSheet{}, err
 	}
 	return calculatorSheet(format, history), nil
@@ -384,7 +384,7 @@ func (s *System) CalculatorDeleteRow(createdAt time.Time) (CalculatorSheet, erro
 	}
 	history = slices.Delete(history, index, index+1)
 	recalculateCalculatorRows(history[:index], calculationReferences(history[index:]), calculationPlaces)
-	if err := writeCalculatorJSON(s.calculatorPath(), history); err != nil {
+	if err := writeLocalJSON(s.calculatorPath(), history); err != nil {
 		return CalculatorSheet{}, err
 	}
 	return calculatorSheet(format, history), nil
@@ -470,7 +470,7 @@ func (s *System) saveCalculation(expression string, createdAt time.Time, showAns
 			recalculateCalculatorRows(history[:index], append(prior, exact), calculationPlaces)
 		}
 	}
-	if err := writeCalculatorJSON(s.calculatorPath(), history); err != nil {
+	if err := writeLocalJSON(s.calculatorPath(), history); err != nil {
 		return calculatorSaved{}, err
 	}
 	entry.Result = result
@@ -537,7 +537,7 @@ func (s *System) CalculatorClearHistory() error {
 		return err
 	}
 	defer unlock()
-	return writeCalculatorJSON(s.calculatorPath(), []CalculationEntry{})
+	return writeLocalJSON(s.calculatorPath(), []CalculationEntry{})
 }
 
 func notifyCalculatorHistory() {

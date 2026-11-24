@@ -22,7 +22,7 @@ import (
 	"rockshinops/internal/localization"
 )
 
-// LauncherShown tells the launcher page that the panel was summoned.
+// LauncherShown tells the page the panel was summoned and whether to show clipboard history.
 var LauncherShown = mygo.NewEvent[bool]("launcherShown")
 var LauncherHidden = mygo.NewEvent[bool]("launcherHidden")
 
@@ -45,18 +45,27 @@ type LauncherSettings struct {
 }
 
 type LauncherResult struct {
-	ID          string `json:"id"`
-	Kind        string `json:"kind"` // app, file, folder or calculation
-	Title       string `json:"title"`
-	Subtitle    string `json:"subtitle"`
-	Path        string `json:"path"`
-	Approximate bool   `json:"approximate,omitempty"`
-	Grouping    string `json:"grouping,omitempty"`
+	ID              string `json:"id"`
+	Kind            string `json:"kind"` // app, file, folder, calculation or clipboard
+	Title           string `json:"title"`
+	Subtitle        string `json:"subtitle"`
+	Path            string `json:"path"`
+	Approximate     bool   `json:"approximate,omitempty"`
+	Grouping        string `json:"grouping,omitempty"`
+	ClipboardImage  bool   `json:"clipboardImage,omitempty"`
+	ClipboardPinned bool   `json:"clipboardPinned,omitempty"`
 }
 
 type LauncherSearch struct {
-	Items           []LauncherResult `json:"items"`
-	CalculatorError string           `json:"calculatorError,omitempty"`
+	Items                []LauncherResult `json:"items"`
+	CalculatorError      string           `json:"calculatorError,omitempty"`
+	ClipboardStatus      string           `json:"clipboardStatus,omitempty"`
+	ClipboardWarning     string           `json:"clipboardWarning,omitempty"`
+	ClipboardCount       int              `json:"clipboardCount,omitempty"`
+	ClipboardPinnedCount int              `json:"clipboardPinnedCount,omitempty"`
+	ClipboardSnippets    []LauncherResult `json:"clipboardSnippets,omitempty"`
+	ClipboardBytes       int64            `json:"clipboardBytes,omitempty"`
+	ClipboardLimit       int64            `json:"clipboardLimit,omitempty"`
 }
 
 type launcherPrefs struct {
@@ -74,10 +83,12 @@ type launcher struct {
 	register   func(string) error
 	unregister func(string)
 
-	panelOnce sync.Once
-	panel     atomic.Pointer[mygo.Window]
-	appsMu    sync.Mutex
-	apps      []mygo.InstalledApp
+	panelOnce     sync.Once
+	panel         atomic.Pointer[mygo.Window]
+	panelVersion  uint64 // main thread only
+	showClipboard atomic.Bool
+	appsMu        sync.Mutex
+	apps          []mygo.InstalledApp
 
 	home        string // "" leaves file search off, as in tests
 	rules       fileindex.Rules
@@ -242,21 +253,29 @@ func (l *launcher) ensurePanel() {
 
 // toggle runs on the main thread from the global shortcut.
 func (l *launcher) toggle() {
-	l.ensurePanel()
-	panel := l.panel.Load()
-	if panel.IsVisible() {
+	if panel := l.panel.Load(); panel != nil && panel.IsVisible() {
 		panel.Hide()
 		return
 	}
+	l.show(false)
+}
+
+func (l *launcher) show(clipboard bool) {
+	l.panelVersion++
+	l.showClipboard.Store(clipboard)
+	l.ensurePanel()
+	panel := l.panel.Load()
 	d := mygo.Screen.DisplayNearestPoint(mygo.Screen.CursorScreenPoint())
 	w, _ := panel.Size()
 	panel.SetPosition(d.WorkArea.X+(d.WorkArea.Width-w)/2, d.WorkArea.Y+d.WorkArea.Height/5)
 	panel.Show()
 	panel.Focus()
-	if err := LauncherShown.Broadcast(true); err != nil {
+	if err := LauncherShown.Broadcast(clipboard); err != nil {
 		log.Printf("launcher shown: %v", err)
 	}
-	go l.loadApps()
+	if !clipboard {
+		go l.loadApps()
+	}
 }
 
 func (l *launcher) loadApps() {
@@ -349,17 +368,14 @@ func (l *launcher) open(id, action string) error {
 		err = mygo.Clipboard.Write(transfer.TextData(path))
 	case "open":
 		if app != nil {
-			err = mygo.Shell.LaunchApp(*app)
-		} else {
-			err = mygo.Shell.OpenPath(path)
+			return l.launchApp(*app)
 		}
+		err = mygo.Shell.OpenPath(path)
 	default:
 		return fmt.Errorf("unknown launcher action: %s", action)
 	}
 	if err == nil {
-		if panel := l.panel.Load(); panel != nil {
-			panel.Hide()
-		}
+		l.hide()
 	}
 	return err
 }
@@ -391,6 +407,8 @@ func rankApps(apps []mygo.InstalledApp, q string, limit int) []scoredApp {
 }
 
 func (s *System) LauncherSettings() LauncherSettings { return s.launcher.settings() }
+
+func (s *System) LauncherShowingClipboard() bool { return s.launcher.showClipboard.Load() }
 
 func (s *System) SetLauncherWeChat(enabled bool) (LauncherSettings, error) {
 	if err := s.launcher.setWeChat(enabled); err != nil {
@@ -442,8 +460,18 @@ func (s *System) LauncherQuery(query string) (search LauncherSearch) {
 	return search
 }
 
-// LauncherOpen opens, reveals or copies an item, or opens the calculator.
+// LauncherOpen opens, reveals or copies a result, or opens the calculator.
 func (s *System) LauncherOpen(id, action string) error {
+	if strings.HasPrefix(id, "clipboard:") {
+		if action != "copy" {
+			return fmt.Errorf("unknown clipboard action: %s", action)
+		}
+		if err := s.CopyClipboardHistory(id); err != nil {
+			return err
+		}
+		s.LauncherHide()
+		return nil
+	}
 	expression, calculation := strings.CutPrefix(id, "calc:")
 	if !calculation {
 		return s.launcher.open(id, action)
@@ -482,7 +510,11 @@ func (s *System) LauncherResize(height int) {
 }
 
 func (s *System) LauncherHide() {
-	if p := s.launcher.panel.Load(); p != nil {
+	s.launcher.hide()
+}
+
+func (l *launcher) hide() {
+	if p := l.panel.Load(); p != nil {
 		p.Hide()
 	}
 }

@@ -18,10 +18,16 @@ import (
 )
 
 type Preferences struct {
-	HideDockOnClose      bool     `json:"hideDockOnClose"`
-	UpdateUseSystemProxy bool     `json:"updateUseSystemProxy"`
-	Language             string   `json:"language"`
-	MenuBarItems         []string `json:"menuBarItems"`
+	HideDockOnClose      bool         `json:"hideDockOnClose"`
+	UpdateUseSystemProxy bool         `json:"updateUseSystemProxy"`
+	Language             string       `json:"language"`
+	MenuBarItems         []string     `json:"menuBarItems"`
+	SidebarTools         SidebarTools `json:"sidebarTools"`
+}
+
+type SidebarTools struct {
+	Calculator bool `json:"calculator"`
+	Clipboard  bool `json:"clipboard"`
 }
 
 // Copy only the two settings files from the former app directory. Keep the
@@ -82,15 +88,17 @@ func validatePreferences(p Preferences) error {
 	return nil
 }
 
-func readPreferences(path string, defaults []string, defaultLanguage string, defaultProxy, defaultHideDock bool) (Preferences, error) {
+func readPreferences(path string, defaults Preferences) (Preferences, error) {
 	data, err := os.ReadFile(path)
+	p := defaults
 	if errors.Is(err, os.ErrNotExist) {
-		return Preferences{HideDockOnClose: defaultHideDock, UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage, MenuBarItems: append([]string{}, defaults...)}, nil
+		p.MenuBarItems = append([]string{}, defaults.MenuBarItems...)
+		return p, nil
 	}
 	if err != nil {
 		return Preferences{}, fmt.Errorf("read preferences: %w", err)
 	}
-	p := Preferences{HideDockOnClose: defaultHideDock, UpdateUseSystemProxy: defaultProxy, Language: defaultLanguage}
+	p.MenuBarItems = nil
 	if err = json.Unmarshal(data, &p); err == nil {
 		err = validatePreferences(p)
 	}
@@ -123,7 +131,9 @@ func writePreferences(path string, p Preferences) error {
 func (s *System) Preferences() Preferences {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return Preferences{HideDockOnClose: s.preferences.HideDockOnClose, UpdateUseSystemProxy: s.preferences.UpdateUseSystemProxy, Language: s.preferences.Language, MenuBarItems: append([]string{}, s.preferences.MenuBarItems...)}
+	p := s.preferences
+	p.MenuBarItems = append([]string{}, p.MenuBarItems...)
+	return p
 }
 
 func (s *System) SavePreferences(p Preferences) (Preferences, error) {
@@ -132,7 +142,8 @@ func (s *System) SavePreferences(p Preferences) (Preferences, error) {
 		s.mu.Unlock()
 		return Preferences{}, err
 	}
-	s.preferences = Preferences{HideDockOnClose: p.HideDockOnClose, UpdateUseSystemProxy: p.UpdateUseSystemProxy, Language: p.Language, MenuBarItems: append([]string{}, p.MenuBarItems...)}
+	s.preferences = p
+	s.preferences.MenuBarItems = append([]string{}, p.MenuBarItems...)
 	s.update(s.monitor.Current())
 	s.mu.Unlock()
 	applyLanguage(p.Language)

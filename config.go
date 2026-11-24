@@ -35,6 +35,7 @@ type Config struct {
 	DefaultLanguage                 string                          `json:"defaultLanguage"`
 	UpdateIntervalSeconds           int                             `json:"updateIntervalSeconds"`
 	DefaultMenuBarItems             []string                        `json:"defaultMenuBarItems"`
+	DefaultSidebarTools             SidebarTools                    `json:"defaultSidebarTools"`
 	SampleIntervalSeconds           int                             `json:"sampleIntervalSeconds"`
 	MetricsIntervalSeconds          int                             `json:"metricsIntervalSeconds"`
 	ProcessIntervalSeconds          int                             `json:"processIntervalSeconds"`
@@ -42,9 +43,21 @@ type Config struct {
 	ConnectionTimeoutSeconds        int                             `json:"connectionTimeoutSeconds"`
 	MachineInfoTimeoutSeconds       int                             `json:"machineInfoTimeoutSeconds"`
 	PowerAssertionIntervalSeconds   int                             `json:"powerAssertionIntervalSeconds"`
+	KeepAwakeMinutes                []int                           `json:"keepAwakeMinutes"`
+	ClipboardHistory                clipboardHistoryConfig          `json:"clipboardHistory"`
 	ScanTargets                     map[string][]metrics.ScanTarget `json:"scanTargets"`
 	Launcher                        LauncherConfig                  `json:"launcher"`
 	CalculatorFormat                CalculatorFormat                `json:"calculatorFormat"`
+}
+
+func (c Config) defaultPreferences() Preferences {
+	return Preferences{
+		HideDockOnClose:      c.DefaultHideDockOnClose,
+		UpdateUseSystemProxy: c.DefaultUpdateUseSystemProxy,
+		Language:             c.DefaultLanguage,
+		MenuBarItems:         c.DefaultMenuBarItems,
+		SidebarTools:         c.DefaultSidebarTools,
+	}
 }
 
 func parseConfig(data []byte) (Config, error) {
@@ -79,13 +92,28 @@ func parseConfig(data []byte) (Config, error) {
 	if c.PowerAssertionIntervalSeconds <= 0 {
 		return c, fmt.Errorf("rockshinops.json: powerAssertionIntervalSeconds must be positive")
 	}
+	if len(c.KeepAwakeMinutes) == 0 {
+		return c, fmt.Errorf("rockshinops.json: keepAwakeMinutes is required")
+	}
+	previous := 0
+	for _, minutes := range c.KeepAwakeMinutes {
+		if minutes <= previous || minutes > 24*60 {
+			return c, fmt.Errorf("rockshinops.json: keepAwakeMinutes must be increasing positive durations up to 24 hours")
+		}
+		previous = minutes
+	}
+	clipboard := c.ClipboardHistory
+	if clipboard.PollMilliseconds <= 0 || clipboard.MaxEntries <= 0 || clipboard.MaxSnippets <= 0 || clipboard.MaxItemBytes <= 0 || clipboard.MaxImageBytes <= 0 ||
+		int64(max(clipboard.MaxItemBytes, clipboard.MaxImageBytes)) > clipboard.MaxHistoryBytes || max(clipboard.MaxImageBytes, clipboard.MaxItemBytes) > 1<<31-1 {
+		return c, fmt.Errorf("rockshinops.json: clipboard history requires positive limits and room for an individual entry")
+	}
 	if c.Launcher.FileRebuildMinutes <= 0 {
 		return c, fmt.Errorf("rockshinops.json: launcher.fileRebuildMinutes must be positive")
 	}
 	if len(c.ScanTargets) == 0 {
 		return c, fmt.Errorf("rockshinops.json: scanTargets is required")
 	}
-	if err := validatePreferences(Preferences{Language: c.DefaultLanguage, MenuBarItems: c.DefaultMenuBarItems}); err != nil {
+	if err := validatePreferences(c.defaultPreferences()); err != nil {
 		return c, fmt.Errorf("rockshinops.json: %w", err)
 	}
 	for _, platform := range []string{"darwin", "windows", "linux"} {
