@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,11 +17,15 @@ func Read() (Volume, error) {
 	if err != nil {
 		return Volume{}, err
 	}
+	home, err = filepath.EvalSymlinks(home)
+	if err != nil {
+		return Volume{}, err
+	}
 	usage, err := disk.Usage(home)
 	if err != nil {
 		return Volume{}, err
 	}
-	mount := home
+	var mount string
 	partitions, err := disk.Partitions(true)
 	if err != nil {
 		return Volume{}, err
@@ -32,6 +37,9 @@ func Read() (Volume, error) {
 			mount = p.Mountpoint
 			longest = len(mount)
 		}
+	}
+	if mount == "" {
+		return Volume{}, fmt.Errorf("no volume mount contains the home directory %q", home)
 	}
 	return Volume{Name: localization.T("用户数据盘"), Mount: mount, Format: strings.ToUpper(usage.Fstype), Total: usage.Total, Available: usage.Free}, nil
 }

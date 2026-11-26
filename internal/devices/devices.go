@@ -59,6 +59,7 @@ type AudioState struct {
 	Source         string        `json:"source"`
 }
 type DeviceState struct {
+	Sequence  uint64         `json:"sequence"`
 	Supported bool           `json:"supported"`
 	UpdatedAt time.Time      `json:"updatedAt"`
 	WiFi      WiFiState      `json:"wifi"`
@@ -124,6 +125,7 @@ func (m *Monitor) refreshLocked() DeviceState {
 		state.Error = err.Error()
 	}
 	m.mu.Lock()
+	state.Sequence = m.state.Sequence + 1
 	m.state = state
 	m.mu.Unlock()
 	return state

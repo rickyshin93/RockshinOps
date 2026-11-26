@@ -46,12 +46,12 @@ func TestKeepAwakeSwitchExtendAndStop(t *testing.T) {
 	}
 
 	requireAwakeOK(t, a.toggleDisplay())
-	if !a.deadline.Equal(initialDeadline) || !a.displayItem.IsChecked() {
+	if a.deadline != initialDeadline || !a.displayItem.IsChecked() {
 		t.Fatal("enabling the display option should keep the deadline and check the menu item")
 	}
 	requireAwakeAssertion(t, "PreventUserIdleDisplaySleep")
 	requireAwakeOK(t, a.extend())
-	if !a.deadline.Equal(initialDeadline.Add(15*time.Minute)) || !a.displayItem.IsChecked() {
+	if a.deadline != initialDeadline+15*time.Minute || !a.displayItem.IsChecked() {
 		t.Fatal("extension should add time to the original deadline and preserve the display option")
 	}
 	requireAwakeAssertion(t, "PreventUserIdleDisplaySleep")
@@ -60,7 +60,7 @@ func TestKeepAwakeSwitchExtendAndStop(t *testing.T) {
 
 	requireAwakeOK(t, a.start(0))
 	requireAwakeOK(t, a.extend())
-	if !a.deadline.IsZero() || a.extendItem.IsVisible() || a.displayItem.IsChecked() {
+	if a.deadline != 0 || a.extendItem.IsVisible() || a.displayItem.IsChecked() {
 		t.Fatal("a new indefinite session should hide Extend and reset the display option")
 	}
 	if a.menu.Subtitle != localization.T("保持唤醒中 · 无限期") {
@@ -76,6 +76,24 @@ func TestKeepAwakeSwitchExtendAndStop(t *testing.T) {
 	}
 	if active := awakeAssertions(t); len(active) != 0 {
 		t.Fatalf("stopping left active assertions: %v", active)
+	}
+}
+
+func TestKeepAwakeExpiresByElapsedTimeAcrossClockChanges(t *testing.T) {
+	a := newKeepAwake([]int{30}, 15)
+	t.Cleanup(func() { requireAwakeOK(t, a.stop()) })
+	requireAwakeOK(t, a.start(30*time.Minute))
+	wall := time.Date(2026, 11, 25, 12, 0, 0, 0, time.Local)
+	elapsed := a.deadline - 5*time.Minute
+	for _, now := range []time.Time{wall.Add(time.Hour), wall.Add(-time.Hour)} {
+		a.refreshAt(now, elapsed)
+		if a.assertion == 0 || a.menu.Subtitle != awakeCountdownLabel(now, now.Add(5*time.Minute)) {
+			t.Fatalf("wall time %v changed remaining duration: %s", now, a.menu.Subtitle)
+		}
+	}
+	a.refreshAt(wall.Add(-time.Hour), a.deadline)
+	if a.assertion != 0 || a.menu.Subtitle != "" {
+		t.Fatal("elapsed deadline must end the session despite the backward clock adjustment")
 	}
 }
 

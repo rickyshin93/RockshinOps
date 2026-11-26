@@ -29,6 +29,7 @@ type CalculationEntry struct {
 
 var errCalculationNotFound = errors.New("calculation_not_found")
 var errCalculationHistoryChanged = errors.New("calculation_history_changed")
+var errCalculationReferenceMerge = errors.New("calculation_reference_merge")
 
 type CalculatorFormat struct {
 	Grouping      string `json:"grouping"`
@@ -337,6 +338,12 @@ func (s *System) calculatorDeleteResult(createdAt time.Time, keepAnswer bool, di
 		answer := displayCalculationAt(exact, format.DecimalPlaces).Value
 		if len(displayed) > 0 && displayed[0] != answer {
 			return CalculatorSheet{}, errCalculationHistoryChanged
+		}
+		if answer[0] >= '0' && answer[0] <= '9' {
+			references := calculatorReferenceToken.FindAllStringIndex(entry.Expression, -1)
+			if len(references) > 0 && references[len(references)-1][1] == len(entry.Expression) {
+				return CalculatorSheet{}, errCalculationReferenceMerge
+			}
 		}
 		entry.Expression += answer
 	}

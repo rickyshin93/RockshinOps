@@ -204,7 +204,7 @@ export function CalculatorExpressionEditor({
   placeholder: string;
   busy: boolean;
   onChange: (value: string) => void;
-  onReject: () => void;
+  onReject: (key?: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }) {
   const field = useRef<HTMLDivElement>(null);
@@ -311,6 +311,7 @@ export function CalculatorExpressionEditor({
   }, [value, operand, display]);
 
   function applyExpression(node: HTMLElement, value: string, caret: number) {
+    ({ value, caret } = normalizeCalculatorZeros(value, caret));
     renderValue(node, value);
     node.focus({ preventScroll: true });
     restoreCaret(node, value, caret);
@@ -328,7 +329,6 @@ export function CalculatorExpressionEditor({
       caret++;
     }
     if (!isCalculatorDraft(next)) return false;
-    ({ value: next, caret } = normalizeCalculatorZeros(next, caret));
     applyExpression(node, next, caret);
     return true;
   }
@@ -440,7 +440,8 @@ export function CalculatorExpressionEditor({
       const node = field.current!;
       if (activeToken.current === null) return false;
       const next = calculatorItemDeletion(raw(node), activeToken.current);
-      if (!next) return false;
+      if (next === undefined) return false;
+      if (next === null) { onReject("此操作会合并行引用与数字，请先调整算式。"); return true; }
       applyExpression(node, next.expression, next.caret);
       return true;
     },

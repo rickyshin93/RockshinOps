@@ -53,6 +53,7 @@ type spaceNode struct {
 	otherCount int64
 	dir        bool
 	partial    bool
+	keep       bool
 	id         FileID
 }
 
@@ -63,32 +64,35 @@ type SpaceTree struct {
 }
 
 // ScanSpaceTree measures allocated bytes below root in parallel. It does not
-// follow symbolic links, leave the volumes of root and the home directory, or
+// follow symbolic links, leave the volume of root, or
 // count hard-linked files twice. Unreadable entries mark their folder partial.
-func ScanSpaceTree(ctx context.Context, root string, skip []string, progress *SpaceProgress) (*SpaceTree, error) {
+// Keep folders remain addressable for cleanup even below the detail threshold.
+func ScanSpaceTree(ctx context.Context, root string, skip []string, progress *SpaceProgress, keepFolders ...string) (*SpaceTree, error) {
 	root = filepath.Clean(root)
-	info, err := os.Lstat(root)
+	info, err := os.Stat(root)
 	if err != nil {
 		return nil, err
 	}
-	devices := map[uint64]bool{}
-	if id, ok := FileIdentity(info); ok {
-		devices[id.Device] = true
+	if !info.IsDir() {
+		return nil, &os.PathError{Op: "scan", Path: root, Err: fs.ErrInvalid}
 	}
-	if home, err := os.UserHomeDir(); err == nil {
-		if info, err := os.Lstat(home); err == nil {
-			if id, ok := FileIdentity(info); ok {
-				devices[id.Device] = true
-			}
-		}
-	}
+	id, restrictDevice := FileIdentity(info)
 	skipped := map[string]bool{}
 	for _, path := range skip {
 		skipped[filepath.Clean(path)] = true
 	}
-	w := &spaceWalker{ctx: ctx, progress: progress, devices: devices, skip: skipped, links: map[FileID]bool{}, slots: make(chan struct{}, 4*runtime.NumCPU())}
-	top := &spaceNode{name: root, dir: true}
-	top.id, _ = FileIdentity(info)
+	kept := map[string]bool{}
+	for _, path := range keepFolders {
+		rel, err := filepath.Rel(root, filepath.Clean(path))
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		for ; rel != "."; rel = filepath.Dir(rel) {
+			kept[filepath.Join(root, rel)] = true
+		}
+	}
+	w := &spaceWalker{ctx: ctx, progress: progress, device: id.Device, restrictDevice: restrictDevice, skip: skipped, keep: kept, links: map[FileID]bool{}, slots: make(chan struct{}, 4*runtime.NumCPU())}
+	top := &spaceNode{name: root, dir: true, id: id}
 	w.wait.Add(1)
 	w.visit(top, root)
 	w.wait.Wait()
@@ -100,14 +104,16 @@ func ScanSpaceTree(ctx context.Context, root string, skip []string, progress *Sp
 }
 
 type spaceWalker struct {
-	ctx      context.Context
-	progress *SpaceProgress
-	devices  map[uint64]bool
-	skip     map[string]bool
-	linkMu   sync.Mutex
-	links    map[FileID]bool
-	slots    chan struct{}
-	wait     sync.WaitGroup
+	ctx            context.Context
+	progress       *SpaceProgress
+	device         uint64
+	restrictDevice bool
+	skip           map[string]bool
+	keep           map[string]bool
+	linkMu         sync.Mutex
+	links          map[FileID]bool
+	slots          chan struct{}
+	wait           sync.WaitGroup
 }
 
 func (w *spaceWalker) visit(node *spaceNode, path string) {
@@ -145,11 +151,14 @@ func (w *spaceWalker) visit(node *spaceNode, path string) {
 			continue
 		}
 		id, identified := FileIdentity(info)
+		if identified && w.restrictDevice && id.Device != w.device {
+			continue
+		}
 		if info.IsDir() {
-			if w.skip[child] || identified && len(w.devices) > 0 && !w.devices[id.Device] {
+			if w.skip[child] {
 				continue
 			}
-			folder := &spaceNode{name: entry.Name(), parent: node, dir: true, id: id}
+			folder := &spaceNode{name: entry.Name(), parent: node, dir: true, id: id, keep: w.keep[child]}
 			node.children = append(node.children, folder)
 			folders = append(folders, folder)
 			continue
@@ -201,7 +210,7 @@ func finish(node *spaceNode) {
 			node.partial = node.partial || child.partial
 		}
 		node.bytes += child.bytes
-		if child.dir && child.bytes < spaceDetailBytes && !child.partial {
+		if child.dir && child.bytes < spaceDetailBytes && !child.partial && !child.keep {
 			node.otherBytes += child.bytes
 			node.otherCount++
 			continue
@@ -339,12 +348,15 @@ func (n *spaceNode) adjust(bytes, files int64) {
 	for node := n; node != nil; node = node.parent {
 		node.bytes += bytes
 		node.files += files
+		if node.parent != nil {
+			slices.SortStableFunc(node.parent.children, bySize)
+		}
 	}
 }
 
-// Move re-parents the entry at path under folder, as moving to the trash does.
-func (t *SpaceTree) Move(path, folder string) bool {
-	node, target := t.node(path), t.node(folder)
+// Move re-parents and renames an entry to match its new on-disk path.
+func (t *SpaceTree) Move(path, destination string) bool {
+	node, target := t.node(path), t.node(filepath.Dir(destination))
 	if node == nil || node.parent == nil {
 		return false
 	}
@@ -355,6 +367,7 @@ func (t *SpaceTree) Move(path, folder string) bool {
 		return true
 	}
 	node.parent = target
+	node.name = filepath.Base(destination)
 	target.children = append(target.children, node)
 	target.adjust(node.bytes, node.files)
 	slices.SortStableFunc(target.children, bySize)

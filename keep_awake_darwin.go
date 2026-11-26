@@ -3,6 +3,7 @@ package main
 /*
 #cgo LDFLAGS: -framework CoreFoundation -framework IOKit
 #include <stdbool.h>
+#include <time.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
 
 static IOReturn take_idle_sleep_assertion(double seconds, bool display, IOPMAssertionID *id) {
@@ -19,6 +20,11 @@ import (
 	"fmt"
 	"time"
 )
+
+// Use a clock that counts sleep and is independent of civil-time adjustments.
+func awakeClock() time.Duration {
+	return time.Duration(C.clock_gettime_nsec_np(C.CLOCK_MONOTONIC_RAW))
+}
 
 func takeIdleSleepAssertion(duration time.Duration, display bool) (uint32, error) {
 	var id C.IOPMAssertionID

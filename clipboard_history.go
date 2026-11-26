@@ -71,6 +71,7 @@ func (h *clipboardHistory) setRecording(enabled bool) {
 }
 
 func (h *clipboardHistory) capture(stop chan struct{}) {
+	generation, err := h.store.clearGeneration()
 	var sample clipboardChange
 	var sampledAt time.Time
 	mygo.RunOnMain(func() {
@@ -93,12 +94,17 @@ func (h *clipboardHistory) capture(stop chan struct{}) {
 	if len(sample.content.data) == 0 {
 		return
 	}
-	recorded, err := h.store.record(sample.content, sampledAt)
+	var recorded bool
+	if err == nil {
+		recorded, err = h.store.record(sample.content, sampledAt, generation)
+	}
 	if !recorded && err == nil {
 		return
 	}
 	warning := ""
-	if err != nil {
+	if errors.Is(err, errClipboardHistoryFull) {
+		warning = "pinned-full"
+	} else if err != nil {
 		log.Printf("save clipboard history: %v", err)
 		warning = "write"
 	}

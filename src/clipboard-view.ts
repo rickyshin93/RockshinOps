@@ -61,7 +61,7 @@ export function clipboardView(state: ClipboardViewState, query: string): string 
     const pinned = !!item.clipboardPinned;
     return `<li data-row-key="${id}">
     ${item.clipboardImage
-      ? `<button type="button" class="clipboard-history-thumbnail" data-clipboard-preview="${e(item.id)}" aria-label="${e(t("预览图片"))}" aria-haspopup="dialog"><img src="${e(clipboardImageURL(item.id))}" loading="lazy" alt=""></button>`
+      ? `<button type="button" class="clipboard-history-thumbnail" data-clipboard-preview="${id}" data-focus-key="preview:${id}" aria-label="${e(t("预览图片"))}" aria-haspopup="dialog"><img src="${e(clipboardImageURL(item.id))}" loading="lazy" alt=""></button>`
       : `<span class="clipboard-history-icon">${icon(snippets ? "snippet" : "clipboard")}</span>`}
     <div class="clipboard-history-preview"><p title="${e(item.title)}">${e(item.title)}</p><small>${e(item.subtitle)}</small></div>
     <div class="clipboard-row-actions">

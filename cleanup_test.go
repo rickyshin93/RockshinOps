@@ -4,10 +4,59 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"rockshinops/internal/metrics"
+	"rockshinops/internal/storage"
 )
+
+func TestSpaceSelectsNativeHomeVolume(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("native APFS volume selection")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	volume, err := storage.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	trash := filepath.Join(home, ".Trash")
+	scope, err := newSpaceScanScope(home, volume.Mount, []metrics.ScanTarget{{Name: trashTargetName, Path: trash}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.root != filepath.Clean(volume.Mount) || scope.targets[0].Path != filepath.Join(scope.home, ".Trash") {
+		t.Fatalf("scope failed to follow the mount or rebase the Trash target: %+v", scope)
+	}
+	original, err := os.Stat(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := os.Stat(scope.home)
+	if err != nil || !os.SameFile(original, selected) {
+		t.Fatalf("home alias does not identify the same directory: %v", err)
+	}
+	t.Logf("home and configured Trash resolve within native %s mount %s", volume.Format, scope.root)
+}
+
+func TestSpaceSuggestionsDescribeOnlyScannedVolume(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	outside := t.TempDir()
+	if err := os.Mkdir(home, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	s := &System{info: AppInfo{ScanTargets: []metrics.ScanTarget{{Name: "Outside", Path: outside}}}}
+	summary, err := s.scanSpace(context.Background(), root)
+	if err != nil || len(summary.Suggestions) != 1 || summary.Suggestions[0].Found {
+		t.Fatalf("an unscanned target cannot report a scanned size: %+v, %v", summary, err)
+	}
+}
 
 func TestEmptyTrashKeepsRootAndOutsideSymlinkTarget(t *testing.T) {
 	root := t.TempDir()
@@ -69,11 +118,12 @@ func TestSpaceCleanupOnlyAllowsReviewedItemsInsideHome(t *testing.T) {
 		filepath.Join(home, "Downloads"):        false,
 		filepath.Join(home, "Library", "Mail"):  false,
 		caches:                                  false,
+		trash:                                   false,
 		filepath.Join(trash, "junk"):            false,
 		home:                                    false,
 		filepath.Dir(home):                      false,
 	} {
-		if got := s.trashable(path); got != want {
+		if got := (spaceScanScope{home: home, targets: s.info.ScanTargets}).trashable(path); got != want {
 			t.Errorf("trashable(%s) = %v, want %v", path, got, want)
 		}
 	}
@@ -117,6 +167,8 @@ func TestSpaceCleanupOnlyAllowsReviewedItemsInsideHome(t *testing.T) {
 
 func TestCancelledSpaceScanKeepsPreviousResult(t *testing.T) {
 	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	s := &System{}
 	if _, err := s.scanSpace(context.Background(), home); err != nil {
 		t.Fatal(err)

@@ -89,6 +89,14 @@ func TestSpaceScanMeasuresEachFileOnceWithoutFollowingLinks(t *testing.T) {
 	}
 }
 
+func TestSpaceScanRejectsNonDirectoryRoot(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	writeSize(t, file, 12)
+	if tree, err := ScanSpaceTree(context.Background(), file, nil, &SpaceProgress{}); err == nil || tree != nil {
+		t.Fatalf("a regular file cannot be a volume root: %+v, %v", tree, err)
+	}
+}
+
 func TestSpaceTreeMoveAndClearKeepTotals(t *testing.T) {
 	root := t.TempDir()
 	writeSize(t, filepath.Join(root, "work", "cache", "blob"), 2_000_000)
@@ -99,7 +107,7 @@ func TestSpaceTreeMoveAndClearKeepTotals(t *testing.T) {
 	}
 	before := tree.Bytes()
 	cache, trash := filepath.Join(root, "work", "cache"), filepath.Join(root, "trash")
-	if !tree.Move(cache, trash) {
+	if !tree.Move(cache, filepath.Join(trash, "cache")) {
 		t.Fatal("move failed")
 	}
 	if tree.Bytes() != before {
@@ -117,6 +125,37 @@ func TestSpaceTreeMoveAndClearKeepTotals(t *testing.T) {
 	tree.Clear(trash)
 	if entry, _ := tree.Find(trash); entry.Bytes != 0 || tree.Bytes() >= before-3_000_000 {
 		t.Fatalf("clearing trash kept bytes: %+v total %d", entry, tree.Bytes())
+	}
+}
+
+func TestSpaceMoveIntoSmallConfiguredTrashKeepsTotalsAndSorting(t *testing.T) {
+	root := t.TempDir()
+	work, trash := filepath.Join(root, "work"), filepath.Join(root, "home", "me", ".Trash")
+	file := filepath.Join(work, "report")
+	writeSize(t, file, 4_000_000)
+	writeSize(t, filepath.Join(trash, "report"), 10)
+	writeSize(t, filepath.Join(root, "spare", "blob"), 2_000_000)
+	tree, err := ScanSpaceTree(context.Background(), root, nil, &SpaceProgress{}, trash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry, ok := tree.Find(trash); !ok || entry.Files != 1 {
+		t.Fatalf("small configured Trash must be retained: %+v", entry)
+	}
+	before := tree.Bytes()
+	actual := filepath.Join(trash, "report 2")
+	if !tree.Move(file, actual) || tree.Bytes() != before {
+		t.Fatalf("move changed the volume total: before %d, after %d", before, tree.Bytes())
+	}
+	if _, ok := tree.Find(actual); !ok {
+		t.Fatal("moved item missing under actual destination name")
+	}
+	if listing, err := tree.Listing(root, 1); err != nil || len(listing.Children) == 0 || listing.Children[0].Name != "home" {
+		t.Fatalf("largest folder must reflect the move: %+v, %v", listing, err)
+	}
+	tree.Clear(trash)
+	if listing, err := tree.Listing(root, 1); err != nil || len(listing.Children) == 0 || listing.Children[0].Name != "spare" {
+		t.Fatalf("largest folder must reflect emptying Trash: %+v, %v", listing, err)
 	}
 }
 

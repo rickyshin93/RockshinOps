@@ -12,6 +12,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"rockshinops/internal/metrics"
+	"rockshinops/internal/storage"
 )
 
 const trashTargetName = "废纸篓"
@@ -75,14 +76,79 @@ func (s *System) CancelScan() {
 // ScanSpace measures the volume holding the home directory once; browsing and
 // cleanup then use the in-memory result until the next scan.
 func (s *System) ScanSpace(ctx context.Context) (SpaceSummary, error) {
+	volume, err := storage.Read()
+	if err != nil {
+		return SpaceSummary{}, err
+	}
+	return s.scanSpace(ctx, volume.Mount)
+}
+
+type spaceScanScope struct {
+	root, home, originalHome, resolvedHome string
+	targets                                []metrics.ScanTarget
+}
+
+// rebaseSpacePath preserves the suffix of a path within a root, including the root itself.
+func rebaseSpacePath(path, from, to string) (string, bool) {
+	rel, err := filepath.Rel(from, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return filepath.Join(to, rel), true
+}
+
+func newSpaceScanScope(home, mount string, targets []metrics.ScanTarget) (spaceScanScope, error) {
+	if !filepath.IsAbs(mount) {
+		return spaceScanScope{}, fmt.Errorf("invalid home volume mount: %q", mount)
+	}
+	root := filepath.Clean(mount)
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return spaceScanScope{}, err
+	}
+	resolvedHome, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		return spaceScanScope{}, err
+	}
+	scannedHome, within := rebaseSpacePath(resolvedHome, resolvedRoot, root)
+	if !within && runtime.GOOS == "darwin" && root == "/System/Volumes/Data" {
+		// The Data volume exposes home through a firmlink such as /Users.
+		candidate := filepath.Join(root, resolvedHome)
+		source, sourceErr := os.Stat(resolvedHome)
+		destination, destinationErr := os.Stat(candidate)
+		if sourceErr == nil && destinationErr == nil && os.SameFile(source, destination) {
+			scannedHome, within = candidate, true
+		}
+	}
+	if !within {
+		return spaceScanScope{}, fmt.Errorf("home directory %q is outside the reported volume %q", home, root)
+	}
+	scope := spaceScanScope{root: root, home: scannedHome, originalHome: home, resolvedHome: resolvedHome}
+	for _, target := range targets {
+		target.Path = scope.treePath(target.Path)
+		scope.targets = append(scope.targets, target)
+	}
+	return scope, nil
+}
+
+func (s spaceScanScope) treePath(path string) string {
+	for _, home := range []string{s.originalHome, s.resolvedHome} {
+		if mapped, ok := rebaseSpacePath(path, home, s.home); ok {
+			return mapped
+		}
+	}
+	return path
+}
+
+func (s *System) scanSpace(ctx context.Context, mount string) (SpaceSummary, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return SpaceSummary{}, err
 	}
-	return s.scanSpace(ctx, filepath.VolumeName(home)+string(filepath.Separator))
-}
-
-func (s *System) scanSpace(ctx context.Context, root string) (SpaceSummary, error) {
+	scope, err := newSpaceScanScope(home, mount, s.info.ScanTargets)
+	if err != nil {
+		return SpaceSummary{}, err
+	}
 	progress := &metrics.SpaceProgress{}
 	if !s.spaceProgress.CompareAndSwap(nil, progress) {
 		return SpaceSummary{}, fmt.Errorf("a scan is already running")
@@ -90,13 +156,12 @@ func (s *System) scanSpace(ctx context.Context, root string) (SpaceSummary, erro
 	defer s.spaceProgress.Store(nil)
 	ctx, done := s.beginScan(ctx)
 	defer done()
-	var skip []string
-	if runtime.GOOS == "darwin" && root == "/" {
-		// The data volume is mounted here and already reached through firmlinks such as /Users.
-		skip = []string{"/System/Volumes"}
-	}
 	started := time.Now()
-	tree, err := metrics.ScanSpaceTree(ctx, root, skip, progress)
+	keep := make([]string, 0, len(scope.targets))
+	for _, target := range scope.targets {
+		keep = append(keep, target.Path)
+	}
+	tree, err := metrics.ScanSpaceTree(ctx, scope.root, nil, progress, keep...)
 	if ctx.Err() != nil {
 		return SpaceSummary{}, errScanCancelled
 	}
@@ -105,6 +170,7 @@ func (s *System) scanSpace(ctx context.Context, root string) (SpaceSummary, erro
 	}
 	s.spaceMu.Lock()
 	defer s.spaceMu.Unlock()
+	s.spaceScope = scope
 	s.space, s.spaceSkipped, s.spaceStarted, s.spaceFinished = tree, progress.Skipped.Load(), started, time.Now()
 	return s.spaceSummary(), nil
 }
@@ -147,7 +213,7 @@ func (s *System) SpaceListing(path string) (metrics.SpaceListing, error) {
 		return listing, fmt.Errorf("folder is not in the scan result; scan again")
 	}
 	for i, child := range listing.Children {
-		listing.Children[i].Trashable = !child.Other && s.trashable(child.Path)
+		listing.Children[i].Trashable = !child.Other && s.spaceScope.trashable(child.Path)
 	}
 	return listing, nil
 }
@@ -155,16 +221,27 @@ func (s *System) SpaceListing(path string) (metrics.SpaceListing, error) {
 func (s *System) TrashSpaceItem(path string) (SpaceSummary, error) {
 	s.spaceMu.Lock()
 	defer s.spaceMu.Unlock()
-	if s.space == nil || !s.trashable(path) {
+	if s.space == nil || !s.spaceScope.trashable(path) {
 		return SpaceSummary{}, fmt.Errorf("this item cannot be moved to the trash")
 	}
 	if err := s.matchesScan(path); err != nil {
 		return SpaceSummary{}, err
 	}
-	if err := mygo.Shell.TrashItem(path); err != nil {
+	var destination string
+	var err error
+	if runtime.GOOS == "darwin" {
+		destination, err = mygo.Shell.TrashItemResult(path)
+		destination = s.spaceScope.treePath(destination)
+	} else {
+		err = mygo.Shell.TrashItem(path)
+		if trash := s.trashPath(); trash != "" {
+			destination = filepath.Join(trash, filepath.Base(path))
+		}
+	}
+	if err != nil {
 		return SpaceSummary{}, err
 	}
-	s.space.Move(path, s.trashPath())
+	s.space.Move(path, destination)
 	return s.spaceSummary(), nil
 }
 
@@ -205,21 +282,17 @@ func (s *System) matchesScan(path string) error {
 
 // trashable allows items at least two levels inside the home directory, except
 // configured cleanup locations themselves, trash contents and app-data roots.
-func (s *System) trashable(path string) bool {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false
-	}
+func (s spaceScanScope) trashable(path string) bool {
 	path = filepath.Clean(path)
-	parts, ok := relativeParts(home, path)
+	parts, ok := relativeParts(s.home, path)
 	if !ok || len(parts) < 2 || len(parts) == 2 && protectedHomeFolders[parts[0]] {
 		return false
 	}
-	for _, target := range s.info.ScanTargets {
+	for _, target := range s.targets {
 		if path == target.Path {
 			return false
 		}
-		if _, inside := relativeParts(target.Path, path); inside && target.Name == trashTargetName {
+		if _, inside := relativeParts(target.Path, path); target.Name == trashTargetName && (path == target.Path || inside) {
 			return false
 		}
 	}
@@ -235,7 +308,7 @@ func relativeParts(base, path string) ([]string, bool) {
 }
 
 func (s *System) trashPath() string {
-	for _, target := range s.info.ScanTargets {
+	for _, target := range s.spaceScope.targets {
 		if target.Name == trashTargetName {
 			if _, ok := s.space.Find(target.Path); ok {
 				return target.Path
@@ -248,16 +321,11 @@ func (s *System) trashPath() string {
 func (s *System) spaceSummary() SpaceSummary {
 	largest := s.space.Largest(50, s.trashPath())
 	for i, file := range largest {
-		largest[i].Trashable = s.trashable(file.Path)
+		largest[i].Trashable = s.spaceScope.trashable(file.Path)
 	}
-	suggestions := make([]SpaceSuggestion, 0, len(s.info.ScanTargets))
-	for _, target := range s.info.ScanTargets {
+	suggestions := make([]SpaceSuggestion, 0, len(s.spaceScope.targets))
+	for _, target := range s.spaceScope.targets {
 		entry, found := s.space.Find(target.Path)
-		if !found {
-			// Folders under 1 MB are summarised by their parent rather than kept.
-			_, err := os.Lstat(target.Path)
-			found = err == nil
-		}
 		suggestions = append(suggestions, SpaceSuggestion{Name: target.Name, Path: target.Path, Bytes: entry.Bytes, Files: entry.Files, Found: found, Trash: target.Name == trashTargetName})
 	}
 	top, _ := s.space.Listing(s.space.Root(), 5)

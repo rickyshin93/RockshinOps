@@ -169,6 +169,7 @@ export interface Connections {
 }
 
 export interface DeviceState {
+  sequence: number;
   supported: boolean;
   updatedAt: string;
   wifi: WiFiState;
@@ -449,6 +450,8 @@ export interface SidebarTools {
 }
 
 export interface Snapshot {
+  sequence: number;
+  historyGeneration: number;
   updatedAt: string;
   cpu: CPU;
   memory: Memory;
@@ -704,6 +707,7 @@ export const events = {
   /** LauncherShown tells the page the panel was summoned and whether to show clipboard history. */
   launcherShown: event<boolean>("launcherShown"),
   launcherHidden: event<boolean>("launcherHidden"),
+  launcherAppsChanged: event<boolean>("launcherAppsChanged"),
   metricsChanged: event<Snapshot>("metricsChanged"),
   settingsOpened: event<boolean>("settingsOpened"),
   menuBarSettingsOpened: event<boolean>("menuBarSettingsOpened"),

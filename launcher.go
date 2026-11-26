@@ -25,6 +25,7 @@ import (
 // LauncherShown tells the page the panel was summoned and whether to show clipboard history.
 var LauncherShown = mygo.NewEvent[bool]("launcherShown")
 var LauncherHidden = mygo.NewEvent[bool]("launcherHidden")
+var LauncherAppsChanged = mygo.NewEvent[bool]("launcherAppsChanged")
 
 const (
 	launcherWidth     = 680
@@ -273,9 +274,7 @@ func (l *launcher) show(clipboard bool) {
 	if err := LauncherShown.Broadcast(clipboard); err != nil {
 		log.Printf("launcher shown: %v", err)
 	}
-	if !clipboard {
-		go l.loadApps()
-	}
+	go l.loadApps()
 }
 
 func (l *launcher) loadApps() {
@@ -285,8 +284,14 @@ func (l *launcher) loadApps() {
 		return
 	}
 	l.appsMu.Lock()
+	changed := !slices.Equal(l.apps, apps)
 	l.apps = apps
 	l.appsMu.Unlock()
+	if changed {
+		if err := LauncherAppsChanged.Broadcast(true); err != nil {
+			log.Printf("launcher apps changed: %v", err)
+		}
+	}
 }
 
 type scoredResult struct {

@@ -211,6 +211,14 @@ func (m *Monitor) refreshAt(now time.Time, force bool) Snapshot {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	s.Sequence = m.snapshot.Sequence + 1
+	s.HistoryGeneration = m.snapshot.HistoryGeneration
+	if s.UpdatedAt.Before(m.snapshot.UpdatedAt) {
+		// Epochs keep the chart's wall-clock cursor ordered across clock changes.
+		s.HistoryGeneration++
+		clear(m.history)
+		m.history = m.history[:0]
+	}
 	m.snapshot, m.processes = s, processes
 	m.history = append(m.history, t)
 	cutoff := now.Add(-time.Duration(m.options.HistorySeconds) * time.Second)

@@ -2,11 +2,12 @@ package metrics
 
 import (
 	"fmt"
-	"rockshinops/internal/localization"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"rockshinops/internal/localization"
 )
 
 func readBattery() Battery { return readLinuxBattery("/sys/class/power_supply") }
@@ -44,6 +45,9 @@ func readLinuxBattery(root string) Battery {
 	if battery == nil {
 		return b
 	}
+	// A disconnected supply can disappear during enumeration. Keep the reading
+	// from the system battery that was read successfully.
+	b.Error = ""
 	b.Present = true
 	percent, err := strconv.ParseFloat(battery["CAPACITY"], 64)
 	if err != nil || percent < 0 || percent > 100 {

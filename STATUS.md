@@ -42,6 +42,12 @@
 
 ## Done
 
+- 2026-11-26: Completed 1,000 parameterized review scenarios across ten groups. Space now scans the home volume and maps APFS Data cleanup paths. Launcher deduplicates overlapping includes and refreshes replaced directories. Calculator keeps queued grouping and reference identities and discards abandoned continuations. Clipboard retains copy order across wall-clock rollback. Go/web/race checks, APFS scope, macOS arm64 packaging, isolated desktop checks and Windows/Linux amd64 builds passed. Evidence: `work/review-1000-20261126/rounds.md`.
+
+- 2026-11-26: Completed 100 additional review scenarios across ten areas. Calculator preserves continuation input during delayed saves and after a write error. Launcher refresh keeps excluded files out. Space preserves Trash accounting, native destination names and navigation intent. Monitor samples stay current across clock and locale changes. Linux battery keeps valid readings when another supply disappears. Go/web/race checks, macOS arm64 packaging, isolated native desktop checks and Windows/Linux amd64 compilation passed. Evidence: `work/review-100-20261126/rounds.md`.
+
+- 2026-11-26: Completed ten review rounds for the v0.3.0–v0.3.2 changes. Fixed clipboard capture failure, pinned capacity, clear ordering, search actions and preview focus, Launcher app search and keyboard behavior, Calculator import order and leading zeros, and Keep Awake clock adjustments. Go/web/race checks, macOS arm64 packaging and isolated native interaction/tray checks passed. Windows/Linux amd64 compiled. Evidence: `work/review-10-20261125/rounds.md`.
+
 - 2026-11-24: Published [v0.3.2](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.2) with independent full-width cards for clipboard history and snippets, and bounded thumbnails for tall and wide images. Apple Silicon verified both tabs, preview, tray text and close/reopen. Four-target signed CI passed and all 12 public asset digests matched the published checksums. Intel desktop interaction and installed upgrades remain unverified. Evidence: `work/clipboard-item-cards-20261124/`, `work/clipboard-thumbnail-boundary-20261124/`, and `work/release-0.3.2/`.
 
 - 2026-11-24: Published [v0.3.1](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.1). macOS Keep Awake offers 30 min and an Hours submenu with 1–9 hours, then 10–12 and 24 hours, a live countdown in `1h 30min 30s` format, local end time, indefinite mode, a 15-minute extension, and per-session display wake. Upgraded the MyGo Go module, CLI and runtime to 0.10.0 and regenerated bindings. Go and web checks and Apple Silicon packaging passed. Native verification covered bilingual submenu grouping, the 12- and 24-hour starts, WebView IPC, close/reopen, expiry and quit. Four-target signed release CI passed; native interaction on Intel macOS, Windows and Linux and installed upgrades remain unverified. Evidence: `work/keep-awake-hours-20261124/` and `work/release-0.3.1/`.
@@ -131,9 +137,9 @@
 
 ## Known issues
 
-- Calculator still blocks continuation input while history is saving, despite showing the answer early. A controlled delayed-write fixture reproduced dropped input; see `work/calculator-lag-20261110/diagnosis.md`.
+- Space's home-volume selection passed synthetic mount cases and the real macOS APFS Data check. An independent Linux home mount still needs runtime acceptance.
 
-- Native smoke CI intermittently fails at CPU 100.00000000000001% due to its ≤100 assertion; [2026-11-04 rerun passed](https://github.com/rickyshin93/RockshinOps/actions/runs/41762407680). The v0.2.11 Intel release job also once reported `system_profiler: signal: killed`; its rerun passed. Both causes remain unresolved.
+- The v0.2.11 Intel release job once reported `system_profiler: signal: killed`; its rerun passed. The cause remains unresolved.
 
 - App-level watt measurements are not implemented; GPU/system power availability depends on hardware. CPU temperature mapping and remaining hardware acceptance are tracked in the Sensors item above.
 - Space and uninstall scans can be partial when macOS denies directory access; the current uninstall comparison encountered 371 protected locations. Full Disk Access may improve coverage but does not guarantee access to all system directories. Name matches do not prove ownership or complete residual detection; REA coverage is representative, not exhaustive. Space results are logical file sizes, not guaranteed reclaimable space.

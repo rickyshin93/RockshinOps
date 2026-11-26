@@ -173,6 +173,66 @@ func TestRefreshFollowsChanges(t *testing.T) {
 	}
 }
 
+func TestRefreshKeepsExcludedFilesOutsideIncludedFolders(t *testing.T) {
+	root := t.TempDir()
+	cloud := filepath.Join(root, "Library", "Cloud")
+	write(t, filepath.Join(root, "Library", "excluded-report.txt"), time.Now())
+	write(t, filepath.Join(cloud, "allowed-report.txt"), time.Now())
+	ix := New(root, Rules{SkipPaths: []string{"Library"}, Include: []string{"Library/Cloud"}})
+	if err := ix.Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := ix.Search("excluded-report", 10); len(got) != 0 {
+		t.Fatalf("build included an excluded item: %v", got)
+	}
+	ix.Refresh(root)
+	write(t, filepath.Join(cloud, "new-allowed-report.txt"), time.Now())
+	ix.Refresh(cloud)
+	if got := ix.Search("excluded-report", 10); len(got) != 0 {
+		t.Fatalf("refresh included an excluded item: %v", got)
+	}
+	if got := ix.Search("new-allowed-report", 10); len(got) != 1 {
+		t.Fatalf("refresh should still index files in the included folder: %v", got)
+	}
+}
+
+func TestOverlappingIncludesIndexOnlyOneCopy(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "Library", "Cloud", "Nested", "report.txt")
+	write(t, path, time.Now())
+	for _, skip := range [][]string{nil, {"Library"}} {
+		ix := New(root, Rules{SkipPaths: skip, Include: []string{"Library/Cloud/Nested", "Library/*", "Library/Cloud/Nested"}})
+		if err := ix.Build(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if got := ix.Search("report.txt", 9); len(got) != 1 || got[0].Path != path {
+			t.Fatalf("expected one included path: %+v", got)
+		}
+	}
+}
+
+func TestRefreshReplacesIndexedFolderWithFile(t *testing.T) {
+	root := t.TempDir()
+	folder := filepath.Join(root, "Project")
+	child := filepath.Join(folder, "Nested", "draft.txt")
+	write(t, child, time.Now())
+	ix := New(root, Rules{})
+	if err := ix.Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(folder); err != nil {
+		t.Fatal(err)
+	}
+	write(t, folder, time.Now())
+	ix.Refresh(filepath.Dir(child))
+	if got := ix.Search("draft.txt", 9); len(got) != 0 {
+		t.Fatalf("deleted child survived: %+v", got)
+	}
+	if got := ix.Search("Project", 9); len(got) != 1 || got[0].Dir {
+		t.Fatalf("replacement file was not recognized: %+v", got)
+	}
+}
+
 func TestSearchPreservesNamesWithDifferentCaseFoldLengths(t *testing.T) {
 	ix := built(t, t.TempDir())
 	// Construct names directly: some filesystems normalize Unicode spellings.

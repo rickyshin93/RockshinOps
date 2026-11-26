@@ -12,7 +12,7 @@ import type { ViewState } from "./views";
 let root: Root | null = null;
 let calculatorOwner: Root | null = null;
 let menuProps: { isMacOS: boolean; refreshSeconds: number } | null = null;
-export type CalculatorDraft = { expression: string; rowIDs?: readonly string[]; incoming?: CalculatorImport; finishImport: (request: CalculatorImport) => void };
+export type CalculatorDraft = { expression: string; rowIDs?: readonly string[]; imports: CalculatorImport[]; finishImport: (request: CalculatorImport) => boolean };
 
 export function renderReactPage(container: HTMLElement, state: ViewState, onLanguage: (language: Language) => void, openDiskAccess: () => void, onLauncherShortcut: (shortcut: string) => void, calculatorDraft: CalculatorDraft, hasClipboardHistory: boolean): void {
   if (!root) { container.replaceChildren(); root = createRoot(container); }
@@ -37,7 +37,7 @@ export function renderReactPage(container: HTMLElement, state: ViewState, onLang
     root.render(createElement(I18nextProvider, { i18n }, createElement(CalculatorView, {
       initialExpression: calculatorDraft.expression,
       initialRowIDs: calculatorDraft.rowIDs,
-      incoming: calculatorDraft.incoming,
+      incoming: calculatorDraft.imports[0],
       onImportHandled: calculatorDraft.finishImport,
       onEdit: (expression, rowIDs) => {
         if (calculatorOwner !== owner) return;

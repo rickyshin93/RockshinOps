@@ -399,6 +399,23 @@ func TestCalculatorDeleteEqualityJoinsExpressionAndDisplayedAnswer(t *testing.T)
 	}
 }
 
+func TestCalculatorDeleteEqualityPreservesTrailingReference(t *testing.T) {
+	s := calculatorTestSystem(t, filepath.Join(t.TempDir(), "preferences.json"))
+	if _, err := s.CalculatorCommit("1+1"); err != nil {
+		t.Fatal(err)
+	}
+	linked, err := s.CalculatorCommit("2+#1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CalculatorDeleteEquality(linked.CreatedAt, "4"); !errors.Is(err, errCalculationReferenceMerge) {
+		t.Fatalf("wanted explicit reference-merge failure, got %v", err)
+	}
+	if rows, err := s.CalculatorHistory(); err != nil || len(rows) != 2 || rows[0] != linked {
+		t.Fatalf("failed deletion modified linked history: %+v, %v", rows, err)
+	}
+}
+
 func TestCalculatorDeleteRowRemapsReferences(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "preferences.json")
 	s := calculatorTestSystem(t, path)

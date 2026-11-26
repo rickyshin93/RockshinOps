@@ -281,6 +281,8 @@ function search(preserveSelection = false) {
     waitForPointer();
     displayed = next;
     render();
+    if (preserveSelection && selected > 0) list.children[selected]?.scrollIntoView({ block: "nearest" });
+    else resultsScroll.scrollTop = 0;
   }).catch(reason => {
     if (next !== request) return;
     console.error(reason);
@@ -359,7 +361,7 @@ input.addEventListener("input", () => search());
 document.addEventListener("keydown", event => {
   if (isMac && !event.isComposing && event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey && event.key === "4") {
     event.preventDefault();
-    setMode(!clipboardMode);
+    if (!event.repeat) setMode(!clipboardMode);
   }
 });
 input.addEventListener("keydown", event => {
@@ -413,6 +415,9 @@ events.launcherHidden.on(() => {
 });
 events.clipboardHistoryChanged.on(() => {
   if (visible && clipboardMode && !clipboardBusy) search(true);
+});
+events.launcherAppsChanged.on(() => {
+  if (visible && !clipboardMode && input.value.trim()) search(true);
 });
 onLocaleChange(applyLanguage);
 reduceMotion.addEventListener("change", () => positionHighlight());

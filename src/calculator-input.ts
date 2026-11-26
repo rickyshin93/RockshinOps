@@ -24,6 +24,18 @@ export function calculatorInputKey(key: string, code: string): string {
   return key === "Decimal" || (code === "NumpadDecimal" && key === ",") ? "." : normalizeCalculatorInput(key);
 }
 
+// #1 is a placeholder for the answer being saved. Pasted text cannot supply references.
+export function queueCalculatorInput(current: string, input: string, fromKey = true): string | null {
+  if (fromKey && input === "AC") return "";
+  if (fromKey && input === "Backspace") return current === "#1" || current.length === 3 && current.startsWith("#1") ? "" : current.slice(0, -1);
+  const text = normalizeCalculatorInput(input);
+  if (text.includes("#")) return null;
+  let expression = !current && fromKey && /^[+−×÷*/(-]$/.test(text)
+    ? `#1${text === "(" ? "×(" : text}` : current + text;
+  if (fromKey && text === "(" && !isCalculatorDraft(expression)) expression = current + "×(";
+  return isCalculatorDraft(expression) ? normalizeCalculatorZeros(expression, expression.length).value : null;
+}
+
 // Unlike the evaluator, the editor allows a prefix, such as "2 × (".
 export function isCalculatorDraft(value: string): boolean {
   if (/\s/.test(value)) return false;

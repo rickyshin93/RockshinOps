@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,9 +14,82 @@ import (
 	"unicode/utf8"
 )
 
+func TestClipboardFailedCaptureKeepsHistory(t *testing.T) {
+	store := clipboardStore{dir: t.TempDir(), config: clipboardHistoryConfig{MaxEntries: 1, MaxHistoryBytes: 64}}
+	at := time.Now().Add(-time.Second)
+	clipboardTestRecord(t, store, clipboardContent{format: "txt", data: []byte("old")}, at)
+	content := clipboardContent{format: "txt", data: []byte("new")}
+	blocked := filepath.Join(store.dir, fmt.Sprintf("%x.txt", sha256.Sum256(content.data)))
+	if err := os.Mkdir(blocked, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if recorded, err := store.record(content, at.Add(time.Second), ""); recorded || err == nil {
+		t.Fatalf("want failed capture, got recorded=%t, error=%v", recorded, err)
+	}
+	if got := clipboardTestSearch(t, store, "", 1).Items; len(got) != 1 || got[0].Title != "old" {
+		t.Fatalf("failed capture evicted history: %+v", got)
+	}
+}
+
+func TestClipboardCaptureAfterClearAcceptsEarlierWallTime(t *testing.T) {
+	store := clipboardStore{dir: t.TempDir(), config: clipboardHistoryConfig{MaxEntries: 3, MaxHistoryBytes: 64}}
+	if err := store.clear(); err != nil {
+		t.Fatal(err)
+	}
+	clipboardTestRecord(t, store, clipboardContent{format: "txt", data: []byte("fresh")}, time.Now().Add(-time.Hour))
+}
+
+func TestClipboardRecopyAfterRollbackKeepsItsWallTimeAndOrder(t *testing.T) {
+	store := clipboardStore{dir: t.TempDir(), config: clipboardHistoryConfig{MaxEntries: 2, MaxHistoryBytes: 64}}
+	at := time.Now().Round(time.Minute)
+	first := clipboardContent{format: "txt", data: []byte("first")}
+	clipboardTestRecord(t, store, first, at)
+	clipboardTestRecord(t, store, clipboardContent{format: "txt", data: []byte("second")}, at.Add(-time.Minute))
+	if items := clipboardTestSearch(t, store, "", 1).Items; items[0].Title != "second" {
+		t.Fatalf("new copy was sorted by its earlier wall time: %+v", items)
+	}
+	reopened := clipboardStore{dir: store.dir, config: store.config}
+	rolled := at.Add(-2 * time.Minute)
+	clipboardTestRecord(t, reopened, first, rolled)
+	if items := clipboardTestSearch(t, store, "", 1).Items; items[0].Title != "first" || items[0].Subtitle != rolled.Local().Format("01-02 15:04") {
+		t.Fatalf("recopy lost its order or wall time: %+v", items)
+	}
+	clipboardTestRecord(t, reopened, clipboardContent{format: "txt", data: []byte("third")}, rolled.Add(-time.Minute))
+	if items := clipboardTestSearch(t, store, "", 2).Items; items[0].Title != "third" || items[1].Title != "first" {
+		t.Fatalf("retention did not follow copy order: %+v", items)
+	}
+}
+
+func TestClipboardReportsCapacityBlockedByPins(t *testing.T) {
+	for _, config := range []clipboardHistoryConfig{
+		{MaxEntries: 1, MaxHistoryBytes: 64},
+		{MaxEntries: 5, MaxHistoryBytes: 7},
+	} {
+		store := clipboardStore{dir: t.TempDir(), config: config}
+		at := time.Now().Add(-time.Second)
+		clipboardTestRecord(t, store, clipboardContent{format: "txt", data: []byte("pin!")}, at)
+		pin := clipboardTestSearch(t, store, "", 1).Items[0]
+		if err := store.setPinned(pin.ID, true); err != nil {
+			t.Fatal(err)
+		}
+		content := clipboardContent{format: "txt", data: []byte("next")}
+		if recorded, err := store.record(content, at.Add(time.Second), ""); recorded || !errors.Is(err, errClipboardHistoryFull) {
+			t.Fatalf("want explicit capacity failure, got recorded=%t, error=%v", recorded, err)
+		}
+		if err := store.setPinned(pin.ID, false); err != nil {
+			t.Fatal(err)
+		}
+		clipboardTestRecord(t, store, content, at.Add(2*time.Second))
+	}
+}
+
 func clipboardTestRecord(t *testing.T, store clipboardStore, content clipboardContent, at time.Time) {
 	t.Helper()
-	if written, err := store.record(content, at); !written || err != nil {
+	generation, err := store.clearGeneration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written, err := store.record(content, at, generation); !written || err != nil {
 		t.Fatalf("record clipboard item: written=%t, error=%v", written, err)
 	}
 }
@@ -37,7 +112,7 @@ func TestClipboardHistoryPersistsAndKeepsOriginalRepresentations(t *testing.T) {
 	image := []byte{0x89, 0x50, 0x4e, 0x47, 0x00, 0x00, 0xff}
 	clipboardTestRecord(t, store, clipboardContent{format: "png", data: image}, at.Add(time.Second))
 	clipboardTestRecord(t, store, clipboardContent{format: "txt", data: []byte(text)}, at.Add(2*time.Second))
-	if saved, err := store.record(clipboardContent{format: "txt", data: []byte(" \n  ")}, at); saved || err != nil {
+	if saved, err := store.record(clipboardContent{format: "txt", data: []byte(" \n  ")}, at, ""); saved || err != nil {
 		t.Fatalf("whitespace must remain uncaptured: %t %v", saved, err)
 	}
 
@@ -155,7 +230,7 @@ func TestClipboardHistoryLimitsAndClearSuppressPendingCaptures(t *testing.T) {
 	if err := store.clear(); err != nil {
 		t.Fatal(err)
 	}
-	if saved, err := peer.record(clipboardContent{format: "txt", data: []byte("queued")}, at); saved || err != nil {
+	if saved, err := peer.record(clipboardContent{format: "txt", data: []byte("queued")}, at, ""); saved || err != nil {
 		t.Fatalf("capture from before clear was replayed: %t %v", saved, err)
 	}
 	if history := clipboardTestSearch(t, peer, "", 3); history.ClipboardCount != 0 || history.ClipboardBytes != 0 {
@@ -164,19 +239,16 @@ func TestClipboardHistoryLimitsAndClearSuppressPendingCaptures(t *testing.T) {
 	if _, err := os.Stat(unrelated); err != nil {
 		t.Fatalf("clear affected a file outside its own history: %v", err)
 	}
-	marker, err := os.Stat(filepath.Join(store.dir, ".cleared"))
+	generation, err := peer.clearGeneration()
 	if err != nil {
 		t.Fatal(err)
 	}
-	freshAt := marker.ModTime().Add(time.Microsecond)
-	for !time.Now().After(freshAt) {
-		time.Sleep(time.Microsecond)
-	}
+	freshAt := time.Now()
 	clipboardTestRecord(t, peer, clipboardContent{format: "txt", data: []byte("fresh")}, freshAt)
 	if err := store.clear(); err != nil {
 		t.Fatal(err)
 	}
-	if saved, err := peer.record(clipboardContent{format: "txt", data: []byte("queued2")}, freshAt); saved || err != nil {
+	if saved, err := peer.record(clipboardContent{format: "txt", data: []byte("queued2")}, freshAt, generation); saved || err != nil {
 		t.Fatalf("second clear allowed an old capture: %t %v", saved, err)
 	}
 }

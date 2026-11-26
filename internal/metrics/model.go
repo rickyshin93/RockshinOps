@@ -122,20 +122,22 @@ type AppUsage struct {
 }
 
 type Snapshot struct {
-	UpdatedAt        time.Time  `json:"updatedAt"`
-	CPU              CPU        `json:"cpu"`
-	Memory           Memory     `json:"memory"`
-	GPU              GPU        `json:"gpu"`
-	Disk             Disk       `json:"disk"`
-	Network          Network    `json:"network"`
-	Battery          Battery    `json:"battery"`
-	ProcessUpdatedAt time.Time  `json:"processUpdatedAt"`
-	ProcessCount     int        `json:"processCount"`
-	ProcessSkipped   int        `json:"processSkipped"`
-	ProcessError     string     `json:"processError"`
-	TopCPU           []Process  `json:"topCPU"`
-	TopMemory        []AppUsage `json:"topMemory"`
-	UptimeSeconds    float64    `json:"uptimeSeconds"`
+	Sequence          uint64     `json:"sequence"`
+	HistoryGeneration uint64     `json:"historyGeneration"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+	CPU               CPU        `json:"cpu"`
+	Memory            Memory     `json:"memory"`
+	GPU               GPU        `json:"gpu"`
+	Disk              Disk       `json:"disk"`
+	Network           Network    `json:"network"`
+	Battery           Battery    `json:"battery"`
+	ProcessUpdatedAt  time.Time  `json:"processUpdatedAt"`
+	ProcessCount      int        `json:"processCount"`
+	ProcessSkipped    int        `json:"processSkipped"`
+	ProcessError      string     `json:"processError"`
+	TopCPU            []Process  `json:"topCPU"`
+	TopMemory         []AppUsage `json:"topMemory"`
+	UptimeSeconds     float64    `json:"uptimeSeconds"`
 
 	// Thermal pressure and power assertions are defined in power.go.
 	Sensors         Sensors         `json:"sensors"`

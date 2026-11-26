@@ -17,6 +17,7 @@ export function SpaceView({ volume, capacityError, isMacOS, openDiskAccess }: { 
   return <div className="space-page">
     <StorageCard volume={volume} capacityError={capacityError} summary={space.summary} />
     {space.notice && <Notice notice={space.notice} />}
+    {space.listingError && <div className="notice error" role="alert">{t("无法读取文件夹：")}{space.listingError}</div>}
     {space.scanning ? <ScanCard used={used} /> : !space.summary ? <section className="space-card space-intro" aria-labelledby="space-intro-title">
       <div className="space-card-title"><Tile name="scan" /><h2 id="space-intro-title">{t("空间分析")}</h2></div>
       <p>{t("扫描整块磁盘，按实际占用找出最大的文件夹和文件，再逐层打开查看。")}</p>
@@ -181,7 +182,7 @@ function Suggestions({ summary }: { summary: SpaceSummary }) {
       </div>
       <div className="space-suggestion-actions">
         {item.found && item.bytes >= 1_000_000 && <button className="cleanup-action" onClick={() => void openFolder(item.path)}>{t("查看")}</button>}
-        {item.trash && <button className="space-danger" disabled={!!busy || !item.found || item.bytes === 0} aria-busy={busy === "trash"}
+        {item.trash && <button className="space-danger" disabled={!!busy || !item.found || item.bytes === 0 && item.files === 0} aria-busy={busy === "trash"}
           onClick={() => { if (window.confirm(t("永久删除废纸篓中的所有内容（{{size}}）？此操作不可恢复。路径：{{path}}", { size: formatCapacity(item.bytes), path: item.path }))) void emptyTrash(item.bytes); }}>{t("清空废纸篓")}</button>}
       </div>
     </div>)}</div>

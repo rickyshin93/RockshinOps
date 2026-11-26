@@ -46,6 +46,9 @@ export function calculatorItemDeletion(expression: string, offset: number) {
   }
   const removed = pair ? [item, pair].sort((a, b) => b.offset - a.offset) : [item];
   const next = removed.reduce((value, part) => value.slice(0, part.offset) + value.slice(part.offset + part.value.length), expression);
+  const references = items.filter(part => part.kind === "reference" && !removed.includes(part)).map(part => part.value);
+  const nextReferences = calculatorExpressionItems(next).filter(part => part.kind === "reference").map(part => part.value);
+  if (references.length !== nextReferences.length || references.some((reference, index) => reference !== nextReferences[index])) return null;
   return { expression: next, caret: Math.min(offset - (pair && pair.offset < offset ? 1 : 0), next.length) };
 }
 

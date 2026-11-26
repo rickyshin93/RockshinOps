@@ -72,6 +72,7 @@ type System struct {
 	update          func(metrics.Snapshot)
 	spaceMu         sync.Mutex
 	space           *metrics.SpaceTree
+	spaceScope      spaceScanScope
 	spaceSkipped    int64
 	spaceStarted    time.Time
 	spaceFinished   time.Time

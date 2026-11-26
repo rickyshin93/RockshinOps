@@ -772,6 +772,9 @@
   "无法保存计算，请重试。": "Couldn’t save the calculation. Try again.",
   "正在计算…": "Calculating…",
   "正在保存计算记录…": "Saving the calculation…",
+  "此操作会合并行引用与数字，请先调整算式。": "This would merge a row reference with a number. Edit the expression first.",
+  "无法读取文件夹：": "Couldn't load the folder: ",
+  "待继续输入：{{expression}}": "Next input: {{expression}}",
   "已存入计算历史": "Saved to calculation history",
   "已复制计算结果": "Calculation result copied",
   "无法复制计算结果，请重试。": "Couldn’t copy the result. Try again.",
@@ -1008,5 +1011,6 @@
   "无法预览这张图片。": "Couldn't preview this image.",
   "无法清空剪贴板历史。": "Couldn't clear clipboard history.",
   "这条剪贴板内容超过单条大小上限，未记录。": "This clipboard item exceeded the per-item size limit and was skipped.",
+  "置顶记录占用了所需空间。取消置顶可继续记录。": "Pinned items left too little room for this copy. Unpin items to make room.",
   "无法保存剪贴板内容，请检查本机存储。": "Couldn't save the clipboard item. Check local storage."
 }

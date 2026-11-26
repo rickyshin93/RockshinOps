@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros } from "../src/calculator-input";
+import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros, queueCalculatorInput } from "../src/calculator-input";
 import { calculatorExpressionItems, calculatorItemDeletion, calculatorResultItems, remapCalculatorReferences } from "../src/calculator-items";
 
 test("calculator items keep expression offsets and separate the sign from the answer", () => {
@@ -63,4 +63,26 @@ test("leading zeroes are removed from integer operands without changing decimal 
     ["#100+0002", "#100+2", 6], ["10+0.00", "10+0.00", 7],
   ] as const) expect(normalizeCalculatorZeros(value, value.length)).toEqual({ value: expected, caret });
   expect(normalizeCalculatorZeros("0009", 2)).toEqual({ value: "9", caret: 0 });
+});
+
+test("input while saving can build a new expression or continue the answer", () => {
+  let value = "";
+  for (const key of ["９", "+", "0", "2", "Backspace", "5"]) value = queueCalculatorInput(value, key)!;
+  expect(value).toBe("9+5");
+  for (const [input, want] of [["+", "#1+"], ["(", "#1×("], [".", "."], ["#2", null], [")", null]]) {
+    expect(queueCalculatorInput("", input!)).toBe(want);
+  }
+  expect(queueCalculatorInput("#1+", "Backspace")).toBe("");
+  expect(queueCalculatorInput("#1+3", "AC")).toBe("");
+  expect(queueCalculatorInput("", "+002", false)).toBe("+2");
+  expect(queueCalculatorInput("#1+", "2*3", false)).toBe("#1+2*3");
+  let grouped = "";
+  for (const key of ["2", "(", "3", ")"]) grouped = queueCalculatorInput(grouped, key)!;
+  expect(grouped).toBe("2×(3)");
+});
+
+test("deleting an operator never retargets the preceding reference", () => {
+  expect(calculatorItemDeletion("#1+12", 2)).toBeNull();
+  expect(calculatorItemDeletion("#19+3", 3)).toBeNull();
+  expect(calculatorItemDeletion("12+#1", 3)).toEqual({ expression: "12+", caret: 3 });
 });

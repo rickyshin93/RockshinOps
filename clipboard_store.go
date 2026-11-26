@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -17,15 +18,18 @@ type clipboardContent struct {
 	data   []byte
 }
 
+var errClipboardHistoryFull = errors.New("pinned clipboard items leave no room for this capture")
+
 type clipboardFile struct {
 	name, format string
 	bytes        int64
 	at           time.Time
+	order        time.Time
 	pinned       bool
 }
 
-// Each history item is an immutable file. Its modification time orders the
-// history, so re-copying an existing item only updates its timestamp.
+// Each item is an immutable file. Its modification time is the displayed
+// copy time. Recency overrides preserve copy order across clock rollback.
 type clipboardStore struct {
 	dir    string
 	config clipboardHistoryConfig
@@ -68,6 +72,10 @@ func (s clipboardStore) files() ([]clipboardFile, int64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	order := map[string]time.Time{}
+	if err := readClipboardJSON(filepath.Join(s.dir, ".recency.json"), &order); err != nil {
+		return nil, 0, err
+	}
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		return nil, 0, err
@@ -93,11 +101,18 @@ func (s clipboardStore) files() ([]clipboardFile, int64, error) {
 		if err != nil {
 			return nil, 0, err
 		}
-		files = append(files, clipboardFile{name: name, format: format, bytes: info.Size(), at: info.ModTime(), pinned: pins[name]})
+		files = append(files, clipboardFile{name: name, format: format, bytes: info.Size(), at: info.ModTime(), order: order[name], pinned: pins[name]})
 		total += info.Size()
 	}
 	slices.SortFunc(files, compareClipboardFiles)
 	return files, total, nil
+}
+
+func (f clipboardFile) sortTime() time.Time {
+	if f.order.IsZero() {
+		return f.at
+	}
+	return f.order
 }
 
 func compareClipboardFiles(a, b clipboardFile) int {
@@ -107,10 +122,29 @@ func compareClipboardFiles(a, b clipboardFile) int {
 		}
 		return 1
 	}
-	if order := b.at.Compare(a.at); order != 0 {
+	if order := b.sortTime().Compare(a.sortTime()); order != 0 {
 		return order
 	}
 	return strings.Compare(a.name, b.name)
+}
+
+func (s clipboardStore) recordOrder(files []clipboardFile, name string, at time.Time) (time.Time, error) {
+	order := at
+	overrides := make(map[string]time.Time)
+	for _, file := range files {
+		if !order.After(file.sortTime()) {
+			order = file.sortTime().Add(time.Nanosecond)
+		}
+		if file.name != name && !file.order.IsZero() {
+			overrides[file.name] = file.order
+		}
+	}
+	if order.Equal(at) {
+		order = time.Time{}
+	} else {
+		overrides[name] = order
+	}
+	return order, writeLocalJSON(filepath.Join(s.dir, ".recency.json"), overrides)
 }
 
 func clipboardPinnedCount(files []clipboardFile) int {
@@ -140,7 +174,23 @@ func (s clipboardStore) remove(files []clipboardFile) error {
 	return nil
 }
 
-func (s clipboardStore) record(content clipboardContent, at time.Time) (bool, error) {
+func (s clipboardStore) clearGeneration() (string, error) {
+	data, err := os.ReadFile(filepath.Join(s.dir, ".cleared"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err == nil && len(data) == 0 {
+		// Older running versions write an empty marker and update its timestamp.
+		marker, err := os.Stat(filepath.Join(s.dir, ".cleared"))
+		if err != nil {
+			return "", err
+		}
+		return marker.ModTime().String(), nil
+	}
+	return string(data), err
+}
+
+func (s clipboardStore) record(content clipboardContent, at time.Time, generation string) (bool, error) {
 	if len(content.data) == 0 || (content.format == "txt" && strings.TrimSpace(string(content.data)) == "") {
 		return false, nil
 	}
@@ -152,12 +202,12 @@ func (s clipboardStore) record(content clipboardContent, at time.Time) (bool, er
 	}
 	var recorded bool
 	err := s.locked(func() error {
-		if marker, err := os.Stat(filepath.Join(s.dir, ".cleared")); err == nil {
-			if !at.After(marker.ModTime()) {
-				return nil // a queued capture predates Clear History, including in another process
-			}
-		} else if !errors.Is(err, fs.ErrNotExist) {
+		current, err := s.clearGeneration()
+		if err != nil {
 			return err
+		}
+		if current != generation {
+			return nil // Clear History invalidates captures already in progress in any instance.
 		}
 		files, total, err := s.files()
 		if err != nil {
@@ -166,8 +216,8 @@ func (s clipboardStore) record(content clipboardContent, at time.Time) (bool, er
 		path := filepath.Join(s.dir, name)
 		for _, file := range files {
 			if file.name == name {
-				if !at.After(file.at) {
-					return nil
+				if _, err := s.recordOrder(files, name, at); err != nil {
+					return err
 				}
 				if err := os.Chtimes(path, at, at); err != nil {
 					return err
@@ -175,6 +225,14 @@ func (s clipboardStore) record(content clipboardContent, at time.Time) (bool, er
 				recorded = true
 				return nil
 			}
+		}
+		pinned := clipboardPinnedCount(files)
+		pinnedBytes := int64(0)
+		for _, file := range files[:pinned] {
+			pinnedBytes += file.bytes
+		}
+		if pinned >= s.config.MaxEntries || pinnedBytes > s.config.MaxHistoryBytes-size {
+			return errClipboardHistoryFull
 		}
 		file, err := os.CreateTemp(s.dir, ".capture-")
 		if err != nil {
@@ -191,38 +249,29 @@ func (s clipboardStore) record(content clipboardContent, at time.Time) (bool, er
 		if err := os.Chtimes(file.Name(), at, at); err != nil {
 			return err
 		}
-		files = append(files, clipboardFile{name: name, format: content.format, bytes: size, at: at})
-		slices.SortFunc(files, compareClipboardFiles)
-		keep, _ := clipboardRetention(files, total+size, s.config.MaxEntries, s.config.MaxHistoryBytes)
-		for _, file := range files[keep:] {
-			if file.name == name {
-				return nil // a capture from another process already displaced this stale item
-			}
-		}
-		if err := s.remove(files[keep:]); err != nil {
+		order, err := s.recordOrder(files, name, at)
+		if err != nil {
 			return err
 		}
+		files = append(files, clipboardFile{name: name, format: content.format, bytes: size, at: at, order: order})
+		slices.SortFunc(files, compareClipboardFiles)
+		keep, _ := clipboardRetention(files, total+size, s.config.MaxEntries, s.config.MaxHistoryBytes)
 		if err := os.Rename(file.Name(), path); err != nil {
 			return err
 		}
 		recorded = true
-		return nil
+		return s.remove(files[keep:])
 	})
 	return recorded, err
 }
 
 func (s clipboardStore) clear() error {
 	return s.locked(func() error {
-		marker := filepath.Join(s.dir, ".cleared")
-		if err := os.WriteFile(marker, nil, 0600); err != nil {
-			return err
-		}
-		now := time.Now()
-		if err := os.Chtimes(marker, now, now); err != nil {
-			return err
-		}
 		files, _, err := s.files()
 		if err != nil {
+			return err
+		}
+		if err := writeLocalJSON(filepath.Join(s.dir, ".cleared"), rand.Text()); err != nil {
 			return err
 		}
 		return s.remove(files[clipboardPinnedCount(files):])

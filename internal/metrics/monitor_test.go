@@ -53,6 +53,24 @@ func TestTotalCPUUsageAtFullUtilization(t *testing.T) {
 	}
 }
 
+func TestHistoryRestartsWhenWallClockMovesBackwards(t *testing.T) {
+	m := performanceMonitor()
+	now := time.Date(2026, 11, 26, 1, 0, 0, 0, time.UTC)
+	before := m.refreshAt(now, false)
+	rolledBack := now.Add(-time.Hour)
+	first := m.refreshAt(rolledBack, false)
+	latest := m.refreshAt(rolledBack.Add(time.Second), false)
+	if first.Sequence != before.Sequence+1 || latest.Sequence != first.Sequence+1 || first.HistoryGeneration != before.HistoryGeneration+1 || latest.HistoryGeneration != first.HistoryGeneration {
+		t.Fatalf("clock rollback changed ordering: before=%d/%d first=%d/%d latest=%d/%d", before.Sequence, before.HistoryGeneration, first.Sequence, first.HistoryGeneration, latest.Sequence, latest.HistoryGeneration)
+	}
+	if history := m.History(); len(history) != 2 || !history[0].At.Equal(rolledBack) || !history[1].At.Equal(latest.UpdatedAt) {
+		t.Fatalf("history kept samples from before the clock rollback: %+v", history)
+	}
+	if after := m.HistorySince(rolledBack); len(after) != 1 || !after[0].At.Equal(latest.UpdatedAt) {
+		t.Fatalf("incremental history did not resume after clock rollback: %+v", after)
+	}
+}
+
 func TestProcessPIDReuseAndFailuresClearCurrentValues(t *testing.T) {
 	m := NewMonitor(Options{Interval: 2 * time.Second, DiskInterval: time.Second, ProcessInterval: 5 * time.Second, HistorySeconds: 60})
 	raw := rawSample{cpuError: "no cpu"}

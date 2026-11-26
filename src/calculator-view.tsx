@@ -8,7 +8,7 @@ import { CalculationText } from "./calculation-text";
 import { CalculatorExpressionEditor, calculatorTokenPosition, type CalculatorCaretPosition, type CalculatorEditor, type LinkedOperand } from "./calculator-expression-editor";
 import { useCalculatorConnections, type CalculatorTrace } from "./calculator-connection";
 import { CalculatorSettings } from "./calculator-settings";
-import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros } from "./calculator-input";
+import { calculatorInputKey, isCalculatorDraft, normalizeCalculatorInput, normalizeCalculatorZeros, queueCalculatorInput } from "./calculator-input";
 import { calculatorExpressionItems, calculatorItemAt, calculatorReferenceBindings, calculatorResultItems, remapCalculatorReferences } from "./calculator-items";
 
 const keys = ["AC", "(", ")", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "0", ".", "Backspace", "="];
@@ -36,6 +36,7 @@ const calculationErrors: Record<string, string> = {
   calculation_history_changed: "计算历史已变更，请检查引用后重试。",
   invalid_calculation_reference: "只能引用此行上方的结果。",
   invalid_calculation_dependency: "引用的结果不可用。",
+  calculation_reference_merge: "此操作会合并行引用与数字，请先调整算式。",
   result_too_large: "结果太大，请缩短计算链。",
 };
 
@@ -81,7 +82,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   initialExpression: string;
   initialRowIDs?: readonly string[];
   incoming?: CalculatorImport;
-  onImportHandled: (request: CalculatorImport) => void;
+  onImportHandled: (request: CalculatorImport) => boolean;
   onEdit: (expression: string, rowIDs: readonly string[]) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -90,7 +91,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   const canvas = useRef<HTMLDivElement>(null);
   const focusToken = useRef<ItemFocus | null>(null);
   const focusAnswer = useRef<string | null>(null);
-  const focusImportedDraft = useRef(false);
+  const focusDraftEnd = useRef(false);
   const returnToRow = useRef<string | undefined>(undefined);
   const revealEditor = useRef(false);
   const savedScrollTop = useRef<number | undefined>(undefined);
@@ -100,6 +101,9 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   const [selectedResult, setSelectedResult] = useState<ResultSelection | null>(null);
   const [draft, setDraft] = useState(() => compactExpression(initialExpression));
   const [savingAnswer, setSavingAnswer] = useState<CalculationValue>();
+  const collectingContinuation = useRef(false);
+  const continuation = useRef("");
+  const [queuedInput, setQueuedInput] = useState("");
   const [draftOpen, setDraftOpen] = useState(true);
   const [editing, setEditing] = useState<{ id: string; expression: string }>();
   const [preview, setPreview] = useState<{ id: string; expression: string; sheet: CalculatorSheet | undefined; rows: CalculationEntry[] | null }>();
@@ -190,8 +194,8 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
     savedScrollTop.current = undefined;
   }, [editing?.id, draftOpen]);
   useLayoutEffect(() => {
-    if (!focusImportedDraft.current) return;
-    focusImportedDraft.current = false;
+    if (!focusDraftEnd.current) return;
+    focusDraftEnd.current = false;
     input.current?.focusEnd();
     input.current?.scrollIntoView({ block: "nearest" });
   }, [draft]);
@@ -234,14 +238,14 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
     return () => { active = false; };
   }, [expression, native, editing?.id, editingChanged, editingEntry?.pending, sheet, rowIDs]);
   const applyImport = useEffectEvent((request: CalculatorImport) => {
+    if (!onImportHandled(request)) return;
     if (editing) changeEditing();
     setTrace(null);
-    focusImportedDraft.current = true;
+    focusDraftEnd.current = true;
     const value = compactExpression(request.expression);
     setSelectedResult(null);
     setDraftOpen(true);
-    updateDraft(value);
-    onImportHandled(request);
+    updateDraft(normalizeCalculatorZeros(value, value.length).value);
   });
   useEffect(() => {
     if (incoming && !busy && !draft && !editingChanged) applyImport(incoming);
@@ -268,6 +272,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   }
 
   function changeEditing(entry?: CalculationEntry, offset?: number, position: CalculatorCaretPosition = { offset: 0 }) {
+    discardContinuation();
     setSelectedResult(current => {
       if (!entry || !current) return null;
       const source = savedRows.findIndex(row => row.createdAt === current.id && !row.error && !row.pending);
@@ -320,7 +325,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   }
 
   function commit(afterEdit?: () => void) {
-    if (!native || busy) return;
+    if (!native || busy || collectingContinuation.current) return;
     const finishCommit = (entry?: CalculationEntry) => {
       if (afterEdit) { afterEdit(); return; }
       if (editing) changeEditing();
@@ -338,22 +343,31 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
       return;
     }
     void perform(async () => {
+      collectingContinuation.current = !afterEdit && (!editing || !draft);
       if (!afterEdit && editedResult) setSavingAnswer(editedResult);
       const request = historyRequest.current;
       const binding = calculatorReferenceBindings(expression, history ? rowIDs : initialRowIDs ?? rowIDs);
-      const { entry, sheet: updatedSheet } = editing && afterEdit ? await System.calculatorSave(expression, editing.id, binding) :
-        await System.calculatorSaveWithAnswer(expression, editing?.id ?? null, new Channel<CalculationValue>(setSavingAnswer), binding).catch(reason => {
-          setSavingAnswer(undefined);
-          throw reason;
-        });
+      const { entry, sheet: updatedSheet } = await (editing && afterEdit ? System.calculatorSave(expression, editing.id, binding) :
+        System.calculatorSaveWithAnswer(expression, editing?.id ?? null, new Channel<CalculationValue>(setSavingAnswer), binding)).finally(() => {
+        collectingContinuation.current = false;
+        setSavingAnswer(undefined);
+      });
       if (!editing) followHistory.current = true;
       applySheet(updatedSheet, request);
-      setSavingAnswer(undefined);
       if (!editing) {
         setTrace(current => current?.target === "draft" ? { ...current, target: entry.createdAt } : current);
-        updateDraft("");
+        if (!continuation.current) updateDraft("");
       }
-      finishCommit(entry);
+      if (!afterEdit && continuation.current && (!editing || !draft)) {
+        const rows = updatedSheet.history.map(row => row.createdAt).reverse();
+        const row = rows.indexOf(entry.createdAt) + 1;
+        updateDraft(continuation.current.replace(/^#1/, `#${row}`), rows);
+        discardContinuation();
+        if (editing) changeEditing();
+        setSelectedResult(null);
+        focusDraftEnd.current = true;
+        setDraftOpen(true);
+      } else finishCommit(entry);
       setMessage({ key: editing ? "已更新原记录" : "已存入计算历史" });
     }, "无法保存计算，请重试。", afterEdit ? undefined : "正在计算…");
   }
@@ -392,6 +406,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
 
   async function clear() {
     await System.calculatorClearHistory();
+    discardContinuation();
     setSelectedResult(null);
     setTrace(null);
     setEditing(undefined);
@@ -561,14 +576,32 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
   }
 
   function press(key: string) {
+    if (captureContinuation(key)) return;
     if (busy) return;
     if (key === "Backspace" && (removeSelectedResult() || removeEmptyRow())) return;
-    if (key === "AC") { setTrace(null); edit(""); input.current?.focus(); }
+    if (key === "AC") { discardContinuation(); setTrace(null); edit(""); input.current?.focus(); }
     else if (!continueResult(key) && !insert(key === "Backspace" ? "" : key, key === "Backspace")) rejectInput();
   }
 
-  function rejectInput() {
-    setMessage({ key: "请输入有效的数字、运算符或括号。", error: true });
+  function captureContinuation(text: string, fromKey = true) {
+    if (!collectingContinuation.current) return false;
+    const next = queueCalculatorInput(continuation.current, text, fromKey);
+    if (next === null) rejectInput();
+    else {
+      continuation.current = next;
+      setQueuedInput(next.replace(/^#1/, ""));
+    }
+    return true;
+  }
+
+  function discardContinuation() {
+    if (!continuation.current) return;
+    continuation.current = "";
+    setQueuedInput("");
+  }
+
+  function rejectInput(key = "请输入有效的数字、运算符或括号。") {
+    setMessage({ key, error: true });
   }
 
   const previewError = activePreview?.rows === null;
@@ -592,7 +625,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
             event.preventDefault(); return;
           }
           if (event.key === "Enter" || event.key === "=" || event.key === "＝") { event.preventDefault(); commit(); }
-          if (event.key === "Escape") { event.preventDefault(); if (selectedResult) setSelectedResult(null); else if (editing) changeEditing(); else if (trace) setTrace(null); else edit(""); }
+          if (event.key === "Escape") { event.preventDefault(); if (selectedResult) setSelectedResult(null); else if (editing) changeEditing(); else if (trace) setTrace(null); else { discardContinuation(); edit(""); } }
           if (event.key === "Backspace" && !busy && !event.altKey && !event.metaKey && !event.ctrlKey) {
             event.preventDefault();
             press("Backspace");
@@ -608,10 +641,23 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
 
   return <form className="calculator-page" aria-label={t("计算器")} aria-busy={busy} onSubmit={event => { event.preventDefault(); commit(); }}
     onKeyDownCapture={event => {
-      if (!pendingDeletion.current || event.key !== "Backspace" || event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = calculatorInputKey(event.key, event.code);
+      if (canvas.current?.contains(event.target as Node) && (/^[0-9.+−×÷*/()-]$/.test(key) || key === "Backspace") && captureContinuation(key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (!pendingDeletion.current || key !== "Backspace") return;
       event.preventDefault();
       event.stopPropagation();
       if (event.repeat) pendingDeletion.current.repeats++;
+    }}
+    onPasteCapture={event => {
+      if (canvas.current?.contains(event.target as Node) && captureContinuation(event.clipboardData.getData("text/plain"), false)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     }}
     onClick={event => {
       const target = event.target as HTMLElement;
@@ -687,6 +733,7 @@ export function CalculatorView({ initialExpression, initialRowIDs, incoming, onI
         <button type="button" className="secondary-button" onClick={() => onImportHandled(incoming)}>{t("取消导入")}</button>
       </div>}
       <p className={message?.error || previewError ? "calculator-feedback error" : "calculator-feedback"} role={message?.error || previewError ? "alert" : "status"}>{feedback}</p>
+      {queuedInput && <p className="calculator-feedback">{t("待继续输入：{{expression}}", { expression: queuedInput })}</p>}
       <div className="calculator-keys" role="group" aria-label={t("计算键盘")}>
         {keys.map(key => {
           const glyph = keyGlyphs[key];

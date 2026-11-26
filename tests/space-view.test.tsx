@@ -4,7 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "../src/i18n";
 import { SpaceView } from "../src/space-view";
-import { openFolder, scanSpace, spaceStore, stopScan } from "../src/space-store";
+import { openFolder, scanSpace, showTab, spaceStore, stopScan, trashItem } from "../src/space-store";
+import type { SpaceListing } from "../src/mygo";
 
 const root = { name: "/", path: "/", bytes: 300e9, files: 900, directory: true, other: false, partial: false, trashable: false };
 const users = { name: "Users", path: "/Users", bytes: 250e9, files: 800, directory: true, other: false, partial: true, trashable: false };
@@ -17,6 +18,8 @@ const summary = {
 };
 const calls: string[] = [];
 let pending: { reject: (error: Error) => void } | null = null;
+let cancellationError = "scan cancelled";
+let listingOverride: ((path: string) => Promise<SpaceListing> | undefined) | undefined;
 const volume = { name: "Macintosh HD", mount: "/", format: "apfs", total: 500e9, available: 150e9 };
 const previous = { mygo: (globalThis as any).mygo, document: globalThis.document };
 
@@ -26,8 +29,9 @@ beforeAll(async () => {
     calls.push(method);
     switch (method) {
       case "System.ScanSpace": return pending ? new Promise((_, reject) => { pending = { reject }; }) : summary;
-      case "System.SpaceListing": return args[0] === "/Users" ? { entry: users, ancestors: [root], children: [iso, other] } : { entry: root, ancestors: [], children: [users, other] };
-      case "System.CancelScan": pending?.reject(new Error("scan cancelled")); return;
+      case "System.SpaceListing": return listingOverride?.(String(args[0])) ?? (args[0] === "/Users" ? { entry: users, ancestors: [root], children: [iso, other] } : { entry: root, ancestors: [], children: [users, other] });
+      case "System.CancelScan": pending?.reject(new Error(cancellationError)); return;
+      case "System.TrashSpaceItem": return { ...summary, largest: [] };
       case "System.SpaceProgress": return { scanning: true, files: 10, bytes: 1e9, skipped: 0, path: "/Users" };
       default: throw new Error(method);
     }
@@ -60,6 +64,50 @@ test("one scan feeds the breakdown, drill-down, large files and stop without res
   const running = scanSpace();
   await stopScan();
   await running;
+  pending = null;
   expect(spaceStore.get().summary).toBe(summary as never);
   expect(render()).toContain("Scan stopped; the previous result is kept.");
+});
+
+test("folder responses respect the latest folder or tab selection", async () => {
+  await scanSpace();
+  const older = Promise.withResolvers<SpaceListing>();
+  const newer = Promise.withResolvers<SpaceListing>();
+  listingOverride = path => path === "/Users" ? older.promise : newer.promise;
+  const first = openFolder("/Users");
+  const second = openFolder("/");
+  newer.resolve({ entry: root, ancestors: [], children: [users] });
+  await second;
+  older.resolve({ entry: users, ancestors: [root], children: [] });
+  await first;
+  expect(spaceStore.get().listing?.entry.path).toBe("/");
+  const late = Promise.withResolvers<SpaceListing>();
+  listingOverride = () => late.promise;
+  const opening = openFolder("/Users");
+  showTab("files");
+  late.resolve({ entry: users, ancestors: [root], children: [] });
+  await opening;
+  expect(spaceStore.get().tab).toBe("files");
+  listingOverride = undefined;
+});
+
+test("a successful trash move survives a failed folder refresh", async () => {
+  await scanSpace();
+  listingOverride = async () => { throw new Error("listing failed"); };
+  await trashItem(iso);
+  listingOverride = undefined;
+  expect(spaceStore.get().summary?.largest).toEqual([]);
+  expect(spaceStore.get().notice?.kind).toBe("trashed");
+  expect(render()).toContain("listing failed");
+});
+
+test("a real scan error is visible even when stop was requested", async () => {
+  pending = { reject() {} };
+  cancellationError = "EACCES";
+  const running = scanSpace();
+  await stopScan();
+  await running;
+  pending = null;
+  cancellationError = "scan cancelled";
+  expect(spaceStore.get().notice).toEqual({ kind: "error", message: "EACCES" });
 });

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -128,6 +130,7 @@ func (ix *Index) Build(ctx context.Context) error {
 	ix.add(-1, "", 0, flagDir|flagHidden)
 	ix.mu.Unlock()
 	ix.scan(ctx, 0, ix.root, "")
+	dirs := map[string]string{}
 	for _, pattern := range ix.include {
 		found, err := filepath.Glob(filepath.Join(ix.root, filepath.FromSlash(pattern)))
 		if err != nil {
@@ -138,11 +141,26 @@ func (ix *Index) Build(ctx context.Context) error {
 				continue
 			}
 			rel, _ := filepath.Rel(ix.root, abs)
-			rel = filepath.ToSlash(rel)
-			ix.mu.Lock()
-			ix.included = append(ix.included, rel)
-			idx := ix.ensure(rel)
-			ix.mu.Unlock()
+			if rel != "." {
+				dirs[filepath.ToSlash(rel)] = abs
+			}
+		}
+	}
+	// An ancestor already scanned will have indexed its traversable descendants.
+	// Prefer it even if the configuration lists a descendant first.
+	paths := make([]string, 0, len(dirs))
+	for rel := range dirs {
+		paths = append(paths, rel)
+	}
+	slices.Sort(paths)
+	for _, rel := range paths {
+		ix.mu.Lock()
+		ix.included = append(ix.included, rel)
+		idx := ix.ensure(rel)
+		unscanned := ix.entries[idx].flags&flagHidden != 0
+		ix.mu.Unlock()
+		if unscanned {
+			abs := dirs[rel]
 			ix.scan(ctx, idx, abs, rel)
 		}
 	}
@@ -380,23 +398,29 @@ func (ix *Index) Refresh(abs string) {
 }
 
 func (ix *Index) refresh(idx int32, abs, rel string) {
-	items, err := list(abs)
-	if os.IsNotExist(err) && idx != 0 {
-		ix.mu.Lock()
-		parent := ix.entries[idx].parent
-		ix.mu.Unlock()
-		ix.refresh(parent, filepath.Dir(abs), rel[:max(strings.LastIndexByte(rel, '/'), 0)])
-		return
+	if idx != 0 {
+		info, err := os.Lstat(abs)
+		if os.IsNotExist(err) || errors.Is(err, syscall.ENOTDIR) || err == nil && !info.IsDir() {
+			ix.mu.RLock()
+			parent := ix.entries[idx].parent
+			ix.mu.RUnlock()
+			ix.refresh(parent, filepath.Dir(abs), rel[:max(strings.LastIndexByte(rel, '/'), 0)])
+			return
+		}
 	}
+	items, err := list(abs)
 	var fresh, changed []folder
 	ix.mu.Lock()
+	// A hidden ancestor can be browsed to reach an included folder, but its
+	// own files are still outside the index's configured scope.
+	excludedAncestor := ix.entries[idx].flags&flagHidden != 0 && ix.skip(rel, pathBase(rel))
 	existing := map[string]int32{}
 	for _, c := range ix.children[idx] {
 		existing[string(ix.nameOf(c))] = c
 	}
 	for _, it := range items {
 		childRel := join(rel, it.name)
-		skipped := it.dir && ix.skip(childRel, it.name)
+		skipped := (it.dir || excludedAncestor) && ix.skip(childRel, it.name)
 		if c, ok := existing[it.name]; ok {
 			delete(existing, it.name)
 			e := &ix.entries[c]

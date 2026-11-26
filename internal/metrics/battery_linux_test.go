@@ -19,8 +19,11 @@ func TestLinuxBatteryUnitsAndAbsentHardware(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "uevent"), []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Mkdir(filepath.Join(root, "USB0"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	b := readLinuxBattery(root)
-	if !b.Present || b.Percent != 50 || b.Minutes != 120 || b.Watts == nil || *b.Watts != -10 || b.Health == nil || *b.Health != 80 || b.Temperature == nil || *b.Temperature != 32.5 {
+	if b.Error != "" || !b.Present || b.Percent != 50 || b.Minutes != 120 || b.Watts == nil || *b.Watts != -10 || b.Health == nil || *b.Health != 80 || b.Temperature == nil || *b.Temperature != 32.5 {
 		t.Fatalf("battery units: %+v", b)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "uevent"), []byte("POWER_SUPPLY_TYPE=Battery\nPOWER_SUPPLY_CAPACITY=unknown\n"), 0600); err != nil {

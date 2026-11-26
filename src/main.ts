@@ -1,7 +1,7 @@
 import { t, i18n, resolveLanguage, type Language } from "./i18n";
 import { toggleAllAppFiles, reconcileAppFiles } from "./app-selection";
 import { isMyGo, locale, onLocaleChange } from "mygo-runtime";
-import { System, events, type Preferences, type Snapshot } from "./mygo";
+import { System, events, type DeviceState, type Preferences, type Snapshot } from "./mygo";
 import { formatBytes, formatCapacity, formatMemory, formatRate, percent, timeLabel } from "./format";
 import { icon } from "./icons";
 import { mergeHistory } from "./history";
@@ -32,10 +32,12 @@ const state: ViewState = {
 };
 const calculatorDraft: CalculatorDraft = {
   expression: "",
+  imports: [],
   finishImport(request) {
-    if (calculatorDraft.incoming !== request) return;
-    calculatorDraft.incoming = undefined;
+    if (calculatorDraft.imports[0] !== request) return false;
+    calculatorDraft.imports.shift();
     render();
+    return true;
   },
 };
 const reactPage = (page: Page) => ["settings", "menubar", "cleanup", "launcher", "calculator"].includes(page);
@@ -246,19 +248,23 @@ const refreshConnectionView = singleFlight(async () => {
 });
 async function readHistory(snapshot: Snapshot, live = false) {
   const historySeconds = state.info!.historySeconds;
-  const last = state.history.at(-1);
+  const last = state.snapshot?.historyGeneration === snapshot.historyGeneration ? state.history.at(-1) : undefined;
   const incoming = last ? await System.historySince(last.at) : await System.history();
   if (live && state.paused) return;
-  if (!state.snapshot || Date.parse(snapshot.updatedAt) >= Date.parse(state.snapshot.updatedAt)) {
+  if (!state.snapshot || snapshot.sequence >= state.snapshot.sequence) {
+    if (state.snapshot?.historyGeneration !== snapshot.historyGeneration) {
+      state.history = [];
+      state.processHistory = [];
+    }
     state.snapshot = snapshot;
     state.history = mergeHistory(state.history, incoming, Date.parse(snapshot.updatedAt), historySeconds);
   }
 }
 async function receive(snapshot: Snapshot) {
   if (stopped || !state.info) return;
-  if (state.snapshot && Date.parse(snapshot.updatedAt) < Date.parse(state.snapshot.updatedAt)) return;
+  if (state.snapshot && snapshot.sequence < state.snapshot.sequence) return;
   if (updating || state.paused || document.hidden) {
-    if (!queuedSnapshot || Date.parse(snapshot.updatedAt) >= Date.parse(queuedSnapshot.updatedAt)) queuedSnapshot = snapshot;
+    if (!queuedSnapshot || snapshot.sequence >= queuedSnapshot.sequence) queuedSnapshot = snapshot;
     return;
   }
   updating = true;
@@ -284,8 +290,11 @@ async function receive(snapshot: Snapshot) {
 async function initialize() {
   const result = await System.initialize();
   state.info = result.info;
-  state.snapshot = result.snapshot;
-  state.history = mergeHistory([], result.history, Date.parse(result.snapshot.updatedAt), result.info.historySeconds);
+  if (!state.snapshot || result.snapshot.sequence >= state.snapshot.sequence) {
+    if (state.snapshot?.historyGeneration !== result.snapshot.historyGeneration) state.processHistory = [];
+    state.snapshot = result.snapshot;
+    state.history = mergeHistory([], result.history, Date.parse(result.snapshot.updatedAt), result.info.historySeconds);
+  }
   el("machine-name").textContent = t("本机");
   el("machine-name").title = result.info.machine.hostname;
   el("machine-detail").textContent = result.info.machine.chip || result.info.machine.architecture;
@@ -370,13 +379,17 @@ function preloadInspection() {
   if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(preload);
   else requestAnimationFrame(() => { setTimeout(preload, 0); });
 }
-async function refresh() {
-  if (state.busy) return;
+let reinitializeAfterRefresh = false;
+async function refresh(reinitialize = false) {
+  if (state.busy) {
+    reinitializeAfterRefresh ||= reinitialize;
+    return;
+  }
   if (!isMyGo()) { error(t("实时数据仅在 RockshinOps 桌面应用中可用。请运行 bun run dev 启动应用。")); return; }
   reactPageError = "";
   state.busy = true; error(""); render();
   try {
-    if (!state.info) await initialize();
+    if (reinitialize || !state.info) await initialize();
     else {
       const snapshot = await System.refresh();
       await readHistory(snapshot);
@@ -385,7 +398,14 @@ async function refresh() {
     if (state.page === "connections") await connections(false, true);
     if (state.page === "devices") await loadDevices(true);
   } catch (reason) { error(`${t("连接采集服务失败：")}${String(reason)}${t("。可再次点击刷新重试。")}`); }
-  finally { state.busy = false; render(); preloadInspection(); }
+  finally {
+    state.busy = false;
+    render();
+    if (reinitializeAfterRefresh) {
+      reinitializeAfterRefresh = false;
+      void refresh(true);
+    } else preloadInspection();
+  }
 }
 let calculatorInputUpdate = Promise.resolve();
 function updateCalculatorInputSource(active: boolean) {
@@ -435,11 +455,13 @@ async function navigate(page: Page, query = "") {
 }
 const readDeviceState = singleFlight(() => System.devices());
 const refreshDeviceState = singleFlight(() => System.refreshDevices());
+function applyDeviceState(next: DeviceState) {
+  if (!state.devices || next.sequence >= state.devices.sequence) state.devices = next;
+}
 async function loadDevices(force = false) {
   if (state.deviceBusy) return;
   try {
-    const next = force ? await refreshDeviceState() : await readDeviceState();
-    if (!state.devices || Date.parse(next.updatedAt) >= Date.parse(state.devices.updatedAt)) state.devices = next;
+    applyDeviceState(force ? await refreshDeviceState() : await readDeviceState());
     state.deviceReadError = "";
   }
   catch (reason) { state.deviceReadError = String(reason); }
@@ -459,7 +481,7 @@ async function deviceAction(action: string, id: string, value = 0, volumeRevisio
       state.deviceNetworks = await System.scanWiFi();
       state.deviceScanAt = new Date().toISOString();
     } else {
-      state.devices = await System.deviceAction(action, id, value);
+      applyDeviceState(await System.deviceAction(action, id, value));
       if (action === "connect" || action === "disconnect") state.deviceMessage = t("请求已发送，连接状态以系统更新为准。");
     }
   } catch (reason) {
@@ -611,7 +633,9 @@ async function loadClipboard() {
 async function runClipboardAction(action: "copy" | "clear" | "pin", id = "", pinned = false) {
   const status = state.clipboardHistory?.clipboardStatus;
   if (state.page !== "clipboard" || !status || state.clipboardBusy) return;
-  clipboardRequest++;
+  const request = ++clipboardRequest;
+  const mode = state.clipboardMode;
+  const isCurrent = () => request === clipboardRequest && mode === state.clipboardMode && !document.hidden;
   state.clipboardBusy = true;
   state.clipboardError = undefined;
   if (action === "clear") setClipboardCopyFeedback();
@@ -619,7 +643,7 @@ async function runClipboardAction(action: "copy" | "clear" | "pin", id = "", pin
   try {
     if (action === "copy") {
       await System.copyClipboardHistory(id);
-      if (state.page === "clipboard" && !document.hidden) setClipboardCopyFeedback(id);
+      if (isCurrent()) setClipboardCopyFeedback(id);
     } else if (action === "pin") {
       await System.setClipboardPinned(id, pinned);
     } else {
@@ -627,7 +651,7 @@ async function runClipboardAction(action: "copy" | "clear" | "pin", id = "", pin
     }
   } catch (reason) {
     console.error(reason);
-    if (state.page === "clipboard" && !document.hidden) {
+    if (isCurrent()) {
       setClipboardCopyFeedback();
       state.clipboardError = { copy: "无法复制这条记录，请重新搜索。", clear: "无法清空剪贴板历史。", pin: "无法更新置顶状态。" }[action];
     }
@@ -745,13 +769,16 @@ document.addEventListener("click", event => {
   if (button.dataset.clipboardPin) { void runClipboardAction("pin", button.dataset.clipboardPin, button.getAttribute("aria-pressed") !== "true"); return; }
   if (button.dataset.clipboardSnippet) {
     const id = button.dataset.clipboardSnippet;
-    if (!state.clipboardBusy) showClipboardSnippetDialog(async name => {
+    if (state.clipboardHistory && !state.clipboardBusy) showClipboardSnippetDialog(async name => {
       await System.saveClipboardSnippet(id, name);
       await loadClipboard();
     });
     return;
   }
-  if (button.dataset.clipboardPreview) { showClipboardPreview(button.dataset.clipboardPreview); return; }
+  if (button.dataset.clipboardPreview) {
+    if (state.clipboardHistory) showClipboardPreview(button.dataset.clipboardPreview);
+    return;
+  }
   if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
   if (button.dataset.action === "toggle-startup") { void toggleStartup(); return; }
   if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
@@ -813,6 +840,9 @@ el("page-filters").addEventListener("input", event => {
   if (input.id === "search") {
     state.query = input.value;
     if (state.page === "clipboard") {
+      clipboardRequest++;
+      state.clipboardHistory = null;
+      state.clipboardReadError = false;
       state.clipboardError = undefined;
       setClipboardCopyFeedback();
       render();
@@ -868,10 +898,10 @@ if (isMyGo()) {
     el("machine-name").textContent = t("本机");
     document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
     el("navigation").setAttribute("aria-label", t("监控页面"));
-    state.info = null; state.processes = null; state.connections = null;
+    state.processes = null; state.connections = null;
     inspectionPreloadScheduled = false;
     state.processError = ""; state.connectionError = "";
-    error(""); render(true); void refresh();
+    error(""); render(true); void refresh(true);
   });
   document.addEventListener("visibilitychange", () => {
     if (state.page === "clipboard") {
@@ -895,7 +925,7 @@ if (isMyGo()) {
   const offMenuBarSettings = events.menuBarSettingsOpened.on(() => { void navigate("menubar"); });
   const offClipboard = events.clipboardHistoryChanged.on(() => { void loadClipboard(); });
   const offCalculator = events.calculatorOpened.on(expression => {
-    calculatorDraft.incoming = { expression };
+    calculatorDraft.imports.push({ expression });
     if (state.page === "calculator" && !navigationTarget) render();
     else void navigate("calculator");
   });

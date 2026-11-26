@@ -22,7 +22,7 @@ type keepAwake struct {
 	durations     []int
 	extendMinutes int
 	assertion     uint32
-	deadline      time.Time
+	deadline      time.Duration
 	displayAwake  bool
 	lastStatus    string
 }
@@ -98,19 +98,19 @@ func awakeDurationLabel(minutes int) string {
 }
 
 func (a *keepAwake) start(duration time.Duration) error {
-	var deadline time.Time
+	var deadline time.Duration
 	if duration > 0 {
-		deadline = time.Now().Round(0).Add(duration)
+		deadline = awakeClock() + duration
 	}
 	return a.replace(deadline, false)
 }
 
 func (a *keepAwake) extend() error {
 	a.refresh()
-	if a.assertion == 0 || a.deadline.IsZero() {
+	if a.assertion == 0 || a.deadline == 0 {
 		return nil
 	}
-	return a.replace(a.deadline.Add(time.Duration(a.extendMinutes)*time.Minute), a.displayAwake)
+	return a.replace(a.deadline+time.Duration(a.extendMinutes)*time.Minute, a.displayAwake)
 }
 
 func (a *keepAwake) toggleDisplay() error {
@@ -126,10 +126,10 @@ func (a *keepAwake) toggleDisplay() error {
 	return err
 }
 
-func (a *keepAwake) replace(deadline time.Time, displayAwake bool) error {
+func (a *keepAwake) replace(deadline time.Duration, displayAwake bool) error {
 	var remaining time.Duration
-	if !deadline.IsZero() {
-		remaining = time.Until(deadline)
+	if deadline != 0 {
+		remaining = deadline - awakeClock()
 		if remaining <= 0 {
 			return a.stop()
 		}
@@ -161,14 +161,14 @@ func (a *keepAwake) stop() error {
 }
 
 func (a *keepAwake) clearSession() {
-	a.assertion, a.deadline, a.displayAwake = 0, time.Time{}, false
+	a.assertion, a.deadline, a.displayAwake = 0, 0, false
 	a.syncActions()
 	a.setStatus("")
 }
 
 func (a *keepAwake) syncActions() {
 	active := a.assertion != 0
-	a.extendItem.SetVisible(active && !a.deadline.IsZero())
+	a.extendItem.SetVisible(active && a.deadline != 0)
 	a.displayItem.SetVisible(active)
 	a.displayItem.SetChecked(a.displayAwake)
 	a.stopItem.SetVisible(active)
@@ -176,15 +176,19 @@ func (a *keepAwake) syncActions() {
 }
 
 func (a *keepAwake) refresh() {
+	a.refreshAt(time.Now(), awakeClock())
+}
+
+func (a *keepAwake) refreshAt(now time.Time, elapsed time.Duration) {
 	if a.assertion == 0 {
 		return
 	}
-	if a.deadline.IsZero() {
+	if a.deadline == 0 {
 		a.setStatus(localization.T("保持唤醒中 · 无限期"))
 		return
 	}
-	now := time.Now()
-	if !now.Before(a.deadline) {
+	remaining := a.deadline - elapsed
+	if remaining <= 0 {
 		if err := a.stop(); err != nil {
 			// The native timeout has already turned off the assertion.
 			log.Printf("release expired idle sleep assertion: %v", err)
@@ -192,7 +196,7 @@ func (a *keepAwake) refresh() {
 		}
 		return
 	}
-	a.setStatus(awakeCountdownLabel(now, a.deadline))
+	a.setStatus(awakeCountdownLabel(now, now.Add(remaining)))
 }
 
 func awakeCountdownLabel(now, deadline time.Time) string {
