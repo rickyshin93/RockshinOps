@@ -42,7 +42,7 @@
 
 ## Done
 
-- 2026-11-26 — Launcher puts matching apps in `/Applications` and `~/Applications` first on macOS and ranks that group by name match. Apple Silicon native WebView verified the search order, calculator results, tray readout and window reopening. The local macOS package passed signing and disk image verification. Evidence in `work/launcher-app-priority-20261126/`.
+- 2026-11-26 — Published [v0.3.4](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.4). Launcher puts matching apps in `/Applications` and `~/Applications` first on macOS and ranks that group by name match. Apple Silicon native WebView verified search order, tray readout and window reopening. [Four-target signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/45778735938) passed.
 
 - 2026-11-26: Published [v0.3.3](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.3) with the Clipboard, Launcher, Calculator, Space, monitoring and Keep Awake reliability fixes. [Four-platform signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/45732751415) passed. The bilingual website source points to the published installers. Installed upgrades and Windows/Linux desktop interaction remain open.
 
