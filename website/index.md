@@ -54,13 +54,13 @@ macOS only. Accessibility allows icon movement; Screen Recording supplies icon p
 
 RockshinOps v0.2.12 interface with demonstration data. Features and readings vary by platform and hardware.
 
-Version 0.3.2
+Version 0.3.3
 
-- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.2/rockshinops-0.3.2-arm64.dmg)
-- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.2/rockshinops-0.3.2-amd64.dmg)
-- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.2/rockshinops-setup-0.3.2-amd64.exe)
-- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.2/rockshinops_0.3.2_amd64.deb)
-- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.2/rockshinops-0.3.2-linux-amd64.tar.gz)
+- [Apple Silicon](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.3/rockshinops-0.3.3-arm64.dmg)
+- [Intel](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.3/rockshinops-0.3.3-amd64.dmg)
+- [Installer .exe](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.3/rockshinops-setup-0.3.3-amd64.exe)
+- [Debian / Ubuntu .deb](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.3/rockshinops_0.3.3_amd64.deb)
+- [Archive .tar.gz](https://github.com/rickyshin93/RockshinOps/releases/download/v0.3.3/rockshinops-0.3.3-linux-amd64.tar.gz)
 
 Ad-hoc signed. Not notarized.
 

@@ -42,6 +42,8 @@
 
 ## Done
 
+- 2026-11-26: Published [v0.3.3](https://github.com/rickyshin93/RockshinOps/releases/tag/v0.3.3) with the Clipboard, Launcher, Calculator, Space, monitoring and Keep Awake reliability fixes. [Four-platform signed release CI](https://github.com/rickyshin93/RockshinOps/actions/runs/45732751415) passed. The bilingual website source points to the published installers. Installed upgrades and Windows/Linux desktop interaction remain open.
+
 - 2026-11-26: Completed 1,000 parameterized review scenarios across ten groups. Space now scans the home volume and maps APFS Data cleanup paths. Launcher deduplicates overlapping includes and refreshes replaced directories. Calculator keeps queued grouping and reference identities and discards abandoned continuations. Clipboard retains copy order across wall-clock rollback. Go/web/race checks, APFS scope, macOS arm64 packaging, isolated desktop checks and Windows/Linux amd64 builds passed. Evidence: `work/review-1000-20261126/rounds.md`.
 
 - 2026-11-26: Completed 100 additional review scenarios across ten areas. Calculator preserves continuation input during delayed saves and after a write error. Launcher refresh keeps excluded files out. Space preserves Trash accounting, native destination names and navigation intent. Monitor samples stay current across clock and locale changes. Linux battery keeps valid readings when another supply disappears. Go/web/race checks, macOS arm64 packaging, isolated native desktop checks and Windows/Linux amd64 compilation passed. Evidence: `work/review-100-20261126/rounds.md`.
