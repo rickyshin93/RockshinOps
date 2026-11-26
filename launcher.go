@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -296,17 +297,31 @@ func (l *launcher) loadApps() {
 
 type scoredResult struct {
 	LauncherResult
-	score int
+	priority int
+	score    int
 }
 
-// query ranks apps and files together. Apps win ties by appBoost.
+// query puts apps in the macOS Applications folders ahead of other matches.
 func (l *launcher) query(q string) ([]LauncherResult, uint64) {
 	l.appsMu.Lock()
 	apps := l.apps
 	l.appsMu.Unlock()
+	userApplications := ""
+	if l.home != "" {
+		userApplications = filepath.Join(l.home, "Applications") + string(filepath.Separator)
+	}
 	var found []scoredResult
-	for _, a := range rankApps(apps, q, launcherResults) {
-		found = append(found, scoredResult{LauncherResult{ID: "app:" + a.app.Path, Kind: "app", Title: a.app.Name, Subtitle: a.app.Path, Path: a.app.Path}, a.score + appBoost})
+	for _, a := range rankApps(apps, q) {
+		path := a.app.Path
+		priority := 0
+		if runtime.GOOS == "darwin" && (strings.HasPrefix(path, "/Applications/") || userApplications != "" && strings.HasPrefix(path, userApplications)) {
+			priority = 1
+		}
+		found = append(found, scoredResult{
+			LauncherResult: LauncherResult{ID: "app:" + path, Kind: "app", Title: a.app.Name, Subtitle: path, Path: path},
+			priority:       priority,
+			score:          a.score + appBoost,
+		})
 	}
 	scope := l.fileScope.Load()
 	ix := l.index.Load()
@@ -316,10 +331,15 @@ func (l *launcher) query(q string) ([]LauncherResult, uint64) {
 			if m.Dir {
 				kind = "folder"
 			}
-			found = append(found, scoredResult{LauncherResult{ID: "file:" + m.Path, Kind: kind, Title: m.Name, Subtitle: l.shortPath(filepath.Dir(m.Path)), Path: m.Path}, m.Score})
+			found = append(found, scoredResult{
+				LauncherResult: LauncherResult{ID: "file:" + m.Path, Kind: kind, Title: m.Name, Subtitle: l.shortPath(filepath.Dir(m.Path)), Path: m.Path},
+				score:          m.Score,
+			})
 		}
 	}
-	slices.SortStableFunc(found, func(a, b scoredResult) int { return cmp.Compare(b.score, a.score) })
+	slices.SortStableFunc(found, func(a, b scoredResult) int {
+		return cmp.Or(cmp.Compare(b.priority, a.priority), cmp.Compare(b.score, a.score))
+	})
 	results := make([]LauncherResult, 0, min(len(found), launcherResults))
 	for _, f := range found[:min(len(found), launcherResults)] {
 		results = append(results, f.LauncherResult)
@@ -392,7 +412,7 @@ type scoredApp struct {
 
 // rankApps orders the apps matching q by how well their shown name, or the
 // name of their bundle file (English for a localized system app), matches.
-func rankApps(apps []mygo.InstalledApp, q string, limit int) []scoredApp {
+func rankApps(apps []mygo.InstalledApp, q string) []scoredApp {
 	lq := []byte(strings.ToLower(strings.TrimSpace(q)))
 	if len(lq) == 0 {
 		return nil
@@ -408,7 +428,7 @@ func rankApps(apps []mygo.InstalledApp, q string, limit int) []scoredApp {
 	slices.SortStableFunc(found, func(a, b scoredApp) int {
 		return cmp.Or(cmp.Compare(b.score, a.score), strings.Compare(strings.ToLower(a.app.Name), strings.ToLower(b.app.Name)))
 	})
-	return found[:min(limit, len(found))]
+	return found
 }
 
 func (s *System) LauncherSettings() LauncherSettings { return s.launcher.settings() }

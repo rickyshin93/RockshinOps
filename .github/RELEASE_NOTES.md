@@ -1,20 +1,12 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### Fixes in v0.3.3
+### Changes in v0.3.4
 
-- Clipboard history preserves existing items if a write fails, reports when pinned items fill the budget, and keeps copy order after a system clock change. Search results and preview focus stay in sync with the current view.
-- Launcher refreshes early app searches, keeps excluded files out, and handles overlapping folders, replaced paths and held shortcuts correctly.
-- Calculator keeps continuation input while saving and through a retry. Canceling a calculation discards its queued input, and deletion preserves row references.
-- Space analysis scans the volume containing the home directory, preserves Trash accounting, and keeps the latest folder or tab selection.
-- Live metrics keep updating across system clock and language changes. Keep Awake uses elapsed time for timed sessions, and Linux keeps a readable battery result when another power supply disappears.
+- On macOS, Launcher places matching apps from `/Applications` and `~/Applications` first and ranks those apps by name match.
 
 ### 中文
 
-- 剪贴板写入失败时保留旧记录，置顶占满容量时显示提示。系统时间回拨后仍按复制顺序排列，搜索结果和预览焦点随当前视图更新。
-- 启动器修复了首次应用搜索、排除目录、重叠索引、路径替换以及长按快捷键的问题。
-- 计算器在保存和失败重试期间保留后续输入。取消算式时清除对应的待续输入，删除操作保留行引用的指向。
-- 空间分析按主目录所在卷扫描，保持废纸篓容量统计正确，并保留最新的目录或标签页选择。
-- 切换语言或调整系统时间后，实时监控继续更新。保持唤醒按实际经过的时长计时。Linux 上其他供电设备消失时，仍会显示可用的电池读数。
+- macOS 启动器优先显示 `/Applications` 和 `~/Applications` 里的匹配应用，组内按名称匹配度排序。
 
 ### Upgrade notice / 升级说明
 
@@ -28,7 +20,7 @@ macOS builds remain ad-hoc signed and not notarized; Accessibility or Screen Rec
 
 - **macOS Apple Silicon:** the `arm64.dmg` file.
 - **macOS Intel:** the `amd64.dmg` file.
-- **Windows x86_64:** the `rockshinops-setup-0.3.3-amd64.exe` installer.
+- **Windows x86_64:** the `rockshinops-setup-0.3.4-amd64.exe` installer.
 - **Linux x86_64:** the `.deb` package or `.tar.gz` archive (extract and run `./rockshinops`; no install script is included).
 - `SHA256SUMS.txt` contains checksums for all packages. `update-*.json` and the macOS/Windows `.tar.gz` files are consumed by the updater; choose the installers above for manual installation.
 

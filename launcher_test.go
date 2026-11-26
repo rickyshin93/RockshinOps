@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,19 +39,16 @@ func TestLauncherAppRanking(t *testing.T) {
 		{"edit", "TextEdit"}, // camel-case word start
 		{"actmon", "Activity Monitor"},
 	} {
-		got := rankApps(apps, c.query, 8)
+		got := rankApps(apps, c.query)
 		if len(got) == 0 || got[0].app.Name != c.top {
 			t.Errorf("%q: want %q first, got %v", c.query, c.top, names(got))
 		}
 	}
-	if got := rankApps(apps, "zzz", 8); len(got) != 0 {
+	if got := rankApps(apps, "zzz"); len(got) != 0 {
 		t.Errorf("unrelated query matched %v", names(got))
 	}
-	if got := rankApps(apps, "  ", 8); len(got) != 0 {
+	if got := rankApps(apps, "  "); len(got) != 0 {
 		t.Errorf("blank query matched %v", names(got))
-	}
-	if got := rankApps(apps, "a", 2); len(got) != 2 {
-		t.Errorf("limit ignored: %v", names(got))
 	}
 }
 
@@ -239,6 +237,50 @@ func TestLauncherMergesAppsAndFiles(t *testing.T) {
 		if err := l.open(id, "open"); err == nil {
 			t.Errorf("opened %s", id)
 		}
+	}
+}
+
+func TestLauncherPrioritizesApplicationsFolders(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS application folders")
+	}
+	home := t.TempDir()
+	file := filepath.Join(home, "editor")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix := fileindex.New(home, fileindex.Rules{})
+	if err := ix.Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	userApp := filepath.Join(home, "Applications", "Tools", "Editor Plus.app")
+	systemApp := "/System/Applications/Editor.app"
+	installedApp := "/Applications/My Editor.app"
+	otherApp := "/Applications Backup/Editor.app"
+	l := &launcher{home: home, apps: []mygo.InstalledApp{
+		{Name: "Editor", Path: systemApp},
+		{Name: "Editor", Path: otherApp},
+		{Name: "My Editor", Path: installedApp},
+		{Name: "Editor Plus", Path: userApp},
+	}}
+	l.index.Store(ix)
+
+	results, _ := l.query("editor")
+	var got []string
+	for _, result := range results {
+		got = append(got, result.Path)
+	}
+	want := []string{userApp, installedApp, systemApp, otherApp, file}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("result paths = %q, want %q", got, want)
+	}
+
+	for i := range launcherResults {
+		l.apps = append(l.apps, mygo.InstalledApp{Name: "Editor", Path: filepath.Join("/System/Applications", strconv.Itoa(i), "Editor.app")})
+	}
+	results, _ = l.query("editor")
+	if len(results) != launcherResults || results[0].Path != userApp || results[1].Path != installedApp {
+		t.Fatalf("preferred apps must be ranked before applying the result limit: %+v", results)
 	}
 }
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.4
+
+- On macOS, Launcher places matching apps from `/Applications` and `~/Applications` first and ranks those apps by name match.
+
+### 中文
+
+- macOS 启动器优先显示 `/Applications` 和 `~/Applications` 里的匹配应用，组内按名称匹配度排序。
+
 ## 0.3.3
 
 - Clipboard history preserves existing items if a write fails, reports when pinned items fill the budget, and keeps copy order after a system clock change. Search results and preview focus stay in sync with the current view.
