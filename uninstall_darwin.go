@@ -48,65 +48,71 @@ func (s *System) InstalledApps() ([]InstalledApp, error) {
 }
 
 func (s *System) ReviewApp(ctx context.Context, path string, id uint64) (AppReview, error) {
-	s.appRemovalMu.Lock()
-	if s.appRemoval.id != id || s.appRemoval.app != path || s.appRemoval.cancelled {
-		s.appRemovalMu.Unlock()
+	s.files.appMu.Lock()
+	if s.files.app.id != id || s.files.app.app != path || s.files.app.cancelled {
+		s.files.appMu.Unlock()
 		return AppReview{}, fmt.Errorf("app review was cancelled or replaced")
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	s.appRemoval.cancel = cancel
-	s.appRemovalMu.Unlock()
+	s.files.app.cancel = cancel
+	s.files.appMu.Unlock()
 	defer cancel()
 	review, err := s.reviewApp(ctx, path, false)
 	if err != nil {
 		return AppReview{}, err
 	}
-	s.appRemovalMu.Lock()
-	defer s.appRemovalMu.Unlock()
-	if ctx.Err() != nil || s.appRemoval.id != id || s.appRemoval.cancelled {
+	s.files.appMu.Lock()
+	defer s.files.appMu.Unlock()
+	if ctx.Err() != nil || s.files.app.id != id || s.files.app.cancelled {
 		return AppReview{}, fmt.Errorf("app review was cancelled or replaced")
 	}
 	review.ReviewID = id
 	s.rememberAppFiles(review)
-	s.appRemoval.cancel = nil
+	s.files.app.cancel = nil
 	return review, nil
 }
 
-func (s *System) ReviewAppQuick(path string) (AppReview, error) {
-	review, err := s.reviewApp(context.Background(), path, true)
+func (s *System) ReviewAppQuick(ctx context.Context, path string) (AppReview, error) {
+	s.files.appMu.Lock()
+	if s.files.app.cancel != nil {
+		s.files.app.cancel()
+	}
+	id := s.files.reviews.Add(1)
+	s.files.app = appRemoval{app: path, id: id}
+	s.files.appMu.Unlock()
+
+	review, err := s.reviewApp(ctx, path, true)
 	if err != nil {
 		return AppReview{}, err
 	}
-	s.appRemovalMu.Lock()
-	defer s.appRemovalMu.Unlock()
-	if s.appRemoval.cancel != nil {
-		s.appRemoval.cancel()
+	s.files.appMu.Lock()
+	defer s.files.appMu.Unlock()
+	if ctx.Err() != nil || s.files.app.id != id || s.files.app.cancelled {
+		return AppReview{}, fmt.Errorf("app review was cancelled or replaced")
 	}
-	s.appReviewSeq++
-	review.ReviewID = s.appReviewSeq
-	s.appRemoval = appRemoval{app: path, id: review.ReviewID}
+	review.ReviewID = id
 	s.rememberAppFiles(review)
 	return review, nil
 }
 
 func (s *System) rememberAppFiles(review AppReview) {
-	s.appRemoval.files = make(map[string]os.FileInfo, len(review.Files))
+	s.files.app.files = make(map[string]os.FileInfo, len(review.Files))
 	for _, file := range review.Files {
 		if info, err := os.Lstat(file.Path); err == nil {
-			s.appRemoval.files[file.Path] = info
+			s.files.app.files[file.Path] = info
 		}
 	}
 }
 
 func (s *System) CancelAppReview(id uint64) error {
-	s.appRemovalMu.Lock()
-	defer s.appRemovalMu.Unlock()
-	if s.appRemoval.id != id {
+	s.files.appMu.Lock()
+	defer s.files.appMu.Unlock()
+	if s.files.app.id != id {
 		return fmt.Errorf("app review was replaced")
 	}
-	s.appRemoval.cancelled = true
-	if s.appRemoval.cancel != nil {
-		s.appRemoval.cancel()
+	s.files.app.cancelled = true
+	if s.files.app.cancel != nil {
+		s.files.app.cancel()
 	}
 	return nil
 }
@@ -346,43 +352,47 @@ func appScanIssue(path string, err error) AppScanIssue {
 	return AppScanIssue{Path: path, Kind: kind, Error: err.Error()}
 }
 
-func (s *System) RemoveAppFiles(paths []string) error {
-	s.appRemovalMu.Lock()
-	defer s.appRemovalMu.Unlock()
-	if len(paths) == 0 {
-		return fmt.Errorf("no items selected")
+func (s *System) RemoveAppFiles(ctx context.Context, id uint64, paths []string) (FileOutcome, error) {
+	s.files.writes.Lock()
+	defer s.files.writes.Unlock()
+	s.files.appMu.Lock()
+	defer s.files.appMu.Unlock()
+	review := &s.files.app
+	if id == 0 || review.id != id {
+		return FileOutcome{}, fmt.Errorf("app review was replaced; review the files again")
+	}
+	if err := checkSelection(review.files, paths); err != nil {
+		return FileOutcome{}, err
 	}
 	processes := s.monitor.Processes()
 	if processes.Error != "" {
-		return fmt.Errorf("cannot verify running processes: %s", processes.Error)
+		return FileOutcome{}, fmt.Errorf("cannot verify running processes: %s", processes.Error)
 	}
 	for _, process := range processes.Items {
-		if process.App == s.appRemoval.app {
-			return fmt.Errorf("quit the app before removing its files")
+		if process.App == review.app {
+			return FileOutcome{}, fmt.Errorf("quit the app before removing its files")
 		}
 	}
-	seen := map[string]bool{}
-	for _, path := range paths {
-		old, ok := s.appRemoval.files[path]
-		if !ok || seen[path] {
-			return fmt.Errorf("item was not reviewed: %s", path)
-		}
-		seen[path] = true
+	outcome := applyReviewed(ctx, paths, func(path string) error {
 		info, err := os.Lstat(path)
 		if err != nil {
 			return err
 		}
-		if !os.SameFile(old, info) {
-			return fmt.Errorf("item changed since review: %s", path)
+		if !os.SameFile(review.files[path], info) {
+			return fmt.Errorf("item changed since review")
+		}
+		return nil
+	}, mygo.Shell.TrashItem)
+	for _, path := range outcome.Succeeded {
+		delete(review.files, path)
+	}
+	for _, failure := range outcome.Failed {
+		if failure.Changed {
+			delete(review.files, failure.Path)
 		}
 	}
-	var failures []error
-	for _, path := range paths {
-		if err := mygo.Shell.TrashItem(path); err != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", path, err))
-		} else {
-			delete(s.appRemoval.files, path)
-		}
+	if len(outcome.Succeeded) > 0 {
+		s.files.invalidateSpace()
 	}
-	return errors.Join(failures...)
+	return outcome, nil
 }

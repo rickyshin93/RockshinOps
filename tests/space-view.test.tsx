@@ -4,19 +4,24 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "../src/i18n";
 import { SpaceView } from "../src/space-view";
-import { openFolder, scanSpace, showTab, spaceStore, stopScan, trashItem } from "../src/space-store";
-import type { SpaceListing } from "../src/mygo";
+import { emptyTrash, invalidateSpace, openFolder, prepareTrash, scanSpace, showTab, spaceStore, stopScan, trashItem } from "../src/space-store";
+import type { SpaceListing, SpaceSummary, SpaceTrashOutcome, TrashReview } from "../src/mygo";
 
 const root = { name: "/", path: "/", bytes: 300e9, files: 900, directory: true, other: false, partial: false, trashable: false };
 const users = { name: "Users", path: "/Users", bytes: 250e9, files: 800, directory: true, other: false, partial: true, trashable: false };
 const iso = { name: "big.iso", path: "/Users/me/Downloads/big.iso", bytes: 8e9, files: 1, directory: false, other: false, partial: false, trashable: true };
 const other = { name: "", path: "", bytes: 2e6, files: 12, directory: false, other: true, partial: false, trashable: false };
 const summary = {
-  root: "/", bytes: 300e9, files: 900, skipped: 3, startedAt: "2026-10-30T00:00:00Z", finishedAt: "2026-10-30T00:00:32Z",
+  id: 10, root: "/", bytes: 300e9, files: 900, skipped: 3, startedAt: "2026-10-30T00:00:00Z", finishedAt: "2026-10-30T00:00:32Z",
   top: [users], largest: [iso],
   suggestions: [{ name: "废纸篓", path: "/Users/me/.Trash", bytes: 5e9, files: 4, found: true, trash: true }],
 };
 const calls: string[] = [];
+const reviewedTrash: TrashReview = { id: 33, path: "/Users/me/.Trash", bytes: 2000, count: 2, items: [{ name: "old", bytes: 2000 }, { name: "another", bytes: 0 }] };
+let trashResponse: Promise<SpaceSummary> | undefined;
+let purgeResponse: Promise<SpaceTrashOutcome> | undefined;
+let prepareResponse: Promise<TrashReview> | undefined;
+const discardedReviews: number[] = [];
 let pending: { reject: (error: Error) => void } | null = null;
 let cancellationError = "scan cancelled";
 let listingOverride: ((path: string) => Promise<SpaceListing> | undefined) | undefined;
@@ -31,7 +36,10 @@ beforeAll(async () => {
       case "System.ScanSpace": return pending ? new Promise((_, reject) => { pending = { reject }; }) : summary;
       case "System.SpaceListing": return listingOverride?.(String(args[0])) ?? (args[0] === "/Users" ? { entry: users, ancestors: [root], children: [iso, other] } : { entry: root, ancestors: [], children: [users, other] });
       case "System.CancelScan": pending?.reject(new Error(cancellationError)); return;
-      case "System.TrashSpaceItem": return { ...summary, largest: [] };
+      case "System.TrashSpaceItem": return trashResponse ?? { ...summary, largest: [] };
+      case "System.EmptySpaceTrash": return purgeResponse;
+      case "System.PrepareSpaceTrash": return prepareResponse;
+      case "System.DiscardTrashReview": discardedReviews.push(Number(args[0])); return;
       case "System.SpaceProgress": return { scanning: true, files: 10, bytes: 1e9, skipped: 0, path: "/Users" };
       default: throw new Error(method);
     }
@@ -110,4 +118,72 @@ test("a real scan error is visible even when stop was requested", async () => {
   pending = null;
   cancellationError = "scan cancelled";
   expect(spaceStore.get().notice).toEqual({ kind: "error", message: "EACCES" });
+});
+
+test("delayed file actions preserve the receipt without restoring invalidated Space data", async () => {
+  await scanSpace();
+  const move = Promise.withResolvers<SpaceSummary>();
+  trashResponse = move.promise;
+  const moving = trashItem(iso);
+  invalidateSpace();
+  const folderReads = calls.filter(method => method === "System.SpaceListing").length;
+  move.resolve({ ...summary, largest: [] });
+  await moving;
+  trashResponse = undefined;
+  expect(spaceStore.get().summary).toBeNull();
+  expect(spaceStore.get().notice?.kind).toBe("trashed");
+  expect(calls.filter(method => method === "System.SpaceListing").length).toBe(folderReads);
+
+  await scanSpace();
+  const purge = Promise.withResolvers<SpaceTrashOutcome>();
+  purgeResponse = purge.promise;
+  const purging = emptyTrash(reviewedTrash);
+  invalidateSpace();
+  purge.resolve({
+    summary, bytes: 2000, deleted: 1, outcome: { succeeded: [], failed: [
+      { path: "folder", changed: true, error: "trash_review_changed", recoveryPath: "/tmp/recovery/folder" },
+    ] }, postDeleteFailures: [{ path: "metadata", changed: false, error: "read-only" }],
+  });
+  await purging;
+  purgeResponse = undefined;
+  expect(spaceStore.get().summary).toBeNull();
+  const html = render();
+  expect(html).toContain("Permanently deleted 1 files or folders");
+  expect(html).toContain("1 top-level items were not fully deleted");
+  expect(html).toContain("The item was kept at /tmp/recovery/folder");
+  expect(html).toContain("1 follow-up cleanup steps failed");
+});
+
+test("preserve filesystem failure details and localize expired review guidance", async () => {
+  await scanSpace();
+  await i18n.changeLanguage("zh");
+  const purge = Promise.withResolvers<SpaceTrashOutcome>();
+  purgeResponse = purge.promise;
+  const purging = emptyTrash(reviewedTrash);
+  purge.reject(new Error("trash_review_changed"));
+  await purging;
+  purgeResponse = undefined;
+  const html = render();
+  expect(html).toContain("废纸篓内容已变化，请重新审阅。");
+  expect(html).not.toContain("trash_review_changed");
+  await i18n.changeLanguage("en");
+});
+
+test("an invalidated or empty preparation releases its backend review", async () => {
+  await scanSpace();
+  const preparation = Promise.withResolvers<TrashReview>();
+  prepareResponse = preparation.promise;
+  const inFlight = prepareTrash();
+  invalidateSpace();
+  preparation.resolve(reviewedTrash);
+  expect(await inFlight).toBeUndefined();
+  expect(discardedReviews.at(-1)).toBe(reviewedTrash.id);
+  expect(spaceStore.get().summary).toBeNull();
+
+  await scanSpace();
+  prepareResponse = Promise.resolve({ ...reviewedTrash, id: 34, count: 0, bytes: 0, items: [] });
+  expect(await prepareTrash()).toBeUndefined();
+  expect(discardedReviews.at(-1)).toBe(34);
+  expect(spaceStore.get().notice?.kind).toBe("trashEmpty");
+  prepareResponse = undefined;
 });

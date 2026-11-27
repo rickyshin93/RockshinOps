@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -69,19 +68,9 @@ type System struct {
 	monitor         *metrics.Monitor
 	config          Config
 	info            AppInfo
-	update          func(metrics.Snapshot)
-	spaceMu         sync.Mutex
-	space           *metrics.SpaceTree
-	spaceScope      spaceScanScope
-	spaceSkipped    int64
-	spaceStarted    time.Time
-	spaceFinished   time.Time
-	spaceProgress   atomic.Pointer[metrics.SpaceProgress]
-	appRemovalMu    sync.Mutex
-	appRemoval      appRemoval
-	appReviewSeq    uint64
-	scanCancelMu    sync.Mutex
-	scanCancel      context.CancelFunc
+	publishTray     func(trayFrame)
+	traySequence    uint64
+	files           fileOperations
 	launcher        *launcher
 	clipboard       *clipboardHistory
 	calculatorMu    sync.Mutex
@@ -128,13 +117,16 @@ func (s *System) OpenFullDiskAccessSettings() error {
 func (s *System) HideWindow(ctx context.Context) { mygo.CallerWindow(ctx).Hide() }
 func (s *System) refresh(force bool) metrics.Snapshot {
 	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
 	snapshot := s.monitor.Refresh(force)
 	s.mu.Lock()
-	s.update(snapshot)
+	frame, publish := s.trayFrameLocked(snapshot)
 	s.mu.Unlock()
 	if err := MetricsChanged.Broadcast(snapshot); err != nil {
 		log.Printf("publish metrics: %v", err)
+	}
+	s.refreshMu.Unlock()
+	if publish != nil {
+		publish(frame)
 	}
 	return snapshot
 }
@@ -303,53 +295,62 @@ func main() {
 		}
 		lastTitle := "—"
 		var lastImage []byte
-		service.update = func(s metrics.Snapshot) {
-			selectedTitle := menuBarTitle(service.preferences, s)
-			selectedItems := append([]string{}, service.preferences.MenuBarItems...)
-			mygo.RunOnMain(func() {
-				title := "—"
-				if s.Disk.CapacityError == "" {
-					title = storage.FormatCapacity(s.Disk.Volume.Available)
-					capacityItem.SetLabel(localization.T("剩余 ") + title + localization.T(" / 共 ") + storage.FormatCapacity(s.Disk.Volume.Total))
-					tray.SetToolTip(localization.T("RockshinOps · 剩余可写空间 ") + title)
+		hideDockOnClose := preferences.HideDockOnClose
+		language := preferences.Language
+		publish := newTrayPublisher(mygo.RunOnMain, func(frame trayFrame) {
+			if language != frame.preferences.Language {
+				language = frame.preferences.Language
+				applyLanguage(language)
+			}
+			hideDockOnClose = frame.preferences.HideDockOnClose
+			s := frame.snapshot
+			selectedTitle := menuBarTitle(frame.preferences, s)
+			selectedItems := frame.preferences.MenuBarItems
+			title := "—"
+			if s.Disk.CapacityError == "" {
+				title = storage.FormatCapacity(s.Disk.Volume.Available)
+				capacityItem.SetLabel(localization.T("剩余 ") + title + localization.T(" / 共 ") + storage.FormatCapacity(s.Disk.Volume.Total))
+				tray.SetToolTip(localization.T("RockshinOps · 剩余可写空间 ") + title)
+			} else {
+				capacityItem.SetLabel(localization.T("容量读取失败"))
+				tray.SetToolTip("RockshinOps · " + s.Disk.CapacityError)
+			}
+			// macOS shows icons with values as one template image; elsewhere, or if drawing fails, the labeled text title.
+			image := menuBarImage(selectedItems, s)
+			if image != nil && !bytes.Equal(image, lastImage) {
+				if err := tray.SetIcon(image, true); err != nil {
+					log.Printf("set menu bar image: %v", err)
+					image = nil
 				} else {
-					capacityItem.SetLabel(localization.T("容量读取失败"))
-					tray.SetToolTip("RockshinOps · " + s.Disk.CapacityError)
+					tray.SetTitle("")
+					lastImage, lastTitle = image, ""
 				}
-				// macOS shows icons with values as one template image; elsewhere, or if drawing fails, the labeled text title.
-				image := menuBarImage(selectedItems, s)
-				if image != nil && !bytes.Equal(image, lastImage) {
-					if err := tray.SetIcon(image, true); err != nil {
-						log.Printf("set menu bar image: %v", err)
-						image = nil
-					} else {
-						tray.SetTitle("")
-						lastImage, lastTitle = image, ""
+			}
+			if image == nil && (selectedTitle != lastTitle || lastImage != nil) {
+				if lastImage != nil {
+					if err := tray.SetIcon(diskIcon(), true); err != nil {
+						log.Printf("restore menu bar icon: %v", err)
 					}
 				}
-				if image == nil && (selectedTitle != lastTitle || lastImage != nil) {
-					if lastImage != nil {
-						if err := tray.SetIcon(diskIcon(), true); err != nil {
-							log.Printf("restore menu bar icon: %v", err)
-						}
-					}
-					tray.SetTitle(selectedTitle)
-					lastImage, lastTitle = nil, selectedTitle
+				tray.SetTitle(selectedTitle)
+				lastImage, lastTitle = nil, selectedTitle
+			}
+			tray.SetToolTip("RockshinOps" + func() string {
+				if selectedTitle == "" {
+					return localization.T(" · 本机监控")
 				}
-				tray.SetToolTip("RockshinOps" + func() string {
-					if selectedTitle == "" {
-						return localization.T(" · 本机监控")
-					}
-					return " · " + selectedTitle
-				}())
-				if s.CPU.Ready && s.Memory.Error == "" {
-					activityItem.SetLabel(fmt.Sprintf(localization.T("CPU %.0f%% · 内存 %s"), s.CPU.Usage, storage.FormatCapacity(s.Memory.Used)))
-				} else {
-					activityItem.SetLabel(localization.T("CPU / 内存采样中或不可用"))
-				}
-				updatedItem.SetLabel(localization.T("更新于 ") + s.UpdatedAt.Local().Format("15:04:05"))
-			})
-		}
+				return " · " + selectedTitle
+			}())
+			if s.CPU.Ready && s.Memory.Error == "" {
+				activityItem.SetLabel(fmt.Sprintf(localization.T("CPU %.0f%% · 内存 %s"), s.CPU.Usage, storage.FormatCapacity(s.Memory.Used)))
+			} else {
+				activityItem.SetLabel(localization.T("CPU / 内存采样中或不可用"))
+			}
+			updatedItem.SetLabel(localization.T("更新于 ") + s.UpdatedAt.Local().Format("15:04:05"))
+		})
+		service.mu.Lock()
+		service.publishTray = publish
+		service.mu.Unlock()
 		mygo.App.OnLocaleChanged(func(language string) {
 			localization.SetLanguage(language)
 			if awake != nil {
@@ -379,16 +380,9 @@ func main() {
 			if !quitting {
 				e.PreventDefault()
 				win.Hide()
-				// A tray refresh can hold the preferences lock while waiting for the UI thread.
-				go func() {
-					if service.Preferences().HideDockOnClose {
-						mygo.RunOnMain(func() {
-							if !win.IsVisible() {
-								mygo.App.Dock.Hide()
-							}
-						})
-					}
-				}()
+				if hideDockOnClose {
+					mygo.App.Dock.Hide()
+				}
 			}
 		})
 		mygo.App.OnActivate(func(visible bool) {

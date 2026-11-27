@@ -1,5 +1,6 @@
 import { t, i18n, resolveLanguage, type Language } from "./i18n";
-import { toggleAllAppFiles, reconcileAppFiles } from "./app-selection";
+import { appUninstallStatus, bindAppUninstall, syncAppSelection } from "./app-uninstall";
+import { calculatorInputTransitions } from "./calculator-navigation";
 import { isMyGo, locale, onLocaleChange } from "mygo-runtime";
 import { System, events, type DeviceState, type Preferences, type Snapshot } from "./mygo";
 import { formatBytes, formatCapacity, formatMemory, formatRate, percent, timeLabel } from "./format";
@@ -23,7 +24,6 @@ const state: ViewState = {
   page: "overview", info: null, snapshot: null, history: [], range: 60, paused: false,
   processes: null, connections: null, connectionSort: null, connectionMode: "all", portScope: "all", favoritePorts: [], portsLoaded: false, selectedProcess: null, processOrder: { key: "cpu", descending: true }, query: "", sort: "cpu", onlyMine: false,
   busy: false, processError: "", connectionError: "",
-  appMode: false, installedApps: null, appReview: null, appSelection: [], appBusy: false, appSearching: false, appMessage: "",
   devices: null, deviceBusy: "", deviceError: "", deviceNetworks: null, deviceVolumeDraft: null,
   startup: null, startupBusy: false, startupError: "",
   launcher: null, launcherBusy: false, launcherError: "",
@@ -60,11 +60,8 @@ const readProcesses = singleFlight(() => System.processes());
 let inspectionPreloadScheduled = false;
 let stopped = false;
 let renderedActions = "";
-let renderedAppReview = "";
 let renderedAboutLanguage = "";
 let renderedAboutInfo: ViewState["info"] = null;
-let appReviewEpoch = 0;
-let appSelectAll = false;
 let navigationEpoch = 0;
 let navigationTarget: { page: Page; query: string } | null = null;
 let renderedBody = "";
@@ -142,7 +139,6 @@ function renderNow(filters = false) {
   if (reactPage(state.page)) {
     renderedBody = "";
     renderedPage = null;
-    renderedAppReview = "";
     if (reactPages) {
       reactPages.renderReactPage(el("page-body"), state, (language: Language) => { state.languageDraft = language; render(); void saveSettings(); }, () => void openFullDiskAccessSettings(), shortcut => { if (state.launcher) void setLauncher(state.launcher.enabled, state.launcher.files, shortcut); }, calculatorDraft, hasClipboardHistory);
     } else {
@@ -152,7 +148,6 @@ function renderNow(filters = false) {
   } else {
     reactPages?.unmountReactPage();
     const body = renderBody(state);
-    const unchangedReview = state.page === "apps" && !!state.appReview && renderedAppReview === body;
     const about = el("page-body").querySelector(".about-page");
     if (state.page === "about" && about && renderedAboutLanguage === i18n.language && renderedAboutInfo === state.info && body.includes('class="about-page"')) {
       const template = document.createElement("template");
@@ -164,8 +159,8 @@ function renderNow(filters = false) {
           if (value.innerHTML !== nextValues[index]!.innerHTML) value.innerHTML = nextValues[index]!.innerHTML;
         });
       } else el("page-body").innerHTML = body;
-    } else if (!unchangedReview && body !== renderedBody) {
-      const live = metricPages.includes(state.page) || ["processes", "connections", "devices", "clipboard"].includes(state.page) || (state.page === "apps" && !state.appMode);
+    } else if (body !== renderedBody) {
+      const live = metricPages.includes(state.page) || ["processes", "connections", "devices", "clipboard"].includes(state.page) || (state.page === "apps" && !appUninstallStatus().installed);
       if (live && renderedPage === state.page) updateLiveContent(el("page-body"), body);
       else el("page-body").innerHTML = body;
     }
@@ -176,10 +171,8 @@ function renderNow(filters = false) {
     renderedPage = state.page;
     renderedAboutLanguage = state.page === "about" ? i18n.language : "";
     renderedAboutInfo = state.page === "about" ? state.info : null;
-    renderedAppReview = state.page === "apps" && state.appReview ? body : "";
     renderedBody = body;
-    const selectAll = el("page-body").querySelector<HTMLInputElement>("[data-app-select-all]");
-    if (selectAll && state.appReview) selectAll.indeterminate = state.appSelection.length > 0 && state.appSelection.length < state.appReview.files.length;
+    if (state.page === "apps") syncAppSelection(el("page-body"));
   }
   if (activityPosition) {
     const scroll = el("page-body").querySelector<HTMLElement>(".activity-scroll");
@@ -303,54 +296,6 @@ async function openFullDiskAccessSettings() {
   try { await System.openFullDiskAccessSettings(); if (errorKind === "action") error("", "action"); }
   catch (reason) { error(t("无法打开系统设置：{{error}}", { error: String(reason) }), "action"); }
 }
-async function installedApps() {
-  if (state.appBusy) return;
-  state.appMode = true; state.appReview = null; state.appSelection = []; state.appBusy = true; state.appMessage = ""; render(true);
-  try { state.installedApps = await System.installedApps(); }
-  catch (reason) { state.installedApps = null; state.appMessage = String(reason); }
-  finally { state.appBusy = false; render(); }
-}
-async function reviewApp(path: string) {
-  if (state.appBusy) return;
-  const epoch = ++appReviewEpoch;
-  appSelectAll = false;
-  state.appBusy = true; state.appSearching = true; state.appReview = null; state.appMessage = ""; state.appSelection = []; render();
-  try {
-    const quick = await System.reviewAppQuick(path);
-    if (epoch !== appReviewEpoch) { await System.cancelAppReview(quick.reviewId); return; }
-    state.appReview = quick; render(true);
-    const review = await System.reviewApp(path, state.appReview.reviewId);
-    if (epoch !== appReviewEpoch) return;
-    state.appReview = review;
-    state.appSelection = reconcileAppFiles(state.appReview.files.map(file => file.path), state.appSelection, appSelectAll);
-  }
-  catch (reason) { if (epoch === appReviewEpoch) state.appMessage = String(reason); }
-  finally { if (epoch === appReviewEpoch) { state.appBusy = false; state.appSearching = false; render(true); } }
-}
-async function stopAppSearch() {
-  if (!state.appSearching || !state.appReview) return;
-  try {
-    await System.cancelAppReview(state.appReview.reviewId);
-    if (!state.appSearching) return;
-    appReviewEpoch++;
-    state.appBusy = false;
-    state.appSearching = false;
-    state.appMessage = t("已停止搜索，仅保留常见位置的首批项目。");
-    render();
-  } catch (reason) { state.appMessage = String(reason); render(); }
-}
-async function removeAppFiles() {
-  if (state.appBusy || !state.appReview || !state.appSelection.length) return;
-  if (!window.confirm(`${t("将以下选中项目移入系统废纸篓？请确认 App 已退出。") }\n\n${state.appSelection.join("\n")}`)) return;
-  const path = state.appReview.app.path;
-  state.appBusy = true; state.appMessage = ""; render();
-  try { await System.removeAppFiles([...state.appSelection]); state.appMessage = t("选中项目已移入废纸篓。"); }
-  catch (reason) { state.appMessage = `${t("清理未完全完成，请检查后重试：")}${String(reason)}`; }
-  state.appSelection = []; state.appReview = null;
-  try { state.installedApps = await System.installedApps(); }
-  catch (reason) { state.appMessage += ` ${String(reason)}`; state.installedApps = null; }
-  state.appBusy = false; render();
-}
 async function connections(live = false, force = false) {
   if (!force && state.connections && !state.connectionError && Date.now() - connectionTime < state.info!.processRefreshSeconds * 1000) return;
   connectionTime = Date.now();
@@ -407,15 +352,10 @@ async function refresh(reinitialize = false) {
     } else preloadInspection();
   }
 }
-let calculatorInputUpdate = Promise.resolve();
-function updateCalculatorInputSource(active: boolean) {
-  // Navigation may overtake a native call; keep source selection and restoration ordered.
-  calculatorInputUpdate = calculatorInputUpdate.then(() => System.setCalculatorInputActive(active)).catch(reason => {
-    console.error(reason);
-    error(`${t("无法切换计算器输入法：")}${String(reason)}`);
-  });
-  return calculatorInputUpdate;
-}
+const updateCalculatorInputSource = calculatorInputTransitions(active => System.setCalculatorInputActive(active), reason => {
+  console.error(reason);
+  error(`${t("无法切换计算器输入法：")}${String(reason)}`);
+});
 
 async function navigate(page: Page, query = "") {
   const current = navigationTarget || state;
@@ -426,8 +366,9 @@ async function navigate(page: Page, query = "") {
   // Paint the selected item before constructing a potentially large table.
   await new Promise<void>(resolve => requestAnimationFrame(() => { setTimeout(resolve, 0); }));
   if (epoch !== navigationEpoch) return;
-  if (isMyGo()) {
-    await updateCalculatorInputSource(page === "calculator");
+  const inputTransition = isMyGo() ? updateCalculatorInputSource(page === "calculator") : undefined;
+  if (inputTransition) {
+    await inputTransition;
     if (epoch !== navigationEpoch) return;
   }
   navigationTarget = null;
@@ -779,7 +720,6 @@ document.addEventListener("click", event => {
     if (state.clipboardHistory) showClipboardPreview(button.dataset.clipboardPreview);
     return;
   }
-  if (button.dataset.reviewApp) { void reviewApp(button.dataset.reviewApp); return; }
   if (button.dataset.action === "toggle-startup") { void toggleStartup(); return; }
   if (button.dataset.action === "load-startup") { void loadStartupSettings(); return; }
   if (button.dataset.action === "toggle-launcher" && state.launcher) { void setLauncher(!state.launcher.enabled, state.launcher.files, state.launcher.shortcut); return; }
@@ -817,14 +757,7 @@ document.addEventListener("click", event => {
     case "close-process": state.selectedProcess = null; render(); break;
     case "pause": state.paused = !state.paused; render(); if (!state.paused) void refresh(); break;
     case "refresh": void refresh(); break;
-    case "installed-apps": void installedApps(); break;
     case "open-full-disk-access": void openFullDiskAccessSettings(); break;
-    case "running-apps":
-      if (state.appSearching && state.appReview) void stopAppSearch();
-      else if (state.appSearching) { appReviewEpoch++; state.appBusy = false; state.appSearching = false; }
-      state.appMode = false; state.appReview = null; render(true); break;
-    case "remove-app-files": void removeAppFiles(); break;
-    case "stop-app-search": void stopAppSearch(); break;
     case "hide": void hide(); break;
     case "load-launcher": void loadLauncherSettings(); break;
     case "load-clipboard": void loadClipboard(); break;
@@ -868,20 +801,7 @@ new ResizeObserver(() => {
 document.addEventListener("keydown", event => {
   if ((event.metaKey || event.ctrlKey) && event.key === ",") { event.preventDefault(); void navigate("settings"); }
 });
-el("page-body").addEventListener("change", event => {
-  const input = event.target as HTMLInputElement;
-  if (input.dataset.appSelectAll && state.appReview) {
-    appSelectAll = input.checked;
-    state.appSelection = toggleAllAppFiles(state.appReview.files.map(file => file.path), !input.checked);
-    render(); return;
-  }
-  if (!input.dataset.appFile) return;
-  const selected = new Set(state.appSelection);
-  if (input.checked) selected.add(input.dataset.appFile); else selected.delete(input.dataset.appFile);
-  state.appSelection = [...selected];
-  appSelectAll = !!state.appReview?.files.length && state.appSelection.length === state.appReview.files.length;
-  render();
-});
+bindAppUninstall(el("page-body"), render);
 document.querySelector(".sidebar")!.setAttribute("aria-label", t("RockshinOps 导航"));
 el("navigation").setAttribute("aria-label", t("监控页面"));
 el("machine-detail").textContent = t("正在连接本机…");

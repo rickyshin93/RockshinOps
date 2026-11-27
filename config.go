@@ -46,6 +46,8 @@ type Config struct {
 	KeepAwakeMinutes                []int                           `json:"keepAwakeMinutes"`
 	KeepAwakeExtendMinutes          int                             `json:"keepAwakeExtendMinutes"`
 	ClipboardHistory                clipboardHistoryConfig          `json:"clipboardHistory"`
+	CleanupIdleDays                 int                             `json:"cleanupIdleDays"`
+	CleanupDownloadMinBytes         int64                           `json:"cleanupDownloadMinBytes"`
 	ScanTargets                     map[string][]metrics.ScanTarget `json:"scanTargets"`
 	Launcher                        LauncherConfig                  `json:"launcher"`
 	CalculatorFormat                CalculatorFormat                `json:"calculatorFormat"`
@@ -117,6 +119,9 @@ func parseConfig(data []byte) (Config, error) {
 	if len(c.ScanTargets) == 0 {
 		return c, fmt.Errorf("rockshinops.json: scanTargets is required")
 	}
+	if c.CleanupIdleDays < 1 || c.CleanupIdleDays > 3650 || c.CleanupDownloadMinBytes < 1 {
+		return c, fmt.Errorf("rockshinops.json: invalid quick cleanup thresholds")
+	}
 	if err := validatePreferences(c.defaultPreferences()); err != nil {
 		return c, fmt.Errorf("rockshinops.json: %w", err)
 	}
@@ -134,6 +139,15 @@ func parseConfig(data []byte) (Config, error) {
 		for _, target := range targets {
 			if target.Name == "" || !(filepath.IsAbs(target.Path) || strings.HasPrefix(target.Path, "~/")) {
 				return c, fmt.Errorf("rockshinops.json: each scan target requires a name and an absolute or ~/ path")
+			}
+			switch target.Cleanup {
+			case "":
+			case "idle", "downloads", "review":
+				if !strings.HasPrefix(target.Path, "~/") || !filepath.IsLocal(strings.TrimPrefix(target.Path, "~/")) || strings.TrimPrefix(target.Path, "~/") == "." {
+					return c, fmt.Errorf("rockshinops.json: quick cleanup targets must be below the home directory")
+				}
+			default:
+				return c, fmt.Errorf("rockshinops.json: unknown quick cleanup mode %q", target.Cleanup)
 			}
 		}
 	}

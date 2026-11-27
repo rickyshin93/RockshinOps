@@ -1,18 +1,22 @@
-import { useSyncExternalStore, type CSSProperties } from "react";
+import { createContext, useContext, useState, useSyncExternalStore, type CSSProperties } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { CleanupConfirmation, type CleanupConfirmationRequest } from "./cleanup-confirmation";
 import { icon } from "./icons";
-import { formatCapacity, percent, timeLabel } from "./format";
-import type { SpaceEntry, SpaceSummary, Volume } from "./mygo";
-import { emptyTrash, openFolder, scanSpace, showTab, spaceStore, stopScan, trashItem, type SpaceNotice, type SpaceTab } from "./space-store";
+import { formatBytes, formatCapacity, percent, timeLabel } from "./format";
+import { System, type CleanupFailure, type SpaceEntry, type SpaceSummary, type TrashReview, type Volume } from "./mygo";
+import { discardTrashReview, emptyTrash, openFolder, prepareTrash, scanSpace, showTab, spaceStore, stopScan, trashItem, type SpaceNotice, type SpaceTab } from "./space-store";
 
 const Icon = ({ name }: { name: string }) => <span className="inline-flex" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(name) }} />;
 const Tile = ({ name }: { name: string }) => <span className="content-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(name) }} />;
 const useSpace = () => useSyncExternalStore(spaceStore.subscribe, spaceStore.get, spaceStore.get);
 const share = (part: number, whole: number) => whole > 0 ? Math.min(1, Math.max(0, part / whole)) : 0;
+const SpaceConfirmation = createContext<((request: CleanupConfirmationRequest) => void) | null>(null);
 
 export function SpaceView({ volume, capacityError, isMacOS, openDiskAccess }: { volume: Volume; capacityError: string; isMacOS: boolean; openDiskAccess: () => void }) {
   const { t } = useTranslation();
   const space = useSpace();
+  const [confirmation, setConfirmation] = useState<CleanupConfirmationRequest | null>(null);
   const used = capacityError || volume.total <= 0 ? 0 : volume.total - volume.available;
   return <div className="space-page">
     <StorageCard volume={volume} capacityError={capacityError} summary={space.summary} />
@@ -23,7 +27,8 @@ export function SpaceView({ volume, capacityError, isMacOS, openDiskAccess }: { 
       <p>{t("扫描整块磁盘，按实际占用找出最大的文件夹和文件，再逐层打开查看。")}</p>
       <ul className="space-facts"><li>{t("只读取文件大小，不读取内容")}</li><li>{t("移入废纸篓前会再次确认")}</li><li>{t("文件较多时需要一两分钟")}</li></ul>
       <div className="space-intro-actions"><button className="primary-button" onClick={() => void scanSpace()}><Icon name="scan" />{t("开始扫描")}</button>{isMacOS && <button className="secondary-button" onClick={openDiskAccess}>{t("打开完全磁盘访问权限")}</button>}</div>
-    </section> : <Results summary={space.summary} isMacOS={isMacOS} openDiskAccess={openDiskAccess} volumeName={volume.name || volume.mount} />}
+    </section> : <SpaceConfirmation value={setConfirmation}><Results summary={space.summary} isMacOS={isMacOS} openDiskAccess={openDiskAccess} volumeName={volume.name || volume.mount} /></SpaceConfirmation>}
+    {confirmation && <CleanupConfirmation request={confirmation} onClose={() => setConfirmation(null)} />}
   </div>;
 }
 
@@ -57,11 +62,70 @@ function StorageCard({ volume, capacityError, summary }: { volume: Volume; capac
 
 function Notice({ notice }: { notice: SpaceNotice }) {
   const { t } = useTranslation();
+  if (notice.kind === "purged") return <div className={notice.failed.length || notice.postDeleteFailures.length ? "notice warning" : "notice"} role="status">
+    {notice.count > 0 && <p>{t("已永久删除 {{count}} 个文件或目录（{{size}}）。", { count: notice.count, size: formatBytes(notice.bytes) })}</p>}
+    <TrashIssues title={t("有 {{count}} 个顶层项目未完整删除", { count: notice.failed.length })} issues={notice.failed} />
+    <TrashIssues title={t("有 {{count}} 项删除后的清理步骤失败", { count: notice.postDeleteFailures.length })} issues={notice.postDeleteFailures} />
+  </div>;
   const text = notice.kind === "trashed" ? t("已将「{{name}}」（{{size}}）移入废纸篓。清空废纸篓后才会释放空间。", { name: notice.name, size: formatCapacity(notice.bytes) })
-    : notice.kind === "emptied" ? t("废纸篓已清空，释放约 {{size}}。", { size: formatCapacity(notice.bytes) })
+    : notice.kind === "trashEmpty" ? t("废纸篓没有可删除的项目。")
     : notice.kind === "cancelled" ? t("扫描已停止，保留上一次的结果。")
-    : `${t("操作未完成：")}${notice.message}`;
+    : `${t("操作未完成：")}${trashError(notice.message, t)}`;
   return <div className={notice.kind === "error" ? "notice error" : "notice"} role={notice.kind === "error" ? "alert" : "status"}>{text}</div>;
+}
+
+function trashError(message: string, t: TFunction) {
+  if (message === "trash_review_changed") return t("废纸篓内容已变化，请重新审阅。");
+  if (message === "trash_recovery_pending") return t("请查看保留在暂存位置的项目，再重新审阅。");
+  if (message === "trash_metadata_changed") return t("恢复信息已变化，已保留现有信息。");
+  if (message === "trash_metadata_invalid") return t("恢复信息不是可读取的普通文件，已保留。");
+  return message;
+}
+
+function TrashIssues({ title, issues }: { title: string; issues: CleanupFailure[] }) {
+  const { t } = useTranslation();
+  if (!issues.length) return null;
+  return <details open={issues.some(item => !!item.recoveryPath)}>
+    <summary>{title}</summary>
+    <ul className="cleanup-issues">{issues.map(item => <li key={item.path}>
+      <span className="path">{item.path}</span>
+      <span>{trashError(item.error, t)}</span>
+      {item.recoveryPath && <span>{t("项目保留在暂存位置 {{path}}", { path: item.recoveryPath })}</span>}
+    </li>)}</ul>
+  </details>;
+}
+
+function TrashManifest({ review }: { review: TrashReview }) {
+  const { t, i18n } = useTranslation();
+  const [page, setPage] = useState({ offset: 0, items: review.items });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const shown = page.offset + page.items.length;
+  const number = (value: number) => value.toLocaleString(i18n.language);
+
+  async function load(offset: number) {
+    setBusy(true);
+    setError("");
+    try {
+      const items = offset === 0 ? review.items : await System.trashReviewItems(review.id, offset);
+      setPage({ offset, items });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(false); }
+  }
+
+  return <section className="trash-manifest" aria-label={t("本次复核清单")} aria-busy={busy}>
+    <h3>{t("本次复核清单")}</h3>
+    <p>{t("清单显示每项占用，预计释放空间已合并共享的硬链接。")}</p>
+    <ul>{page.items.map(item => <li key={item.name}><span className="path">{item.name}</span><span>{formatBytes(item.bytes)}</span></li>)}</ul>
+    {review.count > review.items.length && <div className="trash-manifest-controls">
+      <span aria-live="polite">{t("第 {{first}}–{{last}} 项，共 {{total}} 项", { first: number(page.offset + 1), last: number(shown), total: number(review.count) })}</span>
+      <div>
+        <button className="secondary-button" disabled={busy || page.offset === 0} onClick={() => void load(page.offset - review.items.length)}>{t("上一页")}</button>
+        <button className="secondary-button" disabled={busy || shown >= review.count} onClick={() => void load(shown)}>{t("下一页")}</button>
+      </div>
+    </div>}
+    {error && <p role="alert">{trashError(error, t)}</p>}
+  </section>;
 }
 
 function ScanCard({ used }: { used: number }) {
@@ -98,9 +162,13 @@ function Results({ summary, isMacOS, openDiskAccess, volumeName }: { summary: Sp
 
 function TrashButton({ entry }: { entry: SpaceEntry }) {
   const { t } = useTranslation();
-  const { busy } = useSpace();
+  const { busy, summary } = useSpace();
+  const requestConfirmation = useContext(SpaceConfirmation)!;
   if (!entry.trashable) return <span className="space-trash" aria-hidden="true" />;
-  return <button className="space-trash" disabled={!!busy} aria-busy={busy === entry.path} aria-label={t("将「{{name}}」移入废纸篓", { name: entry.name })} title={t("移入废纸篓")} onClick={() => { if (window.confirm(t("将「{{name}}」（{{size}}）移入废纸篓？目录内的全部内容都会一起移动。路径：{{path}}", { name: entry.name, size: formatCapacity(entry.bytes), path: entry.path }))) void trashItem(entry); }}><Icon name="trash" /></button>;
+  return <button className="space-trash" disabled={!!busy} aria-busy={busy === entry.path} aria-label={t("将「{{name}}」移入废纸篓", { name: entry.name })} title={t("移入废纸篓")} aria-haspopup="dialog" onClick={() => requestConfirmation({
+    message: t("将「{{name}}」（{{size}}）移入废纸篓？目录内的全部内容都会一起移动。路径：{{path}}", { name: entry.name, size: formatCapacity(entry.bytes), path: entry.path }),
+    confirm: () => void trashItem(entry, summary?.id),
+  })}><Icon name="trash" /></button>;
 }
 
 function Folders({ volumeName }: { volumeName: string }) {
@@ -171,6 +239,7 @@ function LargestFiles({ summary }: { summary: SpaceSummary }) {
 function Suggestions({ summary }: { summary: SpaceSummary }) {
   const { t } = useTranslation();
   const { busy } = useSpace();
+  const requestConfirmation = useContext(SpaceConfirmation)!;
   const total = summary.suggestions.reduce((sum, item) => sum + item.bytes, 0);
   return <section className="space-card space-browser" aria-label={t("建议清理")}>
     <div className="space-browser-head"><h2>{t("常见可清理位置")}</h2><span className="space-head-size"><strong>{formatCapacity(total)}</strong><small>{t("合计")}</small></span></div>
@@ -182,8 +251,22 @@ function Suggestions({ summary }: { summary: SpaceSummary }) {
       </div>
       <div className="space-suggestion-actions">
         {item.found && item.bytes >= 1_000_000 && <button className="cleanup-action" onClick={() => void openFolder(item.path)}>{t("查看")}</button>}
-        {item.trash && <button className="space-danger" disabled={!!busy || !item.found || item.bytes === 0 && item.files === 0} aria-busy={busy === "trash"}
-          onClick={() => { if (window.confirm(t("永久删除废纸篓中的所有内容（{{size}}）？此操作不可恢复。路径：{{path}}", { size: formatCapacity(item.bytes), path: item.path }))) void emptyTrash(item.bytes); }}>{t("清空废纸篓")}</button>}
+        {item.trash && <button className="space-danger" disabled={!!busy || !item.found} aria-busy={busy === "trash" || busy === "trash-review"} aria-haspopup="dialog"
+          onClick={async event => {
+            const trigger = event.currentTarget;
+            const review = await prepareTrash();
+            if (!review) return;
+            if (!trigger.isConnected) {
+              void discardTrashReview(review.id);
+              return;
+            }
+            requestConfirmation({
+              message: t("永久删除废纸篓中已复核的 {{count}} 项，预计释放 {{size}}？此操作不可恢复。位置 {{path}}", { count: review.count, size: formatBytes(review.bytes), path: review.path }),
+              details: <TrashManifest review={review} />,
+              cancel: () => void discardTrashReview(review.id),
+              confirm: () => void emptyTrash(review), permanent: true,
+            });
+          }}>{busy === "trash-review" ? t("正在复核废纸篓…") : t("清空废纸篓")}</button>}
       </div>
     </div>)}</div>
     <p className="space-footnote">{t("缓存和日志可能仍被 App 使用，删除后 App 会按需重建。打开文件夹可逐项移入废纸篓。")}</p>

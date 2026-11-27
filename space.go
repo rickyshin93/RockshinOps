@@ -32,6 +32,7 @@ type SpaceSuggestion struct {
 }
 
 type SpaceSummary struct {
+	ID          uint64               `json:"id"`
 	Root        string               `json:"root"`
 	Bytes       int64                `json:"bytes"`
 	Files       int64                `json:"files"`
@@ -54,22 +55,22 @@ type SpaceProgress struct {
 // beginScan registers the running scan so CancelScan can stop it.
 func (s *System) beginScan(ctx context.Context) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
-	s.scanCancelMu.Lock()
-	s.scanCancel = cancel
-	s.scanCancelMu.Unlock()
+	s.files.space.cancelMu.Lock()
+	s.files.space.cancel = cancel
+	s.files.space.cancelMu.Unlock()
 	return ctx, func() {
 		cancel()
-		s.scanCancelMu.Lock()
-		s.scanCancel = nil
-		s.scanCancelMu.Unlock()
+		s.files.space.cancelMu.Lock()
+		s.files.space.cancel = nil
+		s.files.space.cancelMu.Unlock()
 	}
 }
 
 func (s *System) CancelScan() {
-	s.scanCancelMu.Lock()
-	defer s.scanCancelMu.Unlock()
-	if s.scanCancel != nil {
-		s.scanCancel()
+	s.files.space.cancelMu.Lock()
+	defer s.files.space.cancelMu.Unlock()
+	if s.files.space.cancel != nil {
+		s.files.space.cancel()
 	}
 }
 
@@ -150,10 +151,13 @@ func (s *System) scanSpace(ctx context.Context, mount string) (SpaceSummary, err
 		return SpaceSummary{}, err
 	}
 	progress := &metrics.SpaceProgress{}
-	if !s.spaceProgress.CompareAndSwap(nil, progress) {
+	if !s.files.space.progress.CompareAndSwap(nil, progress) {
 		return SpaceSummary{}, fmt.Errorf("a scan is already running")
 	}
-	defer s.spaceProgress.Store(nil)
+	defer s.files.space.progress.Store(nil)
+	s.files.space.mu.Lock()
+	revision := s.files.space.revision
+	s.files.space.mu.Unlock()
 	ctx, done := s.beginScan(ctx)
 	defer done()
 	started := time.Now()
@@ -168,15 +172,20 @@ func (s *System) scanSpace(ctx context.Context, mount string) (SpaceSummary, err
 	if err != nil {
 		return SpaceSummary{}, err
 	}
-	s.spaceMu.Lock()
-	defer s.spaceMu.Unlock()
-	s.spaceScope = scope
-	s.space, s.spaceSkipped, s.spaceStarted, s.spaceFinished = tree, progress.Skipped.Load(), started, time.Now()
+	s.files.space.mu.Lock()
+	defer s.files.space.mu.Unlock()
+	if revision != s.files.space.revision {
+		return SpaceSummary{}, fmt.Errorf("cleanup changed the disk during the scan; scan again")
+	}
+	s.files.space.scope = scope
+	s.files.space.id = s.files.reviews.Add(1)
+	s.files.space.trash = nil
+	s.files.space.tree, s.files.space.skipped, s.files.space.started, s.files.space.finished = tree, progress.Skipped.Load(), started, time.Now()
 	return s.spaceSummary(), nil
 }
 
 func (s *System) SpaceProgress() SpaceProgress {
-	progress := s.spaceProgress.Load()
+	progress := s.files.space.progress.Load()
 	if progress == nil {
 		return SpaceProgress{}
 	}
@@ -200,28 +209,30 @@ func shallowPath(path string, depth int) string {
 
 // SpaceListing returns a scanned folder; an empty path means the volume root.
 func (s *System) SpaceListing(path string) (metrics.SpaceListing, error) {
-	s.spaceMu.Lock()
-	defer s.spaceMu.Unlock()
-	if s.space == nil {
+	s.files.space.mu.Lock()
+	defer s.files.space.mu.Unlock()
+	if s.files.space.tree == nil {
 		return metrics.SpaceListing{}, fmt.Errorf("no scan result; scan again")
 	}
 	if path == "" {
-		path = s.space.Root()
+		path = s.files.space.tree.Root()
 	}
-	listing, err := s.space.Listing(path, 200)
+	listing, err := s.files.space.tree.Listing(path, 200)
 	if err != nil {
 		return listing, fmt.Errorf("folder is not in the scan result; scan again")
 	}
 	for i, child := range listing.Children {
-		listing.Children[i].Trashable = !child.Other && s.spaceScope.trashable(child.Path)
+		listing.Children[i].Trashable = !child.Other && s.files.space.scope.trashable(child.Path)
 	}
 	return listing, nil
 }
 
-func (s *System) TrashSpaceItem(path string) (SpaceSummary, error) {
-	s.spaceMu.Lock()
-	defer s.spaceMu.Unlock()
-	if s.space == nil || !s.spaceScope.trashable(path) {
+func (s *System) TrashSpaceItem(id uint64, path string) (SpaceSummary, error) {
+	s.files.writes.Lock()
+	defer s.files.writes.Unlock()
+	s.files.space.mu.Lock()
+	defer s.files.space.mu.Unlock()
+	if s.files.space.tree == nil || id != s.files.space.id || !s.files.space.scope.trashable(path) {
 		return SpaceSummary{}, fmt.Errorf("this item cannot be moved to the trash")
 	}
 	if err := s.matchesScan(path); err != nil {
@@ -231,7 +242,7 @@ func (s *System) TrashSpaceItem(path string) (SpaceSummary, error) {
 	var err error
 	if runtime.GOOS == "darwin" {
 		destination, err = mygo.Shell.TrashItemResult(path)
-		destination = s.spaceScope.treePath(destination)
+		destination = s.files.space.scope.treePath(destination)
 	} else {
 		err = mygo.Shell.TrashItem(path)
 		if trash := s.trashPath(); trash != "" {
@@ -241,30 +252,93 @@ func (s *System) TrashSpaceItem(path string) (SpaceSummary, error) {
 	if err != nil {
 		return SpaceSummary{}, err
 	}
-	s.space.Move(path, destination)
+	s.files.space.tree.Move(path, destination)
+	s.files.space.revision++
+	s.files.space.trash = nil
 	return s.spaceSummary(), nil
 }
 
-func (s *System) EmptySpaceTrash() (SpaceSummary, error) {
-	s.spaceMu.Lock()
-	defer s.spaceMu.Unlock()
+func (s *System) PrepareSpaceTrash(ctx context.Context, id uint64) (TrashReview, error) {
+	space := &s.files.space
+	space.mu.Lock()
+	if space.tree == nil || id != space.id {
+		space.mu.Unlock()
+		return TrashReview{}, fmt.Errorf("no matching space scan; scan again")
+	}
 	trash := s.trashPath()
-	if s.space == nil || trash == "" {
-		return SpaceSummary{}, fmt.Errorf("trash is not in the scan result; scan again")
-	}
 	if err := s.matchesScan(trash); err != nil {
-		return SpaceSummary{}, err
+		space.mu.Unlock()
+		return TrashReview{}, err
 	}
-	if err := emptyTrash(trash, runtime.GOOS); err != nil {
-		return SpaceSummary{}, err
+	revision := space.revision
+	space.mu.Unlock()
+
+	review, err := reviewTrash(ctx, trash, runtime.GOOS)
+	if err != nil {
+		return TrashReview{}, err
 	}
-	s.space.Clear(trash)
-	return s.spaceSummary(), nil
+	space.mu.Lock()
+	defer space.mu.Unlock()
+	if id != space.id || revision != space.revision {
+		return TrashReview{}, errTrashReviewChanged
+	}
+	review.summary.ID = s.files.reviews.Add(1)
+	space.trash = review
+	return review.summary, nil
+}
+
+func (s *System) DiscardTrashReview(reviewID uint64) {
+	space := &s.files.space
+	space.mu.Lock()
+	defer space.mu.Unlock()
+	if space.trash != nil && space.trash.summary.ID == reviewID {
+		space.trash = nil
+	}
+}
+
+func (s *System) TrashReviewItems(reviewID uint64, offset int) ([]TrashReviewItem, error) {
+	space := &s.files.space
+	space.mu.Lock()
+	defer space.mu.Unlock()
+	review := space.trash
+	if review == nil || review.summary.ID != reviewID {
+		return nil, errTrashReviewChanged
+	}
+	if offset < 0 || offset > len(review.names) {
+		return nil, fmt.Errorf("invalid trash review offset")
+	}
+	return review.items(offset), nil
+}
+
+func (s *System) EmptySpaceTrash(ctx context.Context, reviewID uint64) (SpaceTrashOutcome, error) {
+	s.files.writes.Lock()
+	defer s.files.writes.Unlock()
+	space := &s.files.space
+	space.mu.Lock()
+	defer space.mu.Unlock()
+	review := space.trash
+	if review == nil || review.summary.ID != reviewID {
+		return SpaceTrashOutcome{}, errTrashReviewChanged
+	}
+	space.trash = nil
+	result, empty, err := review.empty(ctx)
+	if err != nil {
+		return SpaceTrashOutcome{}, err
+	}
+	space.revision++
+	if empty {
+		space.tree.Clear(review.summary.Path)
+		summary := s.spaceSummary()
+		result.Summary = &summary
+	} else {
+		space.tree = nil
+	}
+	return result, nil
 }
 
 // matchesScan rejects paths replaced since the scan, where the platform reports identities.
 func (s *System) matchesScan(path string) error {
-	scanned, ok := s.space.Find(path)
+	scanned, ok := s.files.space.tree.Find(path)
 	if !ok {
 		return fmt.Errorf("item is not in the scan result; scan again")
 	}
@@ -272,7 +346,7 @@ func (s *System) matchesScan(path string) error {
 	if err != nil {
 		return err
 	}
-	old, _ := s.space.Identity(path)
+	old, _ := s.files.space.tree.Identity(path)
 	current, identified := metrics.FileIdentity(info)
 	if info.Mode()&os.ModeSymlink != 0 || info.IsDir() != scanned.Directory || identified && current != old {
 		return fmt.Errorf("item changed since the scan; scan again")
@@ -308,9 +382,9 @@ func relativeParts(base, path string) ([]string, bool) {
 }
 
 func (s *System) trashPath() string {
-	for _, target := range s.spaceScope.targets {
+	for _, target := range s.files.space.scope.targets {
 		if target.Name == trashTargetName {
-			if _, ok := s.space.Find(target.Path); ok {
+			if _, ok := s.files.space.tree.Find(target.Path); ok {
 				return target.Path
 			}
 		}
@@ -319,16 +393,16 @@ func (s *System) trashPath() string {
 }
 
 func (s *System) spaceSummary() SpaceSummary {
-	largest := s.space.Largest(50, s.trashPath())
+	largest := s.files.space.tree.Largest(50, s.trashPath())
 	for i, file := range largest {
-		largest[i].Trashable = s.spaceScope.trashable(file.Path)
+		largest[i].Trashable = s.files.space.scope.trashable(file.Path)
 	}
-	suggestions := make([]SpaceSuggestion, 0, len(s.spaceScope.targets))
-	for _, target := range s.spaceScope.targets {
-		entry, found := s.space.Find(target.Path)
+	suggestions := make([]SpaceSuggestion, 0, len(s.files.space.scope.targets))
+	for _, target := range s.files.space.scope.targets {
+		entry, found := s.files.space.tree.Find(target.Path)
 		suggestions = append(suggestions, SpaceSuggestion{Name: target.Name, Path: target.Path, Bytes: entry.Bytes, Files: entry.Files, Found: found, Trash: target.Name == trashTargetName})
 	}
-	top, _ := s.space.Listing(s.space.Root(), 5)
-	return SpaceSummary{Root: s.space.Root(), Bytes: s.space.Bytes(), Files: s.space.Files(), Skipped: s.spaceSkipped,
-		StartedAt: s.spaceStarted, FinishedAt: s.spaceFinished, Top: top.Children, Largest: largest, Suggestions: suggestions}
+	top, _ := s.files.space.tree.Listing(s.files.space.tree.Root(), 5)
+	return SpaceSummary{ID: s.files.space.id, Root: s.files.space.tree.Root(), Bytes: s.files.space.tree.Bytes(), Files: s.files.space.tree.Files(), Skipped: s.files.space.skipped,
+		StartedAt: s.files.space.started, FinishedAt: s.files.space.finished, Top: top.Children, Largest: largest, Suggestions: suggestions}
 }

@@ -1,3 +1,4 @@
+import { appUninstallStatus, installedAppsView } from "./app-uninstall";
 import { portsView } from "./ports-view";
 import { devicesView, type DevicesViewState } from "./devices-view";
 import { sensorsView } from "./sensors-view";
@@ -6,7 +7,7 @@ import { listeningPorts, filterPorts, type PortScope } from "./ports";
 import { windowRows, type TableWindow } from "./table-window";
 import { trendTime } from "./history";
 import { t, i18n } from "./i18n";
-import type { AppInfo, Snapshot, Trend, ProcessList, Connections, AppUsage, Process, InstalledApp, AppReview } from "./mygo";
+import type { AppInfo, Snapshot, Trend, ProcessList, Connections, AppUsage, Process } from "./mygo";
 import { capacityParts, duration, escapeHTML as e, formatBytes, formatCapacity, formatMemory, formatRate, memoryParts, percent, rateParts, timeLabel } from "./format";
 import { dots, lineChart, type TrendKey } from "./charts";
 import { appIcon, icon, processAppIcon } from "./icons";
@@ -68,13 +69,6 @@ export interface ViewState extends SettingsState, DevicesViewState, ClipboardVie
   busy: boolean;
   processError: string;
   connectionError: string;
-  appMode: boolean;
-  installedApps: InstalledApp[] | null;
-  appReview: AppReview | null;
-  appSelection: string[];
-  appBusy: boolean;
-  appSearching: boolean;
-  appMessage: string;
 }
 
 function isMac(state: ViewState): boolean { return state.info?.machine.platform === "darwin"; }
@@ -114,10 +108,10 @@ export function actionControls(state: ViewState): string {
 
 export function filterControls(state: ViewState): string {
   if (state.page === "clipboard") return clipboardFilters(state, state.query);
-  if (!["processes", "connections", "apps"].includes(state.page) || (state.page === "apps" && !!state.appReview)) return "";
-  const sorting = ["processes", "connections"].includes(state.page) || (state.page === "apps" && state.appMode) ? "" : sortControl(state.sort, state.page === "processes");
+  if (!["processes", "connections", "apps"].includes(state.page) || (state.page === "apps" && appUninstallStatus().reviewing)) return "";
+  const sorting = ["processes", "connections"].includes(state.page) || (state.page === "apps" && appUninstallStatus().installed) ? "" : sortControl(state.sort, state.page === "processes");
   const modes = state.page === "connections" ? `<div class="segmented connection-modes" role="group" aria-label="${t("连接视图")}"><button data-connection-mode="all" aria-pressed="${state.connectionMode !== "ports"}" class="${state.connectionMode !== "ports" ? "selected" : ""}">${t("全部连接")}</button><button data-connection-mode="ports" aria-pressed="${state.connectionMode === "ports"}" class="${state.connectionMode === "ports" ? "selected" : ""}">${t("开发端口")}</button></div>` : "";
-  return `${modes}<label class="search-field">${icon("search")}<input id="search" type="search" placeholder="${state.page === "connections" && state.connectionMode === "ports" ? t("搜索端口、进程或 PID") : ["processes", "connections"].includes(state.page) ? t("搜索") : state.page === "apps" && state.appMode ? t("搜索 App 名称或路径") : t("搜索名称或 PID")}" aria-label="${t("搜索")}${t(pages.find(p => p.id === state.page)!.title)}" value="${e(state.query)}" autocomplete="off" spellcheck="false"/></label>${sorting}${state.page === "processes" ? `<div class="segmented process-scopes" role="group" aria-label="${t("进程范围")}">${([["all", "全部"], ["apps", "App"], ["mine", "我的进程"], ["system", "系统"]] as const).map(([key, label]) => `<button data-process-scope="${key}" aria-pressed="${(state.processScope || "all") === key}" class="${(state.processScope || "all") === key ? "selected" : ""}">${t(label)}</button>`).join("")}</div>` : ""}`;
+  return `${modes}<label class="search-field">${icon("search")}<input id="search" type="search" placeholder="${state.page === "connections" && state.connectionMode === "ports" ? t("搜索端口、进程或 PID") : ["processes", "connections"].includes(state.page) ? t("搜索") : state.page === "apps" && appUninstallStatus().installed ? t("搜索 App 名称或路径") : t("搜索名称或 PID")}" aria-label="${t("搜索")}${t(pages.find(p => p.id === state.page)!.title)}" value="${e(state.query)}" autocomplete="off" spellcheck="false"/></label>${sorting}${state.page === "processes" ? `<div class="segmented process-scopes" role="group" aria-label="${t("进程范围")}">${([["all", "全部"], ["apps", "App"], ["mine", "我的进程"], ["system", "系统"]] as const).map(([key, label]) => `<button data-process-scope="${key}" aria-pressed="${(state.processScope || "all") === key}" class="${(state.processScope || "all") === key ? "selected" : ""}">${t(label)}</button>`).join("")}</div>` : ""}`;
 }
 
 function card(state: ViewState, page: Page, color: string, title: string, label: string, main: string, items: [string, string][], keys: TrendKey[], max = 100, status = ""): string {
@@ -372,34 +366,13 @@ function groupApps(processes: Process[]): AppUsage[] {
 }
 
 function appsView(state: ViewState): string {
-  const mode = isMac(state) ? `<div class="app-mode-toolbar"><div class="segmented"><button class="${!state.appMode ? "selected" : ""}" aria-pressed="${!state.appMode}" data-action="running-apps">${t("运行中的 App")}</button><button class="${state.appMode ? "selected" : ""}" aria-pressed="${state.appMode}" data-action="installed-apps">${t("已安装的 App")}</button></div></div>` : "";
-  if (isMac(state) && state.appMode) return mode + installedAppsView(state);
+  const mode = isMac(state) ? `<div class="app-mode-toolbar"><div class="segmented"><button class="${!appUninstallStatus().installed ? "selected" : ""}" aria-pressed="${!appUninstallStatus().installed}" data-action="running-apps">${t("运行中的 App")}</button><button class="${appUninstallStatus().installed ? "selected" : ""}" aria-pressed="${appUninstallStatus().installed}" data-action="installed-apps">${t("已安装的 App")}</button></div></div>` : "";
+  if (isMac(state) && appUninstallStatus().installed) return mode + installedAppsView(state.query);
   if (state.processError) return mode + empty(t("无法读取 App"), state.processError, `<button data-action="refresh">${t("重试")}</button>`);
   if (!state.processes) return mode + empty(t("正在读取运行中的 App"), t("将同一个 App 包中的进程归并显示。"));
   const apps = groupApps(state.processes.items).filter(app => `${app.name} ${app.path}`.toLowerCase().includes(state.query.toLowerCase()));
   apps.sort((a, b) => state.sort === "name" ? a.name.localeCompare(b.name) : state.sort === "cpu" ? b.cpu - a.cpu : b.memory - a.memory);
   return mode + `<div class="result-summary"><span>${apps.length} ${t("个正在运行的 App")}</span><span>${(isMac(state) ? t("按 App 包路径归并 · 不含未启动的 App") : t("按可执行文件路径归并 · 仅含运行中的进程"))}</span></div>${apps.length ? `<div class="app-list"><div class="app-row app-head"><span>App</span><span>${t("物理占用")}</span><span>CPU</span><span>${t("进程")}</span></div>${apps.map(app => `<button class="app-row" data-app="${e(app.path)}">${appIcon(app.path, isMac(state))}<span class="app-name"><strong>${e(app.name)}</strong><small>${e(app.path)}</small></span><span>${formatMemory(app.memory)}</span><span>${app.cpuReady ? percent(app.cpu) : t("采样中")}</span><span>${app.processes}</span><span class="card-chevron">${icon("chevron")}</span></button>`).join("")}</div>` : empty(t("没有匹配的 App"), t("试试其他名称，或查看完整进程列表。"))}${note((isMac(state) ? t("只读查看运行状态。物理占用来自各进程 phys_footprint 之和；此页面不执行卸载或删除应用数据。") : t("只读查看运行状态。内存为各进程 RSS 之和，共享页可能重复计入；此页面不执行卸载或删除。")))}`;
-}
-
-function appScanCoverage(review: AppReview): string {
-  if (!review.scanIssues.length) return "";
-  const issueLabel = (kind: string) => kind === "permission" ? t("没有访问权限") : kind === "changed" ? t("扫描期间位置已变化") : t("读取失败");
-  const permission = review.scanIssues.some(issue => issue.kind === "permission") ? `<div class="disk-access-prompt" role="status"><div><strong>${t("部分位置需要访问权限")}</strong><p>${t("开启完全磁盘访问权限可扩大搜索范围。在系统设置中允许 RockshinOps；若列表里没有，点“+”添加。开启后退出并重新打开 RockshinOps，再重新搜索。部分系统目录仍可能受限。")}</p></div><button class="secondary-button" data-action="open-full-disk-access">${t("打开完全磁盘访问权限")}</button></div>` : "";
-  return permission + `<details class="uninstall-coverage"><summary><strong>${t("扫描覆盖范围受限")}</strong><span>${t("未读取的位置：{{count}} 个", { count: review.scanIssues.length })}</span></summary><p>${t("这是整个搜索范围的访问情况，不是此 App 的残留数量。已找到的项目仍可核对清理；未读取的位置中可能还有关联文件。")}</p><ul>${review.scanIssues.map(issue => `<li><span class="path">${e(issue.path)}</span><small>${e(issueLabel(issue.kind))} · ${e(issue.error)}</small></li>`).join("")}</ul></details>`;
-}
-
-function installedAppsView(state: ViewState): string {
-  const message = state.appMessage ? notice(state.appMessage) : "";
-  if (state.appBusy && !state.appReview) return message + empty(t("正在读取 App"), t("请稍候。"));
-  if (state.appReview) {
-    const review = state.appReview;
-    const selected = state.appSelection.length;
-    const allSelected = review.files.length > 0 && selected === review.files.length;
-    return message + `<button class="cleanup-action uninstall-back" data-action="installed-apps" ${state.appBusy ? "disabled" : ""}>${t("返回应用列表")}</button><section class="uninstall-review"><div class="uninstall-heading">${appIcon(review.app.path, true)}<div><h2>${e(review.app.name)}</h2><p class="path">${e(review.bundleId || review.app.path)}</p></div></div><p class="uninstall-guidance">${t("请逐项核对后选择。名称匹配可能属于共享数据；搜索无法保证找到所有残留。移除前请退出 App。")}</p>${state.appSearching ? `<div class="uninstall-progress" role="status"><span class="loading-dot" aria-hidden="true"></span><span>${t("正在继续搜索关联文件…")}</span><button class="cleanup-action" data-action="stop-app-search">${t("停止搜索")}</button></div>` : ""}${appScanCoverage(review)}<div class="uninstall-list-heading"><label><input type="checkbox" data-app-select-all="true" aria-label="${t("全选关联项目")}" ${allSelected ? "checked" : ""} ${state.appBusy && !state.appSearching ? "disabled" : ""}><span class="uninstall-list-title">${t("关联项目")}</span></label><span>${t("已选择 {{selected}} / {{total}} 项", { selected, total: review.files.length })}</span></div><div class="uninstall-list">${review.files.map(file => `<label><input type="checkbox" data-app-file="${e(file.path)}" ${state.appBusy && !state.appSearching ? "disabled" : ""} ${state.appSelection.includes(file.path) ? "checked" : ""}><span><strong class="path">${e(file.path)}</strong><small>${e(t(file.reason))}</small></span></label>`).join("")}</div><div class="uninstall-actions"><span>${state.appSearching ? t("搜索完成或停止后可移入废纸篓。") : t("所选项目将移入废纸篓。")}</span><button class="primary-button" data-action="remove-app-files" ${selected && !state.appBusy ? "" : "disabled"}>${t("移入废纸篓")}</button></div></section>`;
-  }
-  if (!state.installedApps) return message + empty(t("无法读取已安装的 App"), t("请重试。"));
-  const apps = state.installedApps.filter(app => `${app.name} ${app.path}`.toLowerCase().includes(state.query.toLowerCase()));
-  return message + `<div class="installed-hint"><span>${t("选择 App 后可查看应用包和可能的关联文件。")}</span><button class="cleanup-action" data-action="open-full-disk-access">${t("打开完全磁盘访问权限")}</button></div>` + (apps.length ? `<div class="app-list installed-list">${apps.map(app => `<button data-review-app="${e(app.path)}">${appIcon(app.path, true)}<span><strong>${e(app.name)}</strong><small class="path">${e(app.path)}</small></span>${icon("chevron")}</button>`).join("")}</div>` : empty(t("没有匹配的 App"), t("试试其他名称或路径。")));
 }
 
 function aboutView(state: ViewState): string {

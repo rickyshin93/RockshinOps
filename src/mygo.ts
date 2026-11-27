@@ -141,6 +141,47 @@ export interface CalculatorSheet {
   maxDecimalPlaces: number;
 }
 
+export interface CleanupCategory {
+  name: string;
+  mode: string;
+  path: string;
+  items: CleanupItem[];
+  skipped: number;
+  error: string;
+}
+
+export interface CleanupFailure {
+  path: string;
+  changed: boolean;
+  error: string;
+  recoveryPath?: string;
+}
+
+export interface CleanupItem {
+  name: string;
+  path: string;
+  bytes: number;
+  recommended: boolean;
+  directory: boolean;
+}
+
+export interface CleanupOutcome {
+  moved: CleanupItem[];
+  failed: CleanupFailure[];
+}
+
+export interface CleanupProgress {
+  total: number;
+  completed: number;
+  category: string;
+}
+
+export interface CleanupScan {
+  id: number;
+  idleDays: number;
+  categories: CleanupCategory[];
+}
+
 export interface Connection {
   metrics?: ConnectionMetrics;
   pid: number;
@@ -211,6 +252,11 @@ export interface FanReading {
   minRPM: number | null;
   maxRPM: number | null;
   source: string;
+}
+
+export interface FileOutcome {
+  succeeded: string[];
+  failed: CleanupFailure[];
 }
 
 export interface GPU {
@@ -403,6 +449,7 @@ export interface ProcessList {
 export interface ScanTarget {
   name: string;
   path: string;
+  cleanup?: string;
 }
 
 export interface SensorReading {
@@ -506,6 +553,7 @@ export interface SpaceSuggestion {
 }
 
 export interface SpaceSummary {
+  id: number;
   root: string;
   bytes: number;
   files: number;
@@ -515,6 +563,14 @@ export interface SpaceSummary {
   top: SpaceEntry[];
   largest: SpaceEntry[];
   suggestions: SpaceSuggestion[];
+}
+
+export interface SpaceTrashOutcome {
+  summary?: SpaceSummary;
+  bytes: number;
+  deleted: number;
+  outcome: FileOutcome;
+  postDeleteFailures: CleanupFailure[];
 }
 
 export interface StartupSettings {
@@ -554,6 +610,19 @@ export interface Thermal {
   pressure: string;
   source: string;
   error: string;
+}
+
+export interface TrashReview {
+  id: number;
+  path: string;
+  bytes: number;
+  count: number;
+  items: TrashReviewItem[];
+}
+
+export interface TrashReviewItem {
+  name: string;
+  bytes: number;
 }
 
 export interface Trend {
@@ -629,8 +698,10 @@ export const System = {
   calculatorSheet: bind<[], CalculatorSheet>("System.CalculatorSheet", () => []),
   calculatorUpdate: bind<[string, string], CalculationEntry>("System.CalculatorUpdate", (createdAt: string, expression: string) => [createdAt, expression]),
   cancelAppReview: bind<[number], void>("System.CancelAppReview", (id: number) => [id]),
+  cancelCleanupScan: bind<[], void>("System.CancelCleanupScan", () => []),
   cancelScan: bind<[], void>("System.CancelScan", () => []),
   checkForUpdates: bind<[], void>("System.CheckForUpdates", () => []),
+  cleanupProgress: bind<[], CleanupProgress>("System.CleanupProgress", () => []),
   clearClipboardHistory: bind<[], void>("System.ClearClipboardHistory", () => []),
   clipboardHistory: bind<[string], LauncherSearch>("System.ClipboardHistory", (query: string) => [query]),
   connections: bind<[], Connections>("System.Connections", () => []),
@@ -638,7 +709,8 @@ export const System = {
   copyPortAddress: bind<[string], void>("System.CopyPortAddress", (address: string) => [address]),
   deviceAction: bind<[string, string, number], DeviceState>("System.DeviceAction", (action: string, id: string, value: number) => [action, id, value]),
   devices: bind<[], DeviceState>("System.Devices", () => []),
-  emptySpaceTrash: bind<[], SpaceSummary>("System.EmptySpaceTrash", () => []),
+  discardTrashReview: bind<[number], void>("System.DiscardTrashReview", (reviewID: number) => [reviewID]),
+  emptySpaceTrash: bind<[number], SpaceTrashOutcome>("System.EmptySpaceTrash", (reviewID: number) => [reviewID]),
   /** An absent file means no favorites, including on upgrades. */
   favoritePorts: bind<[], number[]>("System.FavoritePorts", () => []),
   hideWindow: bind<[], void>("System.HideWindow", () => []),
@@ -666,10 +738,12 @@ export const System = {
   /** OpenShortcutSettings opens the Keyboard settings, where Spotlight's shortcut is turned off. */
   openShortcutSettings: bind<[], void>("System.OpenShortcutSettings", () => []),
   preferences: bind<[], Preferences>("System.Preferences", () => []),
+  prepareSpaceTrash: bind<[number], TrashReview>("System.PrepareSpaceTrash", (id: number) => [id]),
   processes: bind<[], ProcessList>("System.Processes", () => []),
   refresh: bind<[], Snapshot>("System.Refresh", () => []),
   refreshDevices: bind<[], DeviceState>("System.RefreshDevices", () => []),
-  removeAppFiles: bind<[string[]], void>("System.RemoveAppFiles", (paths: string[]) => [paths]),
+  removeAppFiles: bind<[number, string[]], FileOutcome>("System.RemoveAppFiles", (id: number, paths: string[]) => [id, paths]),
+  revealCleanupItem: bind<[number, string], void>("System.RevealCleanupItem", (id: number, path: string) => [id, path]),
   reviewApp: bind<[string, number], AppReview>("System.ReviewApp", (path: string, id: number) => [path, id]),
   reviewAppQuick: bind<[string], AppReview>("System.ReviewAppQuick", (path: string) => [path]),
   saveCalculatorFormat: bind<[CalculatorFormat], void>("System.SaveCalculatorFormat", (format: CalculatorFormat) => [format]),
@@ -677,6 +751,7 @@ export const System = {
   saveFavoritePorts: bind<[number[]], number[]>("System.SaveFavoritePorts", (ports: number[]) => [ports]),
   saveMenuBarSettings: bind<[Settings], MenuBarConfiguration>("System.SaveMenuBarSettings", (next: Settings) => [next]),
   savePreferences: bind<[Preferences], Preferences>("System.SavePreferences", (p: Preferences) => [p]),
+  scanCleanup: bind<[], CleanupScan>("System.ScanCleanup", () => []),
   /**
    * ScanSpace measures the volume holding the home directory once; browsing and
    * cleanup then use the in-memory result until the next scan.
@@ -694,7 +769,9 @@ export const System = {
   startupSettings: bind<[], StartupSettings>("System.StartupSettings", () => []),
   terminatePortProcess: bind<[number, string, number], void>("System.TerminatePortProcess", (pid: number, identity: string, port: number) => [pid, identity, port]),
   terminateProcess: bind<[number, string, boolean], void>("System.TerminateProcess", (pid: number, identity: string, force: boolean) => [pid, identity, force]),
-  trashSpaceItem: bind<[string], SpaceSummary>("System.TrashSpaceItem", (path: string) => [path]),
+  trashCleanup: bind<[number, string[]], CleanupOutcome>("System.TrashCleanup", (id: number, paths: string[]) => [id, paths]),
+  trashReviewItems: bind<[number, number], TrashReviewItem[]>("System.TrashReviewItems", (reviewID: number, offset: number) => [reviewID, offset]),
+  trashSpaceItem: bind<[number, string], SpaceSummary>("System.TrashSpaceItem", (id: number, path: string) => [id, path]),
 } as const;
 
 // ---- Events ----

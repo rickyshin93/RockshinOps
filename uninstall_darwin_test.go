@@ -87,12 +87,12 @@ func TestAppReviewDoesNotWaitForDiskScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &System{}
-	quick, err := s.ReviewAppQuick(app)
+	quick, err := s.ReviewAppQuick(context.Background(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.spaceMu.Lock()
-	defer s.spaceMu.Unlock()
+	s.files.space.mu.Lock()
+	defer s.files.space.mu.Unlock()
 	done := make(chan error, 1)
 	go func() { done <- s.CancelAppReview(quick.ReviewID) }()
 	select {
@@ -133,7 +133,7 @@ func TestReviewAppFindsCandidatesWithoutSelectingThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &System{}
-	quick, err := s.ReviewAppQuick(app)
+	quick, err := s.ReviewAppQuick(context.Background(), app)
 	if err != nil || !slices.ContainsFunc(quick.Files, func(file AppFile) bool { return file.Path == cache }) {
 		t.Fatalf("quick review missed the common cache: %+v %v", quick, err)
 	}
@@ -154,7 +154,7 @@ func TestReviewAppFindsCandidatesWithoutSelectingThem(t *testing.T) {
 	if _, err := os.Stat(cache); err != nil {
 		t.Fatal("review modified candidate", err)
 	}
-	if _, err := s.ReviewAppQuick(filepath.Join(home, "not-an-app")); err == nil {
+	if _, err := s.ReviewAppQuick(context.Background(), filepath.Join(home, "not-an-app")); err == nil {
 		t.Fatal("accepted an unlisted app")
 	}
 }
@@ -355,7 +355,7 @@ func TestQuickReviewFindsSystemCacheSibling(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(app, "Contents", "Info.plist"), []byte(`<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>test.example.app</string></dict></plist>`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	review, err := (&System{}).ReviewAppQuick(app)
+	review, err := (&System{}).ReviewAppQuick(context.Background(), app)
 	if err != nil || !slices.ContainsFunc(review.Files, func(f AppFile) bool { return f.Path == cache }) {
 		t.Fatalf("quick review missed system cache: %+v %v", review.Files, err)
 	}

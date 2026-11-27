@@ -72,19 +72,29 @@
       }
     }
   },
+  "cleanupIdleDays": 30,
+  "cleanupDownloadMinBytes": 100000000,
   "scanTargets": {
     "darwin": [
       {
         "name": "应用缓存",
-        "path": "~/Library/Caches"
+        "path": "~/Library/Caches",
+        "cleanup": "idle"
       },
       {
         "name": "应用日志",
-        "path": "~/Library/Logs"
+        "path": "~/Library/Logs",
+        "cleanup": "idle"
       },
       {
         "name": "下载文件",
-        "path": "~/Downloads"
+        "path": "~/Downloads",
+        "cleanup": "downloads"
+      },
+      {
+        "name": "Xcode 构建缓存",
+        "path": "~/Library/Developer/Xcode/DerivedData",
+        "cleanup": "review"
       },
       {
         "name": "废纸篓",
@@ -94,17 +104,20 @@
     "windows": [
       {
         "name": "临时文件",
-        "path": "~/AppData/Local/Temp"
+        "path": "~/AppData/Local/Temp",
+        "cleanup": "idle"
       },
       {
         "name": "下载文件",
-        "path": "~/Downloads"
+        "path": "~/Downloads",
+        "cleanup": "downloads"
       }
     ],
     "linux": [
       {
         "name": "应用缓存",
-        "path": "~/.cache"
+        "path": "~/.cache",
+        "cleanup": "idle"
       },
       {
         "name": "应用日志",
@@ -112,7 +125,8 @@
       },
       {
         "name": "下载文件",
-        "path": "~/Downloads"
+        "path": "~/Downloads",
+        "cleanup": "downloads"
       },
       {
         "name": "废纸篓",

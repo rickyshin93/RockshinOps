@@ -5,7 +5,7 @@ import { LauncherSettingsView } from "./launcher-settings-view";
 import { CalculatorView, type CalculatorImport } from "./calculator-view";
 import { SettingsView } from "./settings-view";
 import { MenuBarView } from "./menu-bar-view";
-import { SpaceView } from "./space-view";
+import { CleanupView } from "./cleanup-view";
 import { i18n, type Language } from "./i18n";
 import type { ViewState } from "./views";
 
@@ -26,7 +26,7 @@ export function renderReactPage(container: HTMLElement, state: ViewState, onLang
   } else if (state.page === "cleanup") {
     menuProps = null;
     const disk = state.snapshot?.disk;
-    if (disk) root.render(createElement(I18nextProvider, { i18n }, createElement(SpaceView, { volume: disk.volume, capacityError: disk.capacityError, isMacOS, openDiskAccess })));
+    if (disk) root.render(createElement(I18nextProvider, { i18n }, createElement(CleanupView, { volume: disk.volume, capacityError: disk.capacityError, isMacOS, openDiskAccess, targets: state.info?.scanTargets ?? [] })));
   } else if (state.page === "launcher") {
     menuProps = null;
     root.render(createElement(I18nextProvider, { i18n }, createElement(LauncherSettingsView, { state, isMacOS, onLauncherShortcut })));

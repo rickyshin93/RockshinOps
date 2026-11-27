@@ -144,9 +144,11 @@ func (s *System) SavePreferences(p Preferences) (Preferences, error) {
 	}
 	s.preferences = p
 	s.preferences.MenuBarItems = append([]string{}, p.MenuBarItems...)
-	s.update(s.monitor.Current())
+	frame, publish := s.trayFrameLocked(s.monitor.Current())
 	s.mu.Unlock()
-	applyLanguage(p.Language)
+	if publish != nil {
+		publish(frame)
+	}
 	return p, nil
 }
 

@@ -1,12 +1,16 @@
 RockshinOps is a local desktop system monitor with persistent menu bar metrics, English/Chinese UI, process and app inspection, disk space analysis, selected cleanup and macOS app removal.
 
-### Changes in v0.3.4
+### Changes in v0.3.5
 
-- On macOS, Launcher places matching apps from `/Applications` and `~/Applications` first and ranks those apps by name match.
+- **Quick Cleanup** finds older caches, logs and temporary files. Search and review your selection before moving items to the system Trash. Downloads and Xcode build caches require manual selection.
+- **Empty Trash** shows a paged review with per-item usage and a space estimate that accounts for hard links. Permanent deletion verifies file contents after staging, preserves changed items and Linux restore information, and reports incomplete operations with recovery paths when available.
+- Preference changes keep tray updates in order. Calculator input-source switching runs when entering or leaving the page.
 
 ### 中文
 
-- macOS 启动器优先显示 `/Applications` 和 `~/Applications` 里的匹配应用，组内按名称匹配度排序。
+- **快速清理**可筛选较旧的缓存、日志和临时文件，复核所选项目后移入系统废纸篓。下载文件和 Xcode 构建缓存需手动选中。
+- **清空废纸篓**前可分页复核每项占用和预计释放空间，合计按共享硬链接去重。永久删除在暂存后核对文件内容，保留发生变化的条目和 Linux 恢复信息，并报告部分失败和可用的恢复路径。
+- 设置变更期间保持菜单栏更新顺序。计算器只在进入或离开页面时切换输入源。
 
 ### Upgrade notice / 升级说明
 
@@ -20,7 +24,7 @@ macOS builds remain ad-hoc signed and not notarized; Accessibility or Screen Rec
 
 - **macOS Apple Silicon:** the `arm64.dmg` file.
 - **macOS Intel:** the `amd64.dmg` file.
-- **Windows x86_64:** the `rockshinops-setup-0.3.4-amd64.exe` installer.
+- **Windows x86_64:** the `rockshinops-setup-0.3.5-amd64.exe` installer.
 - **Linux x86_64:** the `.deb` package or `.tar.gz` archive (extract and run `./rockshinops`; no install script is included).
 - `SHA256SUMS.txt` contains checksums for all packages. `update-*.json` and the macOS/Windows `.tar.gz` files are consumed by the updater; choose the installers above for manual installation.
 

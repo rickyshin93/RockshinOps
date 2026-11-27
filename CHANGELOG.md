@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.5
+
+- Add Quick Cleanup for older caches, logs and temporary files. Search and review selected items before moving them to the system Trash. Downloads and Xcode build caches require manual selection.
+- Review a paged list before emptying the Trash. Permanent deletion checks file contents after staging, preserves changed items and Linux restore metadata, and reports incomplete operations with recovery paths when available.
+- Show per-item disk usage and account for shared hard links in the estimated space to free. Canceling releases the review.
+- Keep tray updates in order during preference changes and limit input-source transitions to entering and leaving Calculator.
+
+### 中文
+
+- 新增「快速清理」，可筛选和复核较旧的缓存、日志与临时文件，再移入系统废纸篓。下载文件和 Xcode 构建缓存需手动选中。
+- 清空废纸篓前可分页复核。永久删除在暂存后核对文件内容，保留发生变化的条目和 Linux 恢复信息，并报告部分失败和可用的恢复路径。
+- 清单显示每项磁盘占用，预计释放空间按共享硬链接去重。取消时释放本次复核。
+- 设置变更期间保持菜单栏更新顺序，只在进入或离开计算器时切换输入源。
+
 ## 0.3.4
 
 - On macOS, Launcher places matching apps from `/Applications` and `~/Applications` first and ranks those apps by name match.
